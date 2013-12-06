@@ -167,7 +167,7 @@ final class Long private (
     )
 
     val (a0, a1, a2, a3, a4) = chunk13(x)
-    val (b0, b1, b2, b3, b4) = chunk13(x)
+    val (b0, b1, b2, b3, b4) = chunk13(y)
 
     // Compute partial products
     // Optimization: if b is small, avoid multiplying by parts that are 0
