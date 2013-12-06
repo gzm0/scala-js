@@ -238,7 +238,8 @@ final class Long private (
 
   // Any API //
 
-  override def toString: String =
+  override def toString: String = {
+    println(f"toString on h: $h%0#10x m: $m%0#10x l: $l%0#10x")
     if (isZero) "0"
     // Check for MinValue, because its not negatable
     else if (isMinValue) "-9223372036854775808"
@@ -264,6 +265,7 @@ final class Long private (
 
       toString0(x, "")
     }
+  }
 
   // helpers //
 
