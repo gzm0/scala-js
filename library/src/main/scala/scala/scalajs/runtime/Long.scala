@@ -253,6 +253,8 @@ final class Long private (
     else if (isMinValue) "-9223372036854775808"
     else if (isNegative) "-" + (-x).toString
     else {
+      assert(!isNegative)
+
       val tenPowZeros = 9
       val tenPow = 1000000000
       val tenPowL = fromInt(tenPow)
@@ -305,11 +307,11 @@ final class Long private (
 
   private def setBit(bit: Int) =
     if (bit < BITS)
-      Long(l | (0x1 << bit), m, h)
+      Long(l | (1 << bit), m, h)
     else if (bit < BITS01)
-      Long(l, m | (0x1 << (bit - BITS)), h)
+      Long(l, m | (1 << (bit - BITS)), h)
     else
-      Long(l, m, h | (0x1 << (bit - BITS01)))
+      Long(l, m, h | (1 << (bit - BITS01)))
 
   private def divMod(y: Long): (Long, Long) = {
     if (y.isZero) throw new ArithmeticException("/ by zero")
