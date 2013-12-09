@@ -122,12 +122,12 @@ final class Long private (
       signy != 0 ||
       x.h >  y.h ||
       x.h == y.h && x.m >  y.m ||
-      x.h == y.h && x.m == y.m || x.l >  y.l
+      x.h == y.h && x.m == y.m && x.l >  y.l
     else !(
       signy == 0 ||
       x.h <  y.h ||
       x.h == y.h && x.m <  y.m ||
-      x.h == y.h && x.m == y.m || x.l <= y.l
+      x.h == y.h && x.m == y.m && x.l <= y.l
     )
   }
 
