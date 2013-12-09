@@ -238,10 +238,16 @@ final class Long private (
 
   //override def getClass(): Class[Long] = null
 
+  /** helper for testing */
+  def toHexString: String = {
+    val mp = m >> 2
+    val lp = l | ((m & 0x3) << BITS)
+    f"$h%05x$mp%05x$lp%06x"
+  }
+
   // Any API //
 
   override def toString: String = {
-    println(f"toString on h: $h%0#10x m: $m%0#10x l: $l%0#10x")
     if (isZero) "0"
     // Check for MinValue, because its not negatable
     else if (isMinValue) "-9223372036854775808"

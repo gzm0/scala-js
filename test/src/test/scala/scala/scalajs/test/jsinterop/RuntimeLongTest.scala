@@ -18,7 +18,7 @@ import scala.scalajs.runtime.Long
 object RuntimeLongTest extends ScalaJSTest {
 
   /** overload expect for long to add toString */
-  def expect(l: Long): JasmineExpectation = expect(l.toString)
+  def expect(l: Long): JasmineExpectation = expect(l.toHexString)
 
   describe("scala.scalajs.runtime.Long") {
 
@@ -27,38 +27,38 @@ object RuntimeLongTest extends ScalaJSTest {
     val one    = Long.fromInt(1)
 
     it("should correctly implement negation") {
-      expect(-Long.fromInt(5)).toEqual("-5")
-      expect(-Long.fromInt(0)).toEqual("0")
-      expect(-minInt).toEqual("2147483648")
+      expect(-Long.fromInt(5)).toEqual("fffffffffffffffb")
+      expect(-Long.fromInt(0)).toEqual("0000000000000000")
+      expect(-minInt).toEqual(         "0000000080000000")
     }
 
     it("should correctly implement addition") {
-      expect(Long.fromInt(7) + Long.fromInt(15)).toEqual("22")
-      expect(maxInt + maxInt).toEqual("4294967294")
+      expect(Long.fromInt(7) + Long.fromInt(15)).toEqual("0000000000000016")
+      expect(maxInt + maxInt).toEqual(                   "00000000fffffffe")
     }
 
     it("should correctly implement subtraction") {
-      expect(Long.fromInt(7) - Long.fromInt(15)).toEqual("-8")
-      expect(maxInt - maxInt).toEqual("0")
+      expect(Long.fromInt(7) - Long.fromInt(15)).toEqual("fffffffffffffff8")
+      expect(maxInt - maxInt).toEqual(                   "0000000000000000")
     }
 
     it("should correctly implement multiplication") {
-      expect(Long.fromInt(7)  * Long.fromInt(15)).toEqual("105")
-      expect(Long.fromInt(-7) * Long.fromInt(15)).toEqual("-105")
-      expect(maxInt * maxInt).toEqual("4611686014132420609")
+      expect(Long.fromInt(7)  * Long.fromInt(15)).toEqual("0000000000000069")
+      expect(Long.fromInt(-7) * Long.fromInt(15)).toEqual("ffffffffffffff97")
+      expect(maxInt * maxInt).toEqual(                    "3fffffff00000001")
     }
 
     it("should correctly implement division") {
-      expect(Long.fromInt(7)  / Long.fromInt(15)).toEqual("0")
-      expect(Long.fromInt(24) / Long.fromInt(5)).toEqual("4")
-      expect(Long.fromInt(24) / Long.fromInt(-5)).toEqual("-4")
-      expect(maxInt / Long.fromInt(-5)).toEqual("429496729")
+      expect(Long.fromInt(7)  / Long.fromInt(15)).toEqual("0000000000000000")
+      expect(Long.fromInt(24) / Long.fromInt(5)).toEqual( "0000000000000004")
+      expect(Long.fromInt(24) / Long.fromInt(-5)).toEqual("fffffffffffffffc")
+      expect(maxInt / Long.fromInt(-5)).toEqual(          "ffffffffe6666667")
     }
 
     it("should correctly implement toString") {
-      expect(maxInt).toEqual("2147483647")
-      expect(maxInt+one).toEqual("2147483648")
-      expect(minInt).toEqual("-2147483648")
+      expect(maxInt.toString).toEqual("2147483647")
+      expect((maxInt+one).toString).toEqual("2147483648")
+      expect(minInt.toString).toEqual("-2147483648")
     }
 
   }
