@@ -228,9 +228,9 @@ final class Long private (
     val c2 = c22 + c23 + c24;
 
     // Propagate high bits from c0 -> c1, c1 -> c2
-    val c1n = c1 + c0 >> BITS
+    val c1n = c1 + (c0 >> BITS)
 
-    masked(c0, c1n, c2 + c1n >> BITS)
+    masked(c0, c1n, c2 + (c1n >> BITS))
   }
 
   def /(y: Long): Long = (x divMod y)._1
