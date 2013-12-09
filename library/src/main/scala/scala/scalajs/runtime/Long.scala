@@ -21,7 +21,12 @@ final class Long private (
 
   import Long._
 
+  def toByte: Byte = toInt.toByte
+  def toShort: Short = toInt.toShort
+  def toChar: Char = toInt.toChar
   def toInt: Int = l | (m << BITS)
+  def toLong: Long = x
+  def toFloat: Float = toDouble.toFloat
   def toDouble: Double =
     if (isMinValue) -9223372036854775808.0
     else if (isNegative) -((-x).toDouble)
