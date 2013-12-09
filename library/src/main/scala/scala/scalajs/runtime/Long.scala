@@ -22,6 +22,10 @@ final class Long private (
   import Long._
 
   def toInt: Int = l | (m << BITS)
+  def toDouble: Double =
+    if (isMinValue) -9223372036854775808.0
+    else if (isNegative) -((-x).toDouble)
+    else l + m * TWO_PWR_22_DBL + h * TWO_PWR_44_DBL
 
   def unary_~ : Long = masked(~x.l, ~x.m, ~x.h)
   def unary_+ : Long = x
@@ -387,15 +391,30 @@ object Long {
   private val TWO_PWR_44_DBL: Double = TWO_PWR_22_DBL * TWO_PWR_22_DBL
   private val TWO_PWR_63_DBL: Double = TWO_PWR_32_DBL * TWO_PWR_31_DBL
 
-  protected def zero = Long(0,0,0)
-  protected def one  = Long(1,0,0)
+  private def zero = Long(0,0,0)
+  private def one  = Long(1,0,0)
 
-  def fromInt(value: Int) = {
+  def fromInt(value: Int): Long = {
     val a0 = value & MASK
     val a1 = (value >> BITS) & MASK
     val a2 = if (value < 0) MASK_2 else 0
     new Long(a0, a1, a2)
   }
+
+  def fromDouble(value: Double): Long = 
+    if (value.isNaN) zero
+    else if (value < -TWO_PWR_63_DBL) MinValue
+    else if (value >= TWO_PWR_63_DBL) MaxValue
+    else if (value < 0) -fromDouble(-value)
+    else {
+      var acc = value
+      val a2 = if (acc >= TWO_PWR_44_DBL) (acc / TWO_PWR_44_DBL).toInt else 0
+      acc -= a2 * TWO_PWR_44_DBL
+      val a1 = if (acc >= TWO_PWR_22_DBL) (acc / TWO_PWR_22_DBL).toInt else 0
+      acc -= a1 * TWO_PWR_22_DBL
+      val a0 = acc.toInt
+      Long(a0, a1, a2)
+    }
 
   /**
    * creates a new long but masks bits as follows:
