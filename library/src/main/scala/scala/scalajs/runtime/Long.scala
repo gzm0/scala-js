@@ -290,9 +290,9 @@ final class Long private (
     if (h == 0 && m == 0)
       Integer.numberOfLeadingZeros(l) - (32 - BITS) + (64 - BITS)
     else if (h == 0)
-      Integer.numberOfLeadingZeros(l) - (32 - BITS) + (64 - BITS01)
+      Integer.numberOfLeadingZeros(m) - (32 - BITS) + (64 - BITS01)
     else
-      Integer.numberOfLeadingZeros(l) - (32 - BITS2)
+      Integer.numberOfLeadingZeros(h) - (32 - BITS2)
 
   /** return Some(log_2(x)) if power of 2 or None othwerise */
   private def powerOfTwo = 
