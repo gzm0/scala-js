@@ -33,6 +33,10 @@ object RuntimeLongTest extends ScalaJSTest {
       expect(-minInt).toEqual(         "0000000080000000")
     }
 
+    it("should correctly implement comparison") {
+      expect(Long.fromInt(7) < Long.fromInt(15)).toBe(true)
+    }
+
     it("should correctly implement addition") {
       expect(Long.fromInt(7) + Long.fromInt(15)).toEqual("0000000000000016")
       expect(maxInt + maxInt).toEqual(                   "00000000fffffffe")
