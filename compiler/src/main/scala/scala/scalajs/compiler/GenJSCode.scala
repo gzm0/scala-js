@@ -889,8 +889,15 @@ abstract class GenJSCode extends plugins.PluginComponent
               js.Undefined()
             case BooleanTag =>
               js.BooleanLiteral(value.booleanValue)
-            case ByteTag | ShortTag | CharTag | IntTag | LongTag =>
+            case ByteTag | ShortTag | CharTag | IntTag =>
               js.IntLiteral(value.longValue)
+            case LongTag =>
+              // Convert literal to triplets (at compile time!)
+              val (l,m,h) = JSConversions.scalaLongToTriplets(value.longValue)
+              genApply(Apply(jsDefinitions.RuntimeLong_apply,
+                  Literal(Constant(l)),
+                  Literal(Constant(m)),
+                  Literal(Constant(h))))
             case FloatTag | DoubleTag =>
               js.DoubleLiteral(value.doubleValue)
             case StringTag =>

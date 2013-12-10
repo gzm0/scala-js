@@ -427,7 +427,7 @@ object Long {
    */
   protected def masked(l: Int, m: Int, h: Int) =
     Long(l & MASK, m & MASK, h & MASK_2)
-  private def apply(l: Int, m: Int, h: Int) = new Long(l, m, h)
+  def apply(l: Int, m: Int, h: Int) = new Long(l, m, h)
 
   /**
    * performs division in "normal cases"
