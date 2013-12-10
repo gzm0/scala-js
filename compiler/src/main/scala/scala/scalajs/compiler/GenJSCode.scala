@@ -892,12 +892,9 @@ abstract class GenJSCode extends plugins.PluginComponent
             case ByteTag | ShortTag | CharTag | IntTag =>
               js.IntLiteral(value.longValue)
             case LongTag =>
-              // Convert literal to triplets (at compile time!)
-              val (l,m,h) = JSConversions.scalaLongToTriplets(value.longValue)
-              genApply(Apply(jsDefinitions.RuntimeLong_apply,
-                  Literal(Constant(l)),
-                  Literal(Constant(m)),
-                  Literal(Constant(h))))
+              // Convert literal to triplet (at compile time!)
+              val (l,m,h) = JSConversions.scalaLongToTriplet(value.longValue)
+              genLongModuleCall("apply", js.IntLiteral(l), js.IntLiteral(m), js.IntLiteral(h))
             case FloatTag | DoubleTag =>
               js.DoubleLiteral(value.doubleValue)
             case StringTag =>
@@ -2764,6 +2761,13 @@ abstract class GenJSCode extends plugins.PluginComponent
       if (isGlobalScope) envField("g")
       else if (isRawJSType(sym.tpe)) genPrimitiveJSModule(sym)
       else encodeModuleSym(sym)
+    }
+    
+    /** Generate a call to scala.scalajs.runtime.Long companion */
+    private def genLongModuleCall(methodName: String, args: js.Tree*)(implicit pos: Position) = {
+      val LongModule = genLoadModule(jsDefinitions.RuntimeLongModule)
+      val method = getMemberMethod(jsDefinitions.RuntimeLongModule, newTermName(methodName))
+      js.ApplyMethod(LongModule, encodeMethodSym(method), args.toList)
     }
 
     /** Generate access to a static member */

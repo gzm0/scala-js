@@ -14,6 +14,6 @@ object JSConversions {
   /** bitmask for Long.h */
   private val MASK_2:  Int = (1 << BITS2) - 1
   
-  private[scalajs] def scalaLongToTriplets(value: scala.Long) =
+  private[scalajs] def scalaLongToTriplet(value: scala.Long) =
 	(value.toInt & MASK, (value >> BITS).toInt & MASK, (value >> BITS01).toInt & MASK_2)
 }

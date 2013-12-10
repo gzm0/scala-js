@@ -98,7 +98,6 @@ trait JSDefinitions { self: JSGlobalAddons =>
 
     lazy val RuntimeLongClass  = getRequiredClass("scala.scalajs.runtime.Long")
     lazy val RuntimeLongModule = RuntimeLongClass.companionModule
-      lazy val RuntimeLong_apply = getMemberMethod(RuntimeLongModule, newTermName("apply"))
 
   }
 }
