@@ -2478,7 +2478,15 @@ abstract class GenJSCode extends plugins.PluginComponent
    *
    *  I.e., test whether the type extends scala.js.Any
    */
-  def isRawJSType(tpe: Type): Boolean =
+  def isRawJSType(tpe: Type): Boolean = /*isScalaJSDefined && 
+    beforePhase(currentRun.erasurePhase) {
+    val res = tpe.typeSymbol.ancestors.contains(JSAnyClass)
+    println(s"checking:  ${tpe.typeSymbol.fullName}  for js.Any ($res). Ancestors:")
+    for (a <- tpe.typeSymbol.ancestors) {
+      println(s"    ${a.fullName}")
+    }
+    res
+  }*//*
     isScalaJSDefined && {
     val res = tpe.typeSymbol.ancestors.contains(JSAnyClass)
     println(s"checking:  ${tpe.typeSymbol.fullName}  for js.Any ($res). Ancestors:")
@@ -2486,11 +2494,10 @@ abstract class GenJSCode extends plugins.PluginComponent
       println(s"    ${a.fullName}")
     } 
     res
-  }
-      //(isScalaJSDefined && beforePhase(currentRun.erasurePhase) {
-//      tpe.typeSymbol isSubClass JSAnyClass
-    //})
-  //}
+    }*/
+      (isScalaJSDefined && beforePhase(currentRun.erasurePhase) {
+      tpe.typeSymbol isSubClass JSAnyClass
+      })
 
   private def isStringType(tpe: Type): Boolean =
     tpe.typeSymbol == StringClass
