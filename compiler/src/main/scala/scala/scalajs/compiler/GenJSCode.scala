@@ -2439,10 +2439,10 @@ abstract class GenJSCode extends plugins.PluginComponent
       val sym = if (sym0.isModule) sym0.moduleClass else sym0
 
       val isGlobalScope =
-        isScalaJSDefined &&
-        beforePhase(currentRun.erasurePhase) {
-          sym.tpe.typeSymbol isSubClass JSGlobalScopeClass
-        }
+        isScalaJSDefined && sym.ancestors.contains(JSGlobalScopeClass)
+        //beforePhase(currentRun.erasurePhase) {
+        //  sym.tpe.typeSymbol isSubClass JSGlobalScopeClass
+        //}
 
       if (isGlobalScope) envField("g")
       else if (isRawJSType(sym.tpe)) genPrimitiveJSModule(sym)
@@ -2478,11 +2478,19 @@ abstract class GenJSCode extends plugins.PluginComponent
    *
    *  I.e., test whether the type extends scala.js.Any
    */
-  def isRawJSType(tpe: Type): Boolean = {
-    (isScalaJSDefined && beforePhase(currentRun.erasurePhase) {
-      tpe.typeSymbol isSubClass JSAnyClass
-    })
+  def isRawJSType(tpe: Type): Boolean =
+    isScalaJSDefined && {
+    val res = tpe.typeSymbol.ancestors.contains(JSAnyClass)
+    println(s"checking:  ${tpe.typeSymbol.fullName}  for js.Any ($res). Ancestors:")
+    for (a <- tpe.typeSymbol.ancestors) {
+      println(s"    ${a.fullName}")
+    } 
+    res
   }
+      //(isScalaJSDefined && beforePhase(currentRun.erasurePhase) {
+//      tpe.typeSymbol isSubClass JSAnyClass
+    //})
+  //}
 
   private def isStringType(tpe: Type): Boolean =
     tpe.typeSymbol == StringClass
