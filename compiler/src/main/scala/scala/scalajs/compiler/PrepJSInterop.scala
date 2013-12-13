@@ -8,6 +8,8 @@ package scala.scalajs.compiler
 import scala.tools.nsc
 import nsc._
 
+import scala.collection.immutable.ListMap
+
 /** Prepares classes extending js.Any for JavaScript interop
  *
  * This phase does two things:
@@ -45,11 +47,14 @@ abstract class PrepJSInterop extends plugins.PluginComponent with transform.Tran
       case _ => tree
     }
 
-    private def isJSAny(implDef: ImplDef) =
-      implDef.symbol.tpe.typeSymbol isSubClass JSAnyClass
+    private def isJSAny(implDef: ImplDef) = isScalaJSDefined &&
+      (implDef.symbol.tpe.typeSymbol isSubClass JSAnyClass)
 
     private def transformImplDef(implDef: ImplDef) = {
-      val sym = implDef.symbol
+      // We cannot use implDef.symbol directly, since the symbol
+      // of a module is not its type's symbol but the value it declares
+      val sym = implDef.symbol.tpe.typeSymbol
+
       sym.setAnnotations(rawJSAnnot :: sym.annotations)
 
       // TODO add extractor methods
@@ -58,7 +63,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent with transform.Tran
     }
 
     private def rawJSAnnot =
-      Annotation(typeOf[scala.scalajs.js.annotation.RawJSType], Nil, Nil)
+      Annotation(RawJSTypeAnnot.tpe, List.empty, ListMap.empty)
     
   }
   
