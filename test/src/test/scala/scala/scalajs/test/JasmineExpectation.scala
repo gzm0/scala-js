@@ -10,6 +10,7 @@ package scala.scalajs.test
 import scala.scalajs.js
 import java.util.regex.Pattern
 
+@js.annotation.RawJSType()
 trait JasmineExpectation extends js.Object {
   def toBe(exp: js.Any): Unit
   def toEqual(exp: js.Any): Unit

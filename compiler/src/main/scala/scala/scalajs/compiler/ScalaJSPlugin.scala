@@ -31,7 +31,7 @@ class ScalaJSPlugin(val global: Global) extends NscPlugin {
     val global: ScalaJSPlugin.this.global.type = ScalaJSPlugin.this.global
     val jsAddons: ScalaJSPlugin.this.jsAddons.type = ScalaJSPlugin.this.jsAddons
     override val runsAfter = List("typer")
-    override val runsBefore = List("refcheck")
+    override val runsBefore = List("pickle")
   } with PrepJSInterop
 
   object GenCodeComponent extends {
@@ -40,12 +40,5 @@ class ScalaJSPlugin(val global: Global) extends NscPlugin {
     override val runsAfter = List("mixin")
     override val runsBefore = List("cleanup", "terminal")
   } with GenJSCode
-
-}
-
-object ScalaJSPlugin {
-
-  trait RawJSTypeTag
-  object RawJSTypeTag extends RawJSTypeTag
 
 }

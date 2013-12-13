@@ -5,7 +5,8 @@
 
 package scala.scalajs.compiler
 
-import scala.tools.nsc._
+import scala.tools.nsc
+import nsc._
 
 /** Prepares classes extending js.Any for JavaScript interop
  *
@@ -15,7 +16,7 @@ import scala.tools.nsc._
  * 
  * @author Tobias Schlatter
  */
-abstract class PrepJSInterop extends plugins.PluginComponent {
+abstract class PrepJSInterop extends plugins.PluginComponent with transform.Transform {
   val jsAddons: JSGlobalAddons {
     val global: PrepJSInterop.this.global.type
   }
@@ -25,40 +26,39 @@ abstract class PrepJSInterop extends plugins.PluginComponent {
   import jsDefinitions._
   
   val phaseName = "jsinterop"
-    
-  override def newPhase(p: Phase) = new JSInteropPhase(p)
-    
-  class JSInteropPhase(prev: Phase) extends StdPhase(prev) {
- 
+
+  override def newPhase(p: nsc.Phase) = new JSInteropPhase(p)
+  class JSInteropPhase(prev: nsc.Phase) extends Phase(prev) {
     override def name = phaseName
     override def description = "Prepare ASTs for JavaScript interop"
+  }
 
-    override def apply(cunit: CompilationUnit): Unit =
-      pass(cunit.body)
-    
-    /**
-     * passes over the tree and extracts class and module definitions
-     */
-    private def pass(tree: Tree): Unit = tree match {
-      case PackageDef(_, stats) => stats foreach pass
-      case cd: ClassDef  => handleImplDef(cd)
-      case md: ModuleDef => handleImplDef(md)
-      // TODO be more restrictive here (avoid useless traversal)
-      case tree: Tree =>
-        for (t <- tree.children) pass(t)
+  override protected def newTransformer(unit: CompilationUnit) =
+    new JSInteropTransformer(unit)
+
+  class JSInteropTransformer(unit: CompilationUnit) extends Transformer {
+    val cpy = treeCopy
+
+    override def transform(tree: Tree): Tree = super.transform(tree) match {
+      case idef: ImplDef if isJSAny(idef) =>
+        transformImplDef(idef)
+      case _ => tree
     }
 
-    private def handleImplDef(implDef: ImplDef) = {
-      val tSym = implDef.symbol.tpe.typeSymbol
+    private def isJSAny(implDef: ImplDef) =
+      implDef.symbol.tpe.typeSymbol isSubClass JSAnyClass
 
-      if (tSym isSubClass JSAnyClass) {
-        println(s"tagging $tSym")
-        tSym.updateAttachment(ScalaJSPlugin.RawJSTypeTag)
-      }
+    private def transformImplDef(implDef: ImplDef) = {
+      val sym = implDef.symbol
+      sym.setAnnotations(rawJSAnnot :: sym.annotations)
 
-      // descend into class definition
-      pass(implDef.impl)
+      // TODO add extractor methods
+
+      implDef
     }
+
+    private def rawJSAnnot =
+      Annotation(typeOf[scala.scalajs.js.annotation.RawJSType], Nil, Nil)
     
   }
   
