@@ -16,11 +16,13 @@ import scala.scalajs.test.ScalaJSTest
  * see scala.scalajs.test.jsinterop.RuntimeLongTest
  * for a test of the implementation itself
  */
-class LongTest extends ScalaJSTest {
+object LongTest extends ScalaJSTest {
 
   describe("JavaScript 64-bit long compatibility") {
-    it("handle appropriately large numbers") {
+    it("should correctly handle literals") {
       expect(5L + 100L).toEqual(105L)
+      expect(2147483649L + 2L).toEqual(2147483651L)
+      expect(-2147483648L * 4).toEqual(-8589934592L)
     }
   }
   
