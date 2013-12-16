@@ -1717,9 +1717,9 @@ abstract class GenJSCode extends plugins.PluginComponent
       sources match {
         // Unary op on long
         case List(source) if isLongType(args.head.tpe) => code match {
-            case POS => genLongCall(source, "unary_$plus")
-            case NEG => genLongCall(source, "unary_$minus")
-            case NOT => genLongCall(source, "unary_$tilde")
+            case POS => genLongCall(source, "unary_+")
+            case NEG => genLongCall(source, "unary_-")
+            case NOT => genLongCall(source, "unary_~")
             case _   => abort("Unknown or invalid op code on Long: " + code)
           }
         
@@ -2774,18 +2774,24 @@ abstract class GenJSCode extends plugins.PluginComponent
     /** Generate a call to scala.scalajs.runtime.Long companion */
     private def genLongModuleCall(methodName: String, args: js.Tree*)(implicit pos: Position) = {
       val LongModule = genLoadModule(jsDefinitions.RuntimeLongModule)
-      val method = getMemberMethod(jsDefinitions.RuntimeLongModule, newTermName(methodName))
+      val encName = scala.reflect.NameTransformer.encode(methodName)
+      val method = getMemberMethod(jsDefinitions.RuntimeLongModule, newTermName(encName))
       js.ApplyMethod(LongModule, encodeMethodSym(method), args.toList)
     }
     
     private def genLongCall(
         receiver: js.Tree,
         methodName: String,
-        args: js.Tree*)(implicit pos: Position) = {
+        args: js.Tree*)(implicit pos: Position): js.Tree = {
+      val encName = scala.reflect.NameTransformer.encode(methodName)
       val method = getMemberMethod(
-          jsDefinitions.RuntimeLongClass, newTermName(methodName))
-      js.ApplyMethod(receiver, encodeMethodSym(method), args.toList)
+          jsDefinitions.RuntimeLongClass, newTermName(encName))
+       genLongCall(receiver, method, args :_*)
     }
+    
+    private def genLongCall(receiver: js.Tree, method: Symbol, args: js.Tree*)
+      (implicit pos: Position): js.Tree =
+      js.ApplyMethod(receiver, encodeMethodSym(method), args.toList)
 
     /** Generate access to a static member */
     private def genStaticMember(sym: Symbol)(implicit pos: Position) = {

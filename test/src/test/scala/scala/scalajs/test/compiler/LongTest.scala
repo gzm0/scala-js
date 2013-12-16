@@ -23,6 +23,12 @@ object LongTest extends ScalaJSTest {
       expect(5L + 100L).toEqual(105L)
       expect(2147483649L + 2L).toEqual(2147483651L)
       expect(-2147483648L * 4).toEqual(-8589934592L)
+      expect(4503599627370510L * (-4)).toEqual(-18014398509482000L)
+    }
+    
+    it("should correctly dispatch unary ops on unboxed Longs") {
+      val x = 10L
+      expect(-x == -10L).toBeTruthy
     }
   }
   
