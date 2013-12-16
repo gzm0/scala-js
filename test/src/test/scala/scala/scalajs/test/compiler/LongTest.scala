@@ -60,6 +60,12 @@ object LongTest extends ScalaJSTest {
       expect(100000.6.toLong).toEqual(100000L)
     }
     
+    it("should correctly concat to string") {
+      val x = 20L
+      expect("asdf" + 5L + x + "hello").toEqual("asdf520hello")
+      expect(x + "hello").toEqual("20hello")
+    }
+    
     it("string should convert to Long") {
       expect("45678901234567890".toLong).toEqual(45678901234567890L)
     }
