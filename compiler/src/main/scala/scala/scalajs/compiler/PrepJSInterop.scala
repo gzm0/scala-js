@@ -49,18 +49,28 @@ abstract class PrepJSInterop extends plugins.PluginComponent with transform.Tran
 
     private def isJSAny(implDef: ImplDef) = isScalaJSDefined &&
       (implDef.symbol.tpe.typeSymbol isSubClass JSAnyClass)
+      
+    private def isJSGlobalScope(implDef: ImplDef) = isScalaJSDefined &&
+      (implDef.symbol.tpe.typeSymbol isSubClass JSGlobalScopeClass)
 
     private def transformImplDef(implDef: ImplDef) = {
       // We cannot use implDef.symbol directly, since the symbol
       // of a module is not its type's symbol but the value it declares
       val sym = implDef.symbol.tpe.typeSymbol
 
-      sym.setAnnotations(rawJSAnnot :: sym.annotations)
+      val baseAnnots = rawJSAnnot :: sym.annotations
+      sym.setAnnotations { 
+        if (isJSGlobalScope(implDef)) globalScopeAnnot :: baseAnnots
+        else baseAnnots
+      }
 
       // TODO add extractor methods
 
       implDef
     }
+    
+    private def globalScopeAnnot = 
+      Annotation(JSGlobalScopeAnnot.tpe, List.empty, ListMap.empty)
 
     private def rawJSAnnot =
       Annotation(RawJSTypeAnnot.tpe, List.empty, ListMap.empty)
