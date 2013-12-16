@@ -1712,6 +1712,12 @@ abstract class GenJSCode extends plugins.PluginComponent
 
       implicit val jspos = tree.pos
 
+      def needLongConv(ltpe: Type, rtpe: Type) =
+        (isLongType(ltpe) || isLongType(rtpe)) &&
+        !(toTypeKind(ltpe).isInstanceOf[FLOAT] ||
+          toTypeKind(rtpe).isInstanceOf[FLOAT] ||
+          isStringType(ltpe) || isStringType(rtpe))
+      
       val sources = args map genExpr
 
       sources match {
@@ -1738,6 +1744,44 @@ abstract class GenJSCode extends plugins.PluginComponent
               abort("Unknown unary operation code: " + code)
           })
 
+        // Binary operation requiring conversion to Long of both sides
+        case List(lsrc, rsrc) if needLongConv(args(0).tpe, args(1).tpe) =>
+          def toLong(tree: js.Tree, tpe: Type) = tpe.typeSymbol match {
+              case ByteClass => genLongModuleCall("fromByte", tree)
+              case ShortClass => genLongModuleCall("fromShort", tree)
+              case CharClass => genLongModuleCall("fromChar", tree)
+              case IntClass => genLongModuleCall("fromInt", tree)
+              case LongClass => tree
+            }
+          
+          val ltree = toLong(lsrc, args(0).tpe)
+          val rtree = toLong(rsrc, args(1).tpe)
+          
+          code match {
+            case ADD => genLongCall(ltree, "+",   rtree)
+            case SUB => genLongCall(ltree, "-",   rtree)
+            case MUL => genLongCall(ltree, "*",   rtree)
+            case DIV => genLongCall(ltree, "/",   rtree)
+            case MOD => genLongCall(ltree, "%",   rtree)
+            case OR  => genLongCall(ltree, "|",   rtree)
+            case XOR => genLongCall(ltree, "^",   rtree)
+            case AND => genLongCall(ltree, "&",   rtree)
+            case LSL => genLongCall(ltree, "<<",  rtree)
+            case LSR => genLongCall(ltree, ">>>", rtree)
+            case ASR => genLongCall(ltree, ">>",  rtree)
+            case LT  => genLongCall(ltree, "<",   rtree)
+            case LE  => genLongCall(ltree, "<=",  rtree)
+            case GT  => genLongCall(ltree, ">",   rtree)
+            case GE  => genLongCall(ltree, ">=",  rtree)
+            case EQ  => genOlLongCall(ltree, "==",  rtree) { _.paramss match {
+              case List(List(s)) if isRTLongType(s.typeSignature) => true
+              case _ => false
+            } }
+            case NE  => genLongCall(ltree, "!=",  rtree)
+            case _ =>
+              abort("Unknown binary operation code: " + code)
+          }
+          
         // Binary operation
         case List(lsrc, rsrc) =>
           lazy val leftKind = toTypeKind(args.head.tpe)
@@ -2779,6 +2823,18 @@ abstract class GenJSCode extends plugins.PluginComponent
       js.ApplyMethod(LongModule, encodeMethodSym(method), args.toList)
     }
     
+    private def genOlLongCall(
+        receiver: js.Tree,
+        methodName: String,
+        args: js.Tree*)
+      (resolve: Symbol => Boolean)(implicit pos: Position): js.Tree = {
+      val encName = scala.reflect.NameTransformer.encode(methodName)
+      val method = getMemberMethod(
+          jsDefinitions.RuntimeLongClass, newTermName(encName))
+      assert(method.isOverloaded)
+      genLongCall(receiver, method.alternatives.find(resolve).get, args :_*)
+    } 
+    
     private def genLongCall(
         receiver: js.Tree,
         methodName: String,
@@ -2830,6 +2886,9 @@ abstract class GenJSCode extends plugins.PluginComponent
     
   private def isLongType(tpe: Type): Boolean =
     tpe.typeSymbol == LongClass
+    
+  private def isRTLongType(tpe: Type): Boolean =
+    tpe.typeSymbol == RuntimeLongClass
 
   /** Get JS name of Symbol if it was specified with JSName annotation */
   def jsNameOf(sym: Symbol): String = {

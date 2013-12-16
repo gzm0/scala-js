@@ -399,6 +399,9 @@ object Long {
   private def zero = Long(0,0,0)
   private def one  = Long(1,0,0)
 
+  def fromByte(value: Byte): Long = fromInt(value.toInt)
+  def fromShort(value: Short): Long = fromInt(value.toInt)
+  def fromChar(value: Char): Long = fromInt(value.toInt)
   def fromInt(value: Int): Long = {
     val a0 = value & MASK
     val a1 = (value >> BITS) & MASK
@@ -406,6 +409,7 @@ object Long {
     new Long(a0, a1, a2)
   }
 
+  def fromFloat(value: Float): Long = fromDouble(value.toDouble)
   def fromDouble(value: Double): Long = 
     if (value.isNaN) zero
     else if (value < -TWO_PWR_63_DBL) MinValue
