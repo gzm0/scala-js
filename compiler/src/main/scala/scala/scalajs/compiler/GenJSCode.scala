@@ -1773,10 +1773,7 @@ abstract class GenJSCode extends plugins.PluginComponent
             case LE  => genLongCall(ltree, "<=",  rtree)
             case GT  => genLongCall(ltree, ">",   rtree)
             case GE  => genLongCall(ltree, ">=",  rtree)
-            case EQ  => genOlLongCall(ltree, "==",  rtree) { _.paramss match {
-              case List(List(s)) if isRTLongType(s.typeSignature) => true
-              case _ => false
-            } }
+            case EQ  => genOlLongCall(ltree, "==",  rtree)(RuntimeLongClass.tpe)
             case NE  => genLongCall(ltree, "!=",  rtree)
             case _ =>
               abort("Unknown binary operation code: " + code)
@@ -2826,13 +2823,22 @@ abstract class GenJSCode extends plugins.PluginComponent
     private def genOlLongCall(
         receiver: js.Tree,
         methodName: String,
-        args: js.Tree*)
-      (resolve: Symbol => Boolean)(implicit pos: Position): js.Tree = {
+        args: js.Tree*)(argTypes: Type*)
+        (implicit pos: Position): js.Tree = {
+      
       val encName = scala.reflect.NameTransformer.encode(methodName)
       val method = getMemberMethod(
           jsDefinitions.RuntimeLongClass, newTermName(encName))
       assert(method.isOverloaded)
-      genLongCall(receiver, method.alternatives.find(resolve).get, args :_*)
+      
+      def checkParams(types: List[Type]) = types.size == argTypes.size &&
+      	(argTypes zip types).forall { case (t1,t2) => t1 =:= t2 }
+      
+      val opt = method.alternatives find { m =>
+        checkParams(m.paramss.head.map(_.typeSignature))
+      }
+
+      genLongCall(receiver, opt.get, args :_*)
     } 
     
     private def genLongCall(
@@ -2886,9 +2892,6 @@ abstract class GenJSCode extends plugins.PluginComponent
     
   private def isLongType(tpe: Type): Boolean =
     tpe.typeSymbol == LongClass
-    
-  private def isRTLongType(tpe: Type): Boolean =
-    tpe.typeSymbol == RuntimeLongClass
 
   /** Get JS name of Symbol if it was specified with JSName annotation */
   def jsNameOf(sym: Symbol): String = {
