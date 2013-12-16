@@ -1,5 +1,8 @@
 package scala.scalajs.runtime
 
+// Explicitly un-import scala.Long to avoid bad things to happen
+import scala.{Long => _}
+
 import scala.annotation.tailrec
 
 /**

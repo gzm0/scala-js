@@ -1747,32 +1747,32 @@ abstract class GenJSCode extends plugins.PluginComponent
         // Binary operation requiring conversion to Long of both sides
         case List(lsrc, rsrc) if needLongConv(args(0).tpe, args(1).tpe) =>
           def toLong(tree: js.Tree, tpe: Type) = tpe.typeSymbol match {
-              case ByteClass => genLongModuleCall("fromByte", tree)
+              case ByteClass  => genLongModuleCall("fromByte",  tree)
               case ShortClass => genLongModuleCall("fromShort", tree)
-              case CharClass => genLongModuleCall("fromChar", tree)
-              case IntClass => genLongModuleCall("fromInt", tree)
-              case LongClass => tree
+              case CharClass  => genLongModuleCall("fromChar",  tree)
+              case IntClass   => genLongModuleCall("fromInt",   tree)
+              case LongClass  => tree
             }
           
           val ltree = toLong(lsrc, args(0).tpe)
           val rtree = toLong(rsrc, args(1).tpe)
           
           code match {
-            case ADD => genLongCall(ltree, "+",   rtree)
-            case SUB => genLongCall(ltree, "-",   rtree)
-            case MUL => genLongCall(ltree, "*",   rtree)
-            case DIV => genLongCall(ltree, "/",   rtree)
-            case MOD => genLongCall(ltree, "%",   rtree)
-            case OR  => genLongCall(ltree, "|",   rtree)
-            case XOR => genLongCall(ltree, "^",   rtree)
-            case AND => genLongCall(ltree, "&",   rtree)
-            case LSL => genLongCall(ltree, "<<",  rtree)
-            case LSR => genLongCall(ltree, ">>>", rtree)
-            case ASR => genLongCall(ltree, ">>",  rtree)
-            case LT  => genLongCall(ltree, "<",   rtree)
-            case LE  => genLongCall(ltree, "<=",  rtree)
-            case GT  => genLongCall(ltree, ">",   rtree)
-            case GE  => genLongCall(ltree, ">=",  rtree)
+            case ADD => genOlLongCall(ltree, "+",   rtree)(RuntimeLongClass.tpe)
+            case SUB => genLongCall  (ltree, "-",   rtree)
+            case MUL => genLongCall  (ltree, "*",   rtree)
+            case DIV => genLongCall  (ltree, "/",   rtree)
+            case MOD => genLongCall  (ltree, "%",   rtree)
+            case OR  => genLongCall  (ltree, "|",   rtree)
+            case XOR => genLongCall  (ltree, "^",   rtree)
+            case AND => genLongCall  (ltree, "&",   rtree)
+            case LSL => genLongCall  (ltree, "<<",  rtree)
+            case LSR => genLongCall  (ltree, ">>>", rtree)
+            case ASR => genLongCall  (ltree, ">>",  rtree)
+            case LT  => genLongCall  (ltree, "<",   rtree)
+            case LE  => genLongCall  (ltree, "<=",  rtree)
+            case GT  => genLongCall  (ltree, ">",   rtree)
+            case GE  => genLongCall  (ltree, ">=",  rtree)
             case EQ  => genOlLongCall(ltree, "==",  rtree)(RuntimeLongClass.tpe)
             case NE  => genOlLongCall(ltree, "!=",  rtree)(RuntimeLongClass.tpe)
             case _ =>

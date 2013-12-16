@@ -26,16 +26,13 @@ object LongTest extends ScalaJSTest {
       expect(4503599627370510L * (-4)).toEqual(-18014398509482000L)
     }
     
-    it("should correctly dispatch unary ops on unboxed Longs") {
+    it("should correctly dispatch unary ops on Longs") {
       val x = 10L
       expect(-x == -10L).toBeTruthy
-    }
-    
-    it("should correctly dispatch unary ops on boxed Long") {
-      val x = 5L
-      expect(-x).toEqual(-5L)
-      expect(+x).toEqual(5L)
-      //expect(~x).toEqual(1844674407370960000L)
+      val y = 5L
+      expect(-y).toEqual(-5L)
+      expect(+y).toEqual(5L)
+      expect(~y).toEqual(1844674407370960000L)
     }
     
     it("should correctly dispatch binary ops on unboxed Longs") {
@@ -59,6 +56,13 @@ object LongTest extends ScalaJSTest {
       // Double
       expect(100000.6.toLong).toEqual(100000L)
     }
+    
+    it("should generate a hash") {
+      val x = 5L
+      val y = 5L
+      expect(x.##).toEqual(y.##)
+    } 
+    
     
     it("should correctly concat to string") {
       val x = 20L
