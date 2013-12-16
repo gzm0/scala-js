@@ -1363,6 +1363,10 @@ abstract class GenJSCode extends plugins.PluginComponent
             /** Unbox a primitive value */
             val arg = args.head
             makeUnbox(genExpr(arg), tree.tpe)
+          } else if (isLongRuntimeConversion(sym)) {
+            /** convert a scala.Long to a scala.scalajs.runtime.Long
+             *  does not do anything. */
+            genExpr(args.head)
           } else {
             /** Actual method call
              *  But even these are further refined into:
@@ -2887,6 +2891,14 @@ abstract class GenJSCode extends plugins.PluginComponent
     private def genLongCall(receiver: js.Tree, method: Symbol, args: js.Tree*)
       (implicit pos: Position): js.Tree =
       js.ApplyMethod(receiver, encodeMethodSym(method), args.toList)
+      
+    private def isLongRuntimeConversion(sym: Symbol) = {
+      lazy val toConv   = getMemberMethod(RuntimeLongModule,
+                                          newTermName("toRuntimeLong"))
+      lazy val fromConv = getMemberMethod(RuntimeLongModule,
+                                          newTermName("fromRuntimeLong"))
+      sym == toConv || sym == fromConv                               
+    }
 
     /** Generate access to a static member */
     private def genStaticMember(sym: Symbol)(implicit pos: Position) = {

@@ -1,8 +1,5 @@
 package scala.scalajs.runtime
 
-// Explicitly un-import scala.Long to avoid bad things to happen
-import scala.{Long => _}
-
 import scala.annotation.tailrec
 
 /**
@@ -289,6 +286,9 @@ final class Long private (
     }
   }
 
+  def bitCount: Int =
+    Integer.bitCount(l) + Integer.bitCount(m) + Integer.bitCount(h)
+  
   // helpers //
 
   /** sign *bit* of long (0 for positive, 1 for negative) */
@@ -402,6 +402,9 @@ object Long {
   private def zero = Long(0,0,0)
   private def one  = Long(1,0,0)
 
+  def toRuntimeLong(x: scala.Long): Long = sys.error("stub")
+  def fromRuntimeLong(x:Long): scala.Long = sys.error("stub")
+  
   def fromHexString(str: String) = {
 	import scalajs.js.parseInt
     assert(str.size == 16)
