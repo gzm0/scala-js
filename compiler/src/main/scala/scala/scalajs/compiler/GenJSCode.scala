@@ -1715,6 +1715,14 @@ abstract class GenJSCode extends plugins.PluginComponent
       val sources = args map genExpr
 
       sources match {
+        // Unary op on long
+        case List(source) if isLongType(args.head.tpe) => code match {
+            case POS => genLongCall(source, "unary_$plus")
+            case NEG => genLongCall(source, "unary_$minus")
+            case NOT => genLongCall(source, "unary_$tilde")
+            case _   => abort("Unknown or invalid op code on Long: " + code)
+          }
+        
         // Unary operation
         case List(source) =>
           (code match {
@@ -2769,6 +2777,15 @@ abstract class GenJSCode extends plugins.PluginComponent
       val method = getMemberMethod(jsDefinitions.RuntimeLongModule, newTermName(methodName))
       js.ApplyMethod(LongModule, encodeMethodSym(method), args.toList)
     }
+    
+    private def genLongCall(
+        receiver: js.Tree,
+        methodName: String,
+        args: js.Tree*)(implicit pos: Position) = {
+      val method = getMemberMethod(
+          jsDefinitions.RuntimeLongClass, newTermName(methodName))
+      js.ApplyMethod(receiver, encodeMethodSym(method), args.toList)
+    }
 
     /** Generate access to a static member */
     private def genStaticMember(sym: Symbol)(implicit pos: Position) = {
@@ -2804,6 +2821,9 @@ abstract class GenJSCode extends plugins.PluginComponent
 
   private def isStringType(tpe: Type): Boolean =
     tpe.typeSymbol == StringClass
+    
+  private def isLongType(tpe: Type): Boolean =
+    tpe.typeSymbol == LongClass
 
   /** Get JS name of Symbol if it was specified with JSName annotation */
   def jsNameOf(sym: Symbol): String = {
