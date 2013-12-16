@@ -1939,14 +1939,39 @@ abstract class GenJSCode extends plugins.PluginComponent
       val source = genExpr(receiver)
 
       (code: @scala.annotation.switch) match {
-        case B2F | B2D | S2F | S2D | C2F | C2D | I2F | I2D | L2F | L2D =>
+        // From Long to something
+        case L2B =>
+          genLongCall(source, "toByte")
+        case L2S =>
+          genLongCall(source, "toShort")
+        case L2C =>
+          genLongCall(source, "toChar")
+        case L2I =>
+          genLongCall(source, "toInt")          
+        case L2F => 
+          genLongCall(source, "toFloat")          
+        case L2D =>
+          genLongCall(source, "toDouble")
+        
+        // From something to long
+        case B2L =>
+          genLongModuleCall("fromByte", source)
+        case S2L =>
+          genLongModuleCall("fromShort", source)
+        case C2L =>
+          genLongModuleCall("fromChar", source)
+        case I2L =>
+          genLongModuleCall("fromInt", source)
+        case F2L =>
+          genLongModuleCall("fromFloat", source)
+        case D2L =>
+          genLongModuleCall("fromDouble", source)
+        
+        case B2F | B2D | S2F | S2D | C2F | C2D | I2F | I2D =>
           source
 
         case F2B | F2S | F2C | F2I | D2B | D2S | D2C | D2I =>
           js.BinaryOp("|", source, js.IntLiteral(0))
-
-        case F2L | D2L =>
-          genCallHelper("truncateToLong", source)
 
         case _ => source
       }
