@@ -52,6 +52,8 @@ object RuntimeLongTest extends ScalaJSTest {
       expect(Long.fromInt(7)  * Long.fromInt(15)).toEqual("0000000000000069")
       expect(Long.fromInt(-7) * Long.fromInt(15)).toEqual("ffffffffffffff97")
       expect(maxInt * maxInt).toEqual(                    "3fffffff00000001")
+      expect(Long.fromHexString("001000000000000e") * 
+             Long.fromInt(-4)).toEqual("ffbfffffffffffc8")
     }
 
     it("should correctly implement division") {

@@ -402,6 +402,15 @@ object Long {
   private def zero = Long(0,0,0)
   private def one  = Long(1,0,0)
 
+  def fromHexString(str: String) = {
+	import scalajs.js.parseInt
+    assert(str.size == 16)
+    val l = parseInt(str.substring(10), 16).toInt
+    val m = parseInt(str.substring(6, 7), 16).toInt >> 2
+    val h = parseInt(str.substring(0, 5), 16).toInt
+    masked(l, m, h)
+  }
+  
   def fromByte(value: Byte): Long = fromInt(value.toInt)
   def fromShort(value: Short): Long = fromInt(value.toInt)
   def fromChar(value: Char): Long = fromInt(value.toInt)
