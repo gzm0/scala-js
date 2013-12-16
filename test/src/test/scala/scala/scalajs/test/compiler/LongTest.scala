@@ -30,6 +30,39 @@ object LongTest extends ScalaJSTest {
       val x = 10L
       expect(-x == -10L).toBeTruthy
     }
+    
+    it("should correctly dispatch unary ops on boxed Long") {
+      val x = 5L
+      expect(-x).toEqual(-5L)
+      expect(+x).toEqual(5L)
+      //expect(~x).toEqual(1844674407370960000L)
+    }
+    
+    it("should correctly dispatch binary ops on unboxed Longs") {
+      expect(5L * 5F).toEqual(25F)
+      expect(5F * 4L).toEqual(20F)
+    }
+    
+    it("primitives should convert to Long") {
+      // Byte
+      expect(234.toByte.toLong).toEqual(234L)
+      // Short
+      expect((-10).toShort.toLong).toEqual(-10L)
+      // Char
+      expect('A'.toLong).toEqual(65L)
+      // Int
+      expect(5.toLong).toEqual(5L)
+      // Long
+      expect(10L.toLong).toEqual(10L)
+      // Float
+      expect(100000.6f.toLong).toEqual(100000L)
+      // Double
+      expect(100000.6.toLong).toEqual(100000L)
+    }
+    
+    it("string should convert to Long") {
+      expect("45678901234567890".toLong).toEqual(45678901234567890L)
+    }
   }
   
 }

@@ -1774,15 +1774,24 @@ abstract class GenJSCode extends plugins.PluginComponent
             case GT  => genLongCall(ltree, ">",   rtree)
             case GE  => genLongCall(ltree, ">=",  rtree)
             case EQ  => genOlLongCall(ltree, "==",  rtree)(RuntimeLongClass.tpe)
-            case NE  => genLongCall(ltree, "!=",  rtree)
+            case NE  => genOlLongCall(ltree, "!=",  rtree)(RuntimeLongClass.tpe)
             case _ =>
               abort("Unknown binary operation code: " + code)
           }
           
         // Binary operation
-        case List(lsrc, rsrc) =>
+        case List(lsrc_in, rsrc_in) =>
+          def fromLong(tree: js.Tree, tpe: Type) = tpe.typeSymbol match {
+            // If we end up with a long, target must be float
+            case LongClass => genLongCall(tree, "toDouble")
+            case _ => tree
+          }
+          
           lazy val leftKind = toTypeKind(args.head.tpe)
           lazy val resultKind = toTypeKind(tree.tpe)
+          
+          val lsrc = fromLong(lsrc_in, args(0).tpe)
+          val rsrc = fromLong(rsrc_in, args(1).tpe)
 
           def genEquality(eqeq: Boolean, not: Boolean) = {
             if (eqeq && leftKind.isReferenceType &&
@@ -1800,7 +1809,6 @@ abstract class GenJSCode extends plugins.PluginComponent
             case DIV =>
               val actualDiv = js.BinaryOp("/", lsrc, rsrc)
               (resultKind: @unchecked) match {
-                case LongKind => genCallHelper("truncateToLong", actualDiv)
                 case _:INT => js.BinaryOp("|", actualDiv, js.IntLiteral(0))
                 case _:FLOAT => actualDiv
               }
