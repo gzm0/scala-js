@@ -91,6 +91,13 @@ object RuntimeLongTest extends ScalaJSTest {
       expect(Long.fromInt(5).toDouble).toEqual(5.0)
       expect((maxInt+one).toDouble).toEqual(2147483648.0)
     }
+    
+    it("should correctly implement fromString") {
+      expect(Long.fromString("4")).toEqual(         "0000000000000004")
+      expect(Long.fromString("-4")).toEqual(        "fffffffffffffffc")
+      expect(Long.fromString("4000000000")).toEqual("00000000ee6b2800")
+      expect(Long.fromString("-18014398509482040")).toEqual("ffbfffffffffffc8")
+    }
 
   }
 

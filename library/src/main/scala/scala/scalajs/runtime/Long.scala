@@ -411,6 +411,22 @@ object Long {
     masked(l, m, h)
   }
   
+  def fromString(str: String): Long =
+    if (str.head == '-') -fromString(str.tail) else {
+      import scalajs.js.parseInt
+      val maxLen = 9
+      @tailrec
+      def fromString0(str: String, acc: Long): Long = if (str.size > 0) {
+        val (cur, next) = str.splitAt(maxLen)
+        val macc = acc * fromInt(math.pow(10, cur.size).toInt)
+        // explicitly specify radix to avoid intepreation as octal
+        val cval = fromInt(parseInt(cur, 10).toInt)
+        fromString0(next, macc + cval)
+      } else acc
+    
+      fromString0(str, zero)
+    }
+  
   def fromByte(value: Byte): Long = fromInt(value.toInt)
   def fromShort(value: Short): Long = fromInt(value.toInt)
   def fromChar(value: Char): Long = fromInt(value.toInt)
