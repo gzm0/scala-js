@@ -209,9 +209,12 @@ object Long {
   def signum(i: scala.Long): scala.Long =
     if (i == 0) 0 else if (i < 0) -1 else 1
 
-  def toBinaryString(l: scala.Long): String = (l: js.Number).toString(2)
-  def toHexString(l: scala.Long): String = (l: js.Number).toString(16)
-  def toOctalString(l: scala.Long): String = (l: js.Number).toString(8)
+  def toBinaryString(l: scala.Long): String =
+    toRuntimeLong(l).toBinaryString.dropWhile(_ == '0')
+  def toHexString(l: scala.Long): String =
+    toRuntimeLong(l).toHexString.dropWhile(_ == '0')
+  def toOctalString(l: scala.Long): String =
+    toRuntimeLong(l).toOctalString.dropWhile(_ == '0')
 }
 
 ////////////////// Float //////////////////

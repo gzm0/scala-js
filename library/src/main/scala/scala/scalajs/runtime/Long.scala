@@ -247,11 +247,20 @@ final class Long private (
 
   //override def getClass(): Class[Long] = null
 
-  /** helper for testing */
+  def toBinaryString: String =
+    f"${h.toBinaryString}%020s${m.toBinaryString}%022s${l.toBinaryString}%022s"
+
   def toHexString: String = {
     val mp = m >> 2
     val lp = l | ((m & 0x3) << BITS)
     f"$h%05x$mp%05x$lp%06x"
+  }
+  
+  def toOctalString: String = {
+    val lp = l & (MASK >> 1)
+    val mp = ((m & (MASK >> 2)) << 1) | (l >> (BITS - 1))
+    val hp = (h << 2) | (m >> (BITS - 2))
+    f"$hp%08o$mp%07o$lp%07o"
   }
 
   // Any API //
@@ -273,7 +282,7 @@ final class Long private (
         if (v.isZero) acc
         else {
           val (quot, rem) = v.divMod(tenPowL)
-          
+
           val digits = rem.toInt.toString
           val zeroPrefix = if (!quot.isZero) {
             "0" * (tenPowZeros - digits.length)
