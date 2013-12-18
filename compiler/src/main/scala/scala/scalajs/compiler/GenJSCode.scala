@@ -3018,14 +3018,6 @@ abstract class GenJSCode extends plugins.PluginComponent
     private def genLongCall(receiver: js.Tree, method: Symbol, args: js.Tree*)
       (implicit pos: Position): js.Tree =
       js.ApplyMethod(receiver, encodeMethodSym(method), args.toList)
-      
-    private def isLongRuntimeConversion(sym: Symbol) = {
-      lazy val toConv   = getMemberMethod(RuntimeLongModule,
-                                          newTermName("toRuntimeLong"))
-      lazy val fromConv = getMemberMethod(RuntimeLongModule,
-                                          newTermName("fromRuntimeLong"))
-      sym == toConv || sym == fromConv                               
-    }
 
     /** Generate access to a static member */
     private def genStaticMember(sym: Symbol)(implicit pos: Position) = {
