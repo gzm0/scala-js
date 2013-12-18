@@ -399,8 +399,8 @@ object Long {
   private val TWO_PWR_44_DBL: Double = TWO_PWR_22_DBL * TWO_PWR_22_DBL
   private val TWO_PWR_63_DBL: Double = TWO_PWR_32_DBL * TWO_PWR_31_DBL
 
-  private def zero = Long(0,0,0)
-  private def one  = Long(1,0,0)
+  val zero = Long(0,0,0)
+  val one  = Long(1,0,0)
 
   def toRuntimeLong(x: scala.Long): Long = sys.error("stub")
   def fromRuntimeLong(x:Long): scala.Long = sys.error("stub")
