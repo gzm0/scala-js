@@ -1372,10 +1372,6 @@ abstract class GenJSCode extends plugins.PluginComponent
             /** Unbox a primitive value */
             val arg = args.head
             makeUnbox(genExpr(arg), tree.tpe)
-          } else if (isLongRuntimeConversion(sym)) {
-            /** convert a scala.Long to a scala.scalajs.runtime.Long
-             *  does not do anything. */
-            genExpr(args.head)
           } else {
             /** Actual method call
              *  But even these are further refined into:
@@ -2208,6 +2204,9 @@ abstract class GenJSCode extends plugins.PluginComponent
             case DICT_PROPS =>
               // js.Dictionary.propertiesOf(arg)
               genCallHelper("propertiesOf", arg)
+
+            case RTJ2J => arg
+            case J2RTJ => arg
           }
 
         case List(arg1, arg2) =>

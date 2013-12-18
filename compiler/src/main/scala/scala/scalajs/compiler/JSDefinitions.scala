@@ -70,7 +70,6 @@ trait JSDefinitions { self: JSGlobalAddons =>
       lazy val JSAny_fromByte    = getMemberMethod(JSAnyModule, newTermName("fromByte"))
       lazy val JSAny_fromShort   = getMemberMethod(JSAnyModule, newTermName("fromShort"))
       lazy val JSAny_fromInt     = getMemberMethod(JSAnyModule, newTermName("fromInt"))
-      lazy val JSAny_fromLong    = getMemberMethod(JSAnyModule, newTermName("fromLong"))
       lazy val JSAny_fromFloat   = getMemberMethod(JSAnyModule, newTermName("fromFloat"))
       lazy val JSAny_fromDouble  = getMemberMethod(JSAnyModule, newTermName("fromDouble"))
       lazy val JSAny_fromString  = getMemberMethod(JSAnyModule, newTermName("fromString"))
@@ -102,6 +101,8 @@ trait JSDefinitions { self: JSGlobalAddons =>
 
     lazy val RuntimeLongClass  = getRequiredClass("scala.scalajs.runtime.Long")
     lazy val RuntimeLongModule = RuntimeLongClass.companionModule
+      lazy val RuntimeLong_from = getMemberMethod(RuntimeLongModule, newTermName("fromRuntimeLong"))
+      lazy val RuntimeLong_to   = getMemberMethod(RuntimeLongModule, newTermName("toRuntimeLong"))
 
   }
 }

@@ -9,6 +9,7 @@ package scala.scalajs.test
 package compiler
 
 import scala.scalajs.test.ScalaJSTest
+import scala.scalajs.js
 
 /**
  * tests the compiler re-patching of native longs to
@@ -17,44 +18,45 @@ import scala.scalajs.test.ScalaJSTest
  * for a test of the implementation itself
  */
 object LongTest extends ScalaJSTest {
-
+  
   describe("JavaScript 64-bit long compatibility") {
     it("should correctly handle literals") {
-      expect(5L + 100L).toEqual(105L)
-      expect(2147483649L + 2L).toEqual(2147483651L)
-      expect(-2147483648L * 4).toEqual(-8589934592L)
-      expect(4503599627370510L * (-4)).toEqual(-18014398509482040L)
+      expect(5L + 100L == 105L).toBeTruthy
+      expect(2147483649L + 2L == 2147483651L).toBeTruthy
+      expect(-2147483648L * 4 == -8589934592L).toBeTruthy
+      expect(4503599627370510L * (-4) == -18014398509482040L).toBeTruthy
     }
     
     it("should correctly dispatch unary ops on Longs") {
       val x = 10L
       expect(-x == -10L).toBeTruthy
       val y = 5L
-      expect(-y).toEqual(-5L)
-      expect(+y).toEqual(5L)
-      expect(~y).toEqual(-6L)
+      expect(-y == -5L).toBeTruthy
+      expect(+y == 5L).toBeTruthy
+      expect(~y == -6L).toBeTruthy
     }
     
-    it("should correctly dispatch binary ops on unboxed Longs") {
-      expect(5L * 5F).toEqual(25F)
-      expect(5F * 4L).toEqual(20F)
+    it("should correctly dispatch binary ops on Longs") {
+      expect(5L * 5F == 25F).toBeTruthy
+      expect(5L % 4F == 1F).toBeTruthy
+      expect(5F * 4L == 20F).toBeTruthy
     }
     
     it("primitives should convert to Long") {
       // Byte
-      expect(234.toByte.toLong).toEqual(234L)
+      expect(234.toByte.toLong == 234L).toBeTruthy
       // Short
-      expect((-10).toShort.toLong).toEqual(-10L)
+      expect((-10).toShort.toLong == -10L).toBeTruthy
       // Char
-      expect('A'.toLong).toEqual(65L)
+      expect('A'.toLong == 65L).toBeTruthy
       // Int
-      expect(5.toLong).toEqual(5L)
+      expect(5.toLong == 5L).toBeTruthy
       // Long
-      expect(10L.toLong).toEqual(10L)
+      expect(10L.toLong == 10L).toBeTruthy
       // Float
-      expect(100000.6f.toLong).toEqual(100000L)
+      expect(100000.6f.toLong == 100000L).toBeTruthy
       // Double
-      expect(100000.6.toLong).toEqual(100000L)
+      expect(100000.6.toLong == 100000L).toBeTruthy
     }
     
     it("should generate a hash") {
@@ -62,8 +64,8 @@ object LongTest extends ScalaJSTest {
       val y = 5L
       expect(x.##).toEqual(y.##)
     } 
-    
-    
+
+
     it("should correctly concat to string") {
       val x = 20L
       expect("asdf" + 5L + x + "hello").toEqual("asdf520hello")
@@ -71,7 +73,13 @@ object LongTest extends ScalaJSTest {
     }
     
     it("string should convert to Long") {
-      expect("45678901234567890".toLong).toEqual(45678901234567890L)
+      expect("45678901234567890".toLong == 45678901234567890L).toBeTruthy
+    }
+    
+    it("should convert from and to js.Number") {
+      val x = 5: js.Number
+      expect((5L: js.Number) == x).toBeTruthy
+      expect(x.toLong == 5L).toBeTruthy
     }
   }
   
