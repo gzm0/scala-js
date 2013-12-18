@@ -210,11 +210,13 @@ object Long {
     if (i == 0) 0 else if (i < 0) -1 else 1
 
   def toBinaryString(l: scala.Long): String =
-    toRuntimeLong(l).toBinaryString.dropWhile(_ == '0')
+    dropLZ(toRuntimeLong(l).toBinaryString)
   def toHexString(l: scala.Long): String =
-    toRuntimeLong(l).toHexString.dropWhile(_ == '0')
+    dropLZ(toRuntimeLong(l).toHexString)
   def toOctalString(l: scala.Long): String =
-    toRuntimeLong(l).toOctalString.dropWhile(_ == '0')
+    dropLZ(toRuntimeLong(l).toOctalString)
+
+  private def dropLZ(s: String) = s.dropWhile(_ == '0').padTo(1, '0')
 }
 
 ////////////////// Float //////////////////
