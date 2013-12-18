@@ -2831,7 +2831,7 @@ abstract class GenJSCode extends plugins.PluginComponent
     def genZeroOf(tpe: Type)(implicit pos: Position): js.Tree = toTypeKind(tpe) match {
       case UNDEFINED => js.Undefined()
       case BOOL => js.BooleanLiteral(false)
-      case INT(LongKind) => genLongModuleCall("fromInt", js.IntLiteral(0))
+      case INT(LongKind) => genLongModuleCall("zero")
       case INT(_) => js.IntLiteral(0)
       case FLOAT(_) => js.DoubleLiteral(0.0)
       case REFERENCE(_) => js.Null()
