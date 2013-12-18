@@ -1460,9 +1460,13 @@ abstract class GenJSCode extends plugins.PluginComponent
       def float1 = js.DoubleLiteral(1.0)
 
       (from, to) match {
+        case (INT(LongKind), BOOL) =>
+          genLongCall(value, "!=", genLongModuleCall("zero"))
         case (_:INT, BOOL) => js.BinaryOp("!=", value, int0)
         case (_:FLOAT, BOOL) => js.BinaryOp("!=", value, float0)
 
+        case (BOOL, INT(LongKind)) =>
+          js.If(value, genLongModuleCall("one"), genLongModuleCall("zero"))
         case (BOOL, _:INT) => js.If(value, int1, int0)
         case (BOOL, _:FLOAT) => js.If(value, float1, float0)
 
@@ -2950,6 +2954,7 @@ abstract class GenJSCode extends plugins.PluginComponent
     def genZeroOf(tpe: Type)(implicit pos: Position): js.Tree = toTypeKind(tpe) match {
       case UNDEFINED => js.Undefined()
       case BOOL => js.BooleanLiteral(false)
+      case INT(LongKind) => genLongModuleCall("fromInt", js.IntLiteral(0))
       case INT(_) => js.IntLiteral(0)
       case FLOAT(_) => js.DoubleLiteral(0.0)
       case REFERENCE(_) => js.Null()

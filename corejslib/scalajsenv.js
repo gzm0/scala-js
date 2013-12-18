@@ -383,7 +383,16 @@ ScalaJS.ClassTypeData = function(internalNameObj, isInterface, fullName,
 ScalaJS.ArrayTypeData = function(componentData) {
   // The constructor
 
-  var componentZero = componentData.zero;
+  // componentData.zero may be a function, since some of the stuff
+  // we need to construct Longs is not yet available when we construct
+  // the primitives
+  var componentZero = componentData.zero
+
+  if (componentZero == "longZero") {
+    componentZero = ScalaJS.modules.scala_scalajs_runtime_Long().
+      zero__Lscala_scalajs_runtime_Long()
+  }
+
   /** @constructor */
   var ArrayClass = function(arg) {
     ScalaJS.c.java_lang_Object.call(this);
@@ -461,7 +470,7 @@ ScalaJS.data.scala_Char    = new ScalaJS.PrimitiveTypeData(0, "C", "char");
 ScalaJS.data.scala_Byte    = new ScalaJS.PrimitiveTypeData(0, "B", "byte");
 ScalaJS.data.scala_Short   = new ScalaJS.PrimitiveTypeData(0, "S", "short");
 ScalaJS.data.scala_Int     = new ScalaJS.PrimitiveTypeData(0, "I", "int");
-ScalaJS.data.scala_Long    = new ScalaJS.PrimitiveTypeData(0, "J", "long");
+ScalaJS.data.scala_Long    = new ScalaJS.PrimitiveTypeData("longZero", "J", "long");
 ScalaJS.data.scala_Float   = new ScalaJS.PrimitiveTypeData(0.0, "F", "float");
 ScalaJS.data.scala_Double  = new ScalaJS.PrimitiveTypeData(0.0, "D", "double");
 
