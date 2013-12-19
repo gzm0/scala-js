@@ -81,6 +81,23 @@ object LongTest extends ScalaJSTest {
       expect((5L: js.Number) == x).toBeTruthy
       expect(x.toLong == 5L).toBeTruthy
     }
+    
+    it("should correctly implement is/asInstanceOf Longs") {
+      val dyn:  Any  = 5L
+      val stat: Long = 5L
+      
+      expect(stat.asInstanceOf[Long]).toEqual(5L)
+      expect(stat.asInstanceOf[Int]).toThrow
+      
+      expect(stat.isInstanceOf[Long]).toBeTruthy
+      expect(stat.isInstanceOf[Int]).toBeFalsy
+      
+      expect(dyn.asInstanceOf[Long]).toEqual(5L)
+      expect(dyn.asInstanceOf[Int]).toThrow
+            
+      expect(dyn.isInstanceOf[Long]).toBeTruthy
+      expect(dyn.isInstanceOf[Int]).toBeFalsy
+    }
   }
   
 }
