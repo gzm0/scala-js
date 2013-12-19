@@ -383,14 +383,14 @@ ScalaJS.ClassTypeData = function(internalNameObj, isInterface, fullName,
 ScalaJS.ArrayTypeData = function(componentData) {
   // The constructor
 
-  var componentZero = componentData.zero
+  var componentZero = componentData.zero;
 
   // The zero for the Long runtime representation
   // is a special case here, since the class has not 
   // been defined yet, when this file is read
   if (componentZero == "longZero") {
     componentZero = ScalaJS.modules.scala_scalajs_runtime_Long().
-      zero__Lscala_scalajs_runtime_Long()
+      zero__Lscala_scalajs_runtime_Long();
   }
 
   /** @constructor */
