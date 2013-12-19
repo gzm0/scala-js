@@ -119,8 +119,12 @@ final class Long private (
 
   }
 
-  def ==(y: Long): Boolean = x.l == y.l && x.m == y.m && x.h == y.h
-  def !=(y: Long): Boolean = x.l != y.l || x.m != y.m || x.h != y.h
+  override def equals(that: Any): Boolean = that match {
+    case y: Long =>
+      x.l == y.l && x.m == y.m && x.h == y.h
+    case _ => false
+  }
+  def notEquals(that: Any): Boolean = !equals(that)
 
   def < (y: Long): Boolean = !(x >= y)
   def <=(y: Long): Boolean = !(x >  y)
