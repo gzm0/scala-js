@@ -62,9 +62,10 @@ object LongTest extends ScalaJSTest {
     it("should generate a hash") {
       val x = 5L
       val y = 5L
+      val z = 6L
       expect(x.##).toEqual(y.##)
-    } 
-
+      expect(z.##).not.toEqual(y.##)
+    }
 
     it("should correctly concat to string") {
       val x = 20L
@@ -80,6 +81,31 @@ object LongTest extends ScalaJSTest {
       val x = 5: js.Number
       expect((5L: js.Number) == x).toBeTruthy
       expect(x.toLong == 5L).toBeTruthy
+    }
+    
+    it("should correctly implement is/asInstanceOf Longs") {
+      val dyn:  Any  = 5L
+      val stat: Long = 5L
+      
+      expect(stat.asInstanceOf[Long]).toEqual(5L)
+      // models current scala behavior. See SI-1448
+      expect(stat.asInstanceOf[Int]).toEqual(5) 
+      
+      expect(stat.isInstanceOf[Long]).toBeTruthy
+      expect(stat.isInstanceOf[Int]).toBeFalsy
+      
+      expect(dyn.asInstanceOf[Long]).toEqual(5L)
+      expect(() => dyn.asInstanceOf[Int]).toThrow
+            
+      expect(dyn.isInstanceOf[Long]).toBeTruthy
+      expect(dyn.isInstanceOf[Int]).toBeFalsy
+    }
+    
+    it("should correctly compare to other numeric types") {
+      expect(5L == 5).toBeTruthy
+      expect(5 == 5L).toBeTruthy
+      expect(4 == 5l).toBeFalsy
+      expect('A' == 65L).toBeTruthy
     }
   }
   
