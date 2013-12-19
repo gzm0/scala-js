@@ -1448,7 +1448,7 @@ abstract class GenJSCode extends plugins.PluginComponent
 
       (from, to) match {
         case (LongKind, BOOL) =>
-          genLongCall(value, "!=", genLongModuleCall("zero"))
+          genLongCall(value, "notEquals", genLongModuleCall("zero"))
         case (_:INT, BOOL) => js.BinaryOp("!=", value, int0)
         case (_:FLOAT, BOOL) => js.BinaryOp("!=", value, float0)
 
@@ -1777,8 +1777,8 @@ abstract class GenJSCode extends plugins.PluginComponent
             case LE  => genLongCall  (ltree, "<=",  rtree)
             case GT  => genLongCall  (ltree, ">",   rtree)
             case GE  => genLongCall  (ltree, ">=",  rtree)
-            case EQ  => genOlLongCall(ltree, "==",  rtree)(RuntimeLongClass.tpe)
-            case NE  => genOlLongCall(ltree, "!=",  rtree)(RuntimeLongClass.tpe)
+            case EQ  => genLongCall  (ltree, "equals", rtree)
+            case NE  => genLongCall  (ltree, "notEquals", rtree)
             case _ =>
               abort("Unknown binary operation code: " + code)
           }
