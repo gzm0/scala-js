@@ -661,63 +661,71 @@ abstract class GenJSCode extends plugins.PluginComponent
         val alts = sym.owner.tpe.findMember(
             name = sym.name,
             excludedFlags = Flags.DEFERRED,
-            requiredFlags = Flags.METHOD | Flags.SYNTHETIC,
+            requiredFlags = Flags.METHOD,
             stableOnly    = false).alternatives
 
         // All other methods that match in name and parameters
         val overs = alts filter { s =>
           val apars = s.paramss.flatten
-          s != sym && apars.size == pars.size &&
+          s != sym &&
+          apars.size == pars.size &&
           (apars zip pars).forall { case (s1,s2) =>
             s1.tpe =:= s2.tpe
           }
         }
 
-        // Check if we have only one method
-        overs match {
-          case Nil =>
-            // We actually need to generate the proxy
-            val retTpe =
-              beforePhase(currentRun.posterasurePhase)(sym.tpe.resultType)
-            val jsParams =
-              for (param <- pars)
-                yield encodeLocalSym(param, freshName)(param.pos)
+        val retTps = overs.map(_.tpe.resultType)
 
-            val call = js.ApplyMethod(js.This(), encodeMethodSym(sym), jsParams)
+        if (retTps.exists(_.typeSymbol == ObjectClass)) {
+          // no need to generate method. it's already here
+          None
+        } else if (retTps.exists(sym.tpe.resultType <:< _)) {
+          // there is a more general method which this method overrides.
+          // use its proxy
+          None
+        } else if (retTps.forall(_ <:< sym.tpe.resultType)) {
+          // This is the most general overload. we actually need to generate
+          // the proxy
+          val retTpe =
+            beforePhase(currentRun.posterasurePhase)(sym.tpe.resultType)
+          val jsParams =
+            for (param <- pars)
+              yield encodeLocalSym(param, freshName)(param.pos)
 
-            val value = retTpe match {
-              case _ if isPrimitiveValueType(retTpe) =>
-                makeBox(call, retTpe)
-              case ErasedValueType(boxedTpe) =>
-                val boxCtor = boxedTpe.member(nme.CONSTRUCTOR)
-                genNew(boxedTpe.typeSymbol, boxCtor, List(call))
-              case _ =>
-                call
-            }
+          val call = js.ApplyMethod(js.This(), encodeMethodSym(sym), jsParams)
 
-            val body = js.Return(value)
+          val value = retTpe match {
+            case _ if isPrimitiveValueType(retTpe) =>
+              makeBox(call, retTpe)
+            case ErasedValueType(boxedTpe) =>
+              val boxCtor = boxedTpe.member(nme.CONSTRUCTOR)
+              genNew(boxedTpe.typeSymbol, boxCtor, List(call))
+            case _ =>
+              call
+          }
 
-            Some(js.MethodDef(
-                encodeMethodSym(sym, retAny = true), jsParams, body))
-          case x :: Nil if x.asMethod.returnType.typeSymbol == ObjectClass =>
-            // no need to generate method. it is already here
-            None
-          case _ =>
-            // bad things are happening
-            val sb = new StringBuilder(
-                s"""Ambiguous overload. Cannot generate return any proxy.
-                   |Offending symbol: $sym
-                   |With type: ${sym.tpe}
-                   |Alternatives:
-                   |""".stripMargin)
-            for (a <- alts) {
-              sb.append(s"""Symbol    = $a
-                           |  paramss = ${a.paramss}
-                           |  type    = ${a.tpe}
-                           |
-                           |""".stripMargin)
-            }
-            abort(sb.toString)
+          val body = js.Return(value)
+
+          Some(js.MethodDef(
+              encodeMethodSym(sym, retAny = true), jsParams, body))
+
+        } else {
+          // bad things are happening
+          val sb = new StringBuilder(
+              s"""Ambiguous overload. Cannot generate return any proxy.
+                 |Offending symbol: $sym
+                 |With type: ${sym.tpe}
+                 |Alternatives:
+                 |""".stripMargin)
+
+          for (a <- overs) {
+            sb.append(s"""Symbol    = $a
+                         |  paramss = ${a.paramss}
+                         |  type    = ${a.tpe}
+                         |
+                         |""".stripMargin)
+          }
+          abort(sb.toString)
         }
       }
     }
