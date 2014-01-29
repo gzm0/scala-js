@@ -20,11 +20,6 @@ object StringTest extends JasmineTest {
       expect("".length).toEqual(0)
     }
 
-    it("should respond to `intern`") {
-      val s = "Scala.js"
-      expect(s.intern).toEqual(s)
-    }
-
     it("should respond to `equals`") {
       expect("Scala.js".equals("Scala.js")).toBeTruthy
       expect("Scala.js".equals("Java")).toBeFalsy
