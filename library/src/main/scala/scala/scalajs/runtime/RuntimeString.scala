@@ -55,6 +55,28 @@ trait RuntimeString { this: js.String =>
   /** Unimplemented, unused, but referenced */
   def getBytes(charsetName: String): Array[Byte] = ???
 
+  def getChars(srcBegin: Int, srcEnd: Int,
+    dst: Array[Char], dstBegin: Int): Unit = {
+
+    val thisjs: js.String = this
+
+    if (srcBegin < 0 ||
+        srcEnd   > thisjs.length ||
+        srcEnd   < 0 ||
+        srcBegin > srcEnd) {
+      throw new StringIndexOutOfBoundsException("Index out of Bound")
+    }
+
+    val offset = dstBegin - srcBegin
+    var i = srcBegin
+
+    while (i < srcEnd) {
+      dst(i+offset) = thisjs.charCodeAt(i).toChar
+      i += 1
+    }
+
+  }
+
   def indexOf(ch: Int): Int = {
     val search: js.String = js.String.fromCharCode(ch)
     (this: js.String).indexOf(search).toInt
