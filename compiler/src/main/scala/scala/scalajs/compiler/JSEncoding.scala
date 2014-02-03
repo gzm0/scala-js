@@ -75,10 +75,9 @@ trait JSEncoding extends SubComponent { self: GenJSCode =>
     js.Ident(mangleJSName(encodedName), Some(sym.originalName.decoded))
   }
 
-  def encodeMethodSym(sym: Symbol, retAny: Boolean = false)
+  def encodeMethodSym(sym: Symbol, reflProxy: Boolean = false)
                      (implicit pos: Position): js.Ident = {
     require(sym.isMethod, "encodeMethodSym called with non-method symbol: " + sym)
-
     val encodedName = {
       if (sym.isClassConstructor)
         "init" + InnerSep
@@ -91,7 +90,7 @@ trait JSEncoding extends SubComponent { self: GenJSCode =>
         mangleJSName(sym.name.toString)
     }
 
-    val paramsString = makeParamsString(sym, retAny)
+    val paramsString = makeParamsString(sym, reflProxy)
     js.Ident(encodedName + paramsString,
         Some(sym.originalName.decoded + paramsString))
   }
@@ -212,12 +211,12 @@ trait JSEncoding extends SubComponent { self: GenJSCode =>
 
   // Encoding of method signatures
 
-  private def makeParamsString(sym: Symbol, retAny: Boolean = false): String = {
+  private def makeParamsString(sym: Symbol, reflProxy: Boolean): String = {
     val tpe = sym.tpe
     val paramTypeNames = tpe.params map (p => internalName(p.tpe))
     makeParamsString(
         if (sym.isClassConstructor) paramTypeNames
-        else if (retAny)
+        else if (reflProxy)
           paramTypeNames :+ internalName(definitions.ObjectClass.tpe)
         else
           paramTypeNames :+ internalName(tpe.resultType))
