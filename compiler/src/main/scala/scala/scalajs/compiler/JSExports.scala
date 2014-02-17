@@ -9,26 +9,79 @@ import scala.tools.nsc._
 import scala.math.PartialOrdering
 import scala.reflect.internal.Flags
 
+
 /** Generation of bridges for JavaScript
  *
  *  @author Sébastien Doeraene
  */
-trait JSBridges extends SubComponent { self: GenJSCode =>
+trait JSExports extends SubComponent { self: GenJSCode =>
   import global._
   import jsAddons._
   import definitions._
   import jsDefinitions._
   import scalaPrimitives.isPrimitive
 
-  private def isCandidateForBridge(sym: Symbol): Boolean = (
+  // TODO these checks should be done in the prep interop phase
+  /*
+  private def isCandidateForExport(sym: Symbol): Boolean = (
      sym.isMethod      &&
     !sym.isBridge      &&
      sym.isPublic      &&
     !isPrimitive(sym)  &&
-    !sym.isMacro)
+    !sym.isMacro)*/
+
+  private case class Export(sym: Symbol, name: String)
+
+  /** attachment to Interface symbols saying which symbols a subclass has to
+   *  export */
+  private case class DeferredExports(exports: List[Export])
+
+  private case class Exports(exports: Map[String, List[Export]])
+
+  val exportCache: Map[Symbol, Map[String, Symbol]] = Map.empty
+
+  val deferredExpCache: Map[Symbol, List[Export]] = Map.empty
+
+  def genExportsForClass(sym: Symbol): List[js.Tree] = {
+
+
+
+    val declaredExports = sym.info.decls.filter(isExported)
+    val newlyDeclaredExports = declaredExports.filterNot(isOverridingBridge)
+    val newlyDeclaredMethodNames =
+      newlyDeclaredMethods.map(_.name.toTermName).toList.distinct
+    newlyDeclaredMethodNames map (genBridge(sym, _))
+    for { (name, altBuf) <- reg.exports }
+      yield genExport(name, altBuf.toList)
+  }.toList
+
+  def genExport(name: String, alts: List[Symbol]) = {
+    implicit val pos = alts.head.pos
+
+    val altsByArgCount = alts.groupBy(_.tpe.params.size).toList.sortBy(_._1)
+
+    val maxArgCount = altsByArgCount.last._1
+    val formalsArgs = genFormalArgs(maxArgCount)
+
+    val cases = for {
+      (argc, methods) <- altsByArgCount
+    } yield {
+      (js.IntLiteral(argc), genBridgeSameArgc(methods, 0))
+    }
+
+    val body = {
+      if (cases.size == 1) cases.head._2
+      else {
+        js.Switch(js.DotSelect(js.Ident("arguments"), js.Ident("length")),
+            cases, genThrowTypeError())
+      }
+    }
+
+    js.MethodDef(js.StringLiteral(name), formalsArgs, body)
+  }
 
   /** checks if a symbol is overriding a symbol we already made a bridge for */
-  private def isOverridingBridge(sym: Symbol): Boolean = {
+  private def isOverridingExport(sym: Symbol): Boolean = {
     lazy val osym = sym.nextOverriddenSymbol
     sym.isOverridingSymbol && osym.isPublic && !osym.owner.isInterface
   }
@@ -262,4 +315,12 @@ trait JSBridges extends SubComponent { self: GenJSCode =>
 
   private def genFormalArg(index: Int)(implicit pos: Position): js.Ident =
     js.Ident("arg$" + index)
+
+  private def isExported(sym: Symbol) =
+    sym.getAnnotation(JSExportAnnotation).isDefined
+
+  def exportNameOf(sym: Symbol): Option[String] =
+    sym.getAnnotation(JSExportAnnotation).map { annot =>
+      annot.stringArg(0).getOrElse(jsExportName(sym.unexpandedName))
+    }
 }

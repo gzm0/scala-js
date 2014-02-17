@@ -6,8 +6,9 @@
 package helloworld
 
 import scala.scalajs.js
-import js.annotation.JSName
+import js.annotation.{ JSName, JSExport }
 
+@JSExport(name = "fooo")
 object HelloWorld {
   def main() {
     sayHelloFromDOM()

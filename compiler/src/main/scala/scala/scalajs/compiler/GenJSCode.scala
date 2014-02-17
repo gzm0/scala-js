@@ -19,7 +19,7 @@ import scala.annotation.tailrec
 abstract class GenJSCode extends plugins.PluginComponent
                             with TypeKinds
                             with JSEncoding
-                            with JSBridges
+                            with JSExports
                             with JSDesugaring
                             with GenJSFiles
                             with Compat210Component {
@@ -263,6 +263,9 @@ abstract class GenJSCode extends plugins.PluginComponent
       }
       assert(constructorBridges0.size <= 1)
       val constructorBridge = constructorBridges0.headOption
+
+      // Generate the exported members
+      val exports = genExportsForClass(sym)
 
       // Generate the reflective call proxies (where required)
       val reflProxies = genReflCallProxies(sym)
@@ -786,8 +789,9 @@ abstract class GenJSCode extends plugins.PluginComponent
         moduleInstance := js.Undefined()
       }
 
+      val accessorName = envField("modules") DOT moduleIdent
       val createAccessor = {
-        envField("modules") DOT moduleIdent := js.Function(Nil, js.Block(
+        accessorName := js.Function(Nil, js.Block(
             IF (!(moduleInstance)) {
               moduleInstance := js.ApplyMethod(
                   js.New(encodeClassSym(sym), Nil),
@@ -798,7 +802,13 @@ abstract class GenJSCode extends plugins.PluginComponent
         ))
       }
 
-      js.Block(createModuleInstanceField, createAccessor)
+      // For simplicity, this export is generated in place
+      val exportedAccessor = exportNameOf(sym) map { name =>
+        js.Select(envField("g"), js.StringLiteral(name)) := accessorName
+      }
+
+      js.Block(List(createModuleInstanceField, createAccessor) ++
+          exportedAccessor :_*)
     }
 
     // Code generation ---------------------------------------------------------
