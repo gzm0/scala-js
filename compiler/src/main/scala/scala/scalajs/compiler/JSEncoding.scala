@@ -231,6 +231,13 @@ trait JSEncoding extends SubComponent { self: GenJSCode =>
   def encodeModuleFullName(sym: Symbol): String =
     encodeFullNameInternal(sym)
 
+  /** the JavaScript name given to an exported symbol */
+  def jsExportName(name: TermName): String = name.toString match {
+    case "<init>" => "init_" // will be stolen by the JS constructor
+    case "constructor" => "$constructor"
+    case x => mangleJSName(x)
+  }
+
   private def encodeFullNameInternal(sym: Symbol): String = {
     val tmp = sym.fullName.replace("_", "$und").replace(".", "_")
     mangleJSName(tmp)
