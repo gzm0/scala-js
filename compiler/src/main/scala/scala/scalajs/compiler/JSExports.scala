@@ -30,30 +30,72 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     !isPrimitive(sym)  &&
     !sym.isMacro)*/
 
-  private case class Export(sym: Symbol, name: String)
+  /** Marks an export: sym is exported with a given name
+   *  
+   *  This can either be an obligation to export, or an already exported symbol
+   */  
+  private case class Export(name: String, sym: Symbol) {
+    /** whether this export fulfills a given obligation */ 
+    def fulfills(e: Export) = {
+      name == e.name && sym.name == e.sym.name &&
+      sym.tpe <:< e.sym.tpe
+    }
+  }
 
-  /** attachment to Interface symbols saying which symbols a subclass has to
-   *  export */
-  private case class DeferredExports(exports: List[Export])
-
-  private case class Exports(exports: Map[String, List[Export]])
-
-  val exportCache: Map[Symbol, Map[String, Symbol]] = Map.empty
-
-  val deferredExpCache: Map[Symbol, List[Export]] = Map.empty
+  private def localExports(sym: Symbol) = for {
+    meth <- sym.tpe.decls
+    name <- exportNameOf(meth)
+  } yield Export(name, meth)
+  
+  private def exportBurdens(sym: Symbol) = for {
+    iface <- sym.tpe.baseClasses
+    if iface.isInterface
+    exp   <- getExports(iface)
+  } yield exp
+  
+  private def getExports(sym: Symbol): List[Export] = {
+    if (sym == ObjectClass) Nil else {
+      sym.attachments.get[List[Export]].getOrElse {
+        val exps = if (sym.isInterface) {
+          // If this is an interface, just create a simple burden list
+          localExports(sym)
+        } else {
+          // Fetch all burdens from interfaces
+          val burdens = exportBurdens(sym) 
+          // Fetch stuff from super
+          val superExp = getExports(sym.superClass)
+          // Fetch my stuff
+          val thisExp = localExports(sym)
+          burdens ++ superExp ++ thisExp
+        }
+        val res = exps.toList
+        sym.updateAttachment(res)
+        res
+      }
+    }
+  }
 
   def genExportsForClass(sym: Symbol): List[js.Tree] = {
-
-
-
-    val declaredExports = sym.info.decls.filter(isExported)
+    val superExports = getExports(sym.superClass)
+    val burdens = exportBurdens(sym)
+    val localExps = localExports(sym)
+    
+    //sym.tpe.
+    
+    println(s"Exports for ${sym.fullName}:")
+    println(s" Burdens: ${burdens}")
+    println(s" Super: ${superExports}")
+    println(s" Local: ${localExps}")
+    Nil
+  }
+/*    val declaredExports = sym.info.decls.filter(isExported)
     val newlyDeclaredExports = declaredExports.filterNot(isOverridingBridge)
     val newlyDeclaredMethodNames =
       newlyDeclaredMethods.map(_.name.toTermName).toList.distinct
     newlyDeclaredMethodNames map (genBridge(sym, _))
     for { (name, altBuf) <- reg.exports }
       yield genExport(name, altBuf.toList)
-  }.toList
+  }.toList*/
 
   def genExport(name: String, alts: List[Symbol]) = {
     implicit val pos = alts.head.pos
@@ -85,7 +127,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     lazy val osym = sym.nextOverriddenSymbol
     sym.isOverridingSymbol && osym.isPublic && !osym.owner.isInterface
   }
-
+/*
   def genBridgesForClass(sym: Symbol): List[js.Tree] = {
     val declaredMethods = sym.info.decls.filter(isCandidateForBridge)
     val newlyDeclaredMethods = declaredMethods.filterNot(isOverridingBridge)
@@ -133,7 +175,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
       case x => x
     }
     js.MethodDef(js.Ident(jsName), formalsArgs, body)
-  }
+  }*/
 
   private def genBridgeSameArgc(alts: List[Symbol], paramIndex: Int): js.Tree = {
     implicit val pos = alts.head.pos
@@ -319,8 +361,9 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   private def isExported(sym: Symbol) =
     sym.getAnnotation(JSExportAnnotation).isDefined
 
-  def exportNameOf(sym: Symbol): Option[String] =
-    sym.getAnnotation(JSExportAnnotation).map { annot =>
-      annot.stringArg(0).getOrElse(jsExportName(sym.unexpandedName))
-    }
+  def exportNameOf(sym: Symbol): List[String] = for {
+    annot <- sym.annotations
+    if annot.symbol == JSExportAnnotation
+  } yield annot.stringArg(0).getOrElse(jsExportName(sym.unexpandedName))
+
 }

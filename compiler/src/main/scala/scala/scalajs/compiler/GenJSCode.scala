@@ -256,13 +256,14 @@ abstract class GenJSCode extends plugins.PluginComponent
       gen(impl)
 
       // Generate the bridges, then steal the constructor bridges (1 at most)
-      val bridges0 = genBridgesForClass(sym)
+/*      val bridges0 = genBridgesForClass(sym)
       val (constructorBridges0, bridges) = bridges0.partition {
         case js.MethodDef(js.Ident("init_", _), _, _) => true
         case _ => false
       }
       assert(constructorBridges0.size <= 1)
-      val constructorBridge = constructorBridges0.headOption
+      val constructorBridge = constructorBridges0.headOption*/
+      val constructorBridge: Option[js.Tree] = None
 
       // Generate the exported members
       val exports = genExportsForClass(sym)
@@ -273,7 +274,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       // The actual class definition
       val classDefinition = js.ClassDef(classVar,
           envField("inheritable") DOT encodeClassFullNameIdent(sym.superClass),
-          generatedMembers.toList ++ bridges ++ reflProxies)
+          generatedMembers.toList ++ exports ++ reflProxies)
 
       /* Inheritable constructor
        *
@@ -296,6 +297,7 @@ abstract class GenJSCode extends plugins.PluginComponent
        * }
        * ScalaJS.classes.prototype = Class.prototype;
        */
+
       val createJSConstructorStat = constructorBridge match {
         case Some(js.MethodDef(_, args, body)) =>
           val jsConstructorVar = envField("classes") DOT classIdent

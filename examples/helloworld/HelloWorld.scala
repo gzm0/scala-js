@@ -8,6 +8,36 @@ package helloworld
 import scala.scalajs.js
 import js.annotation.{ JSName, JSExport }
 
+trait Foo {
+  @JSExport
+  def x: Int
+}
+
+trait Bar extends Foo {
+  @JSExport(name = "hello")
+  @JSExport(name = "myawesomemethod")
+  def x: Int
+}
+
+class Impl extends Bar {
+  def x: Int = 1
+  @JSExport
+  def y: String = "asdf"
+}
+
+class A
+class B extends A
+
+class C1 {
+  @JSExport
+  def x: A = new A
+}
+
+class C2 extends C1 {
+  @JSExport
+  override def x: B = new B 
+}
+
 @JSExport(name = "fooo")
 object HelloWorld {
   def main() {
