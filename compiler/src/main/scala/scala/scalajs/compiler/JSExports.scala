@@ -31,28 +31,31 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     !sym.isMacro)*/
 
   /** Marks an export: sym is exported with a given name
-   *  
+   *
    *  This can either be an obligation to export, or an already exported symbol
-   */  
+   */
   private case class Export(name: String, sym: Symbol) {
-    /** whether this export fulfills a given obligation */ 
+    /** whether this export fulfills a given obligation */
     def fulfills(e: Export) = {
-      name == e.name && sym.name == e.sym.name &&
-      sym.tpe <:< e.sym.tpe
+      name == e.name && sym.name == e.sym.name && (
+        sym.tpe <:< e.sym.tpe ||
+        e.sym.allOverriddenSymbols.contains(sym)
+      )
     }
+    override def toString = s"Export(${sym.fullName} --> $name)"
   }
 
   private def localExports(sym: Symbol) = for {
     meth <- sym.tpe.decls
     name <- exportNameOf(meth)
   } yield Export(name, meth)
-  
+
   private def exportBurdens(sym: Symbol) = for {
     iface <- sym.tpe.baseClasses
     if iface.isInterface
     exp   <- getExports(iface)
   } yield exp
-  
+
   private def getExports(sym: Symbol): List[Export] = {
     if (sym == ObjectClass) Nil else {
       sym.attachments.get[List[Export]].getOrElse {
@@ -61,7 +64,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
           localExports(sym)
         } else {
           // Fetch all burdens from interfaces
-          val burdens = exportBurdens(sym) 
+          val burdens = exportBurdens(sym)
           // Fetch stuff from super
           val superExp = getExports(sym.superClass)
           // Fetch my stuff
@@ -79,13 +82,17 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val superExports = getExports(sym.superClass)
     val burdens = exportBurdens(sym)
     val localExps = localExports(sym)
-    
+
+    val exps = (localExps ++ burdens).filterNot(
+        b => superExports.exists(_ fulfills b))
+
     //sym.tpe.
-    
+
     println(s"Exports for ${sym.fullName}:")
     println(s" Burdens: ${burdens}")
     println(s" Super: ${superExports}")
     println(s" Local: ${localExps}")
+    println(s" Final: ${exps}")
     Nil
   }
 /*    val declaredExports = sym.info.decls.filter(isExported)

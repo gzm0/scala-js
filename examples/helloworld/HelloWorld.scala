@@ -19,7 +19,7 @@ trait Bar extends Foo {
   def x: Int
 }
 
-class Impl extends Bar {
+class FooBarImpl extends Bar {
   def x: Int = 1
   @JSExport
   def y: String = "asdf"
@@ -35,7 +35,7 @@ class C1 {
 
 class C2 extends C1 {
   @JSExport
-  override def x: B = new B 
+  override def x: A = new B
 }
 
 @JSExport(name = "fooo")
