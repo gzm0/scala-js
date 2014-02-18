@@ -21,8 +21,7 @@ abstract class GenJSCode extends plugins.PluginComponent
                             with JSEncoding
                             with JSExports
                             with JSDesugaring
-                            with GenJSFiles
-                            with Compat210Component {
+                            with GenJSFiles {
   val jsAddons: JSGlobalAddons {
     val global: GenJSCode.this.global.type
   }
@@ -805,8 +804,10 @@ abstract class GenJSCode extends plugins.PluginComponent
       }
 
       // For simplicity, this export is generated in place
-      val exportedAccessor = exportNameOf(sym) map { name =>
-        js.Select(envField("g"), js.StringLiteral(name)) := accessorName
+      val exportedAccessor = jsExport.exportNamesOf(sym) map {
+        case (name, p) =>
+          implicit val pos = p
+          js.Select(envField("g"), js.StringLiteral(name)) := accessorName
       }
 
       js.Block(List(createModuleInstanceField, createAccessor) ++

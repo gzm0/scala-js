@@ -9,6 +9,7 @@ import scala.tools.nsc
 import nsc._
 
 import scala.collection.immutable.ListMap
+import scala.collection.mutable
 
 /** Prepares classes extending js.Any for JavaScript interop
  *
@@ -18,7 +19,8 @@ import scala.collection.immutable.ListMap
  *
  * @author Tobias Schlatter
  */
-abstract class PrepJSInterop extends plugins.PluginComponent with transform.Transform {
+abstract class PrepJSInterop extends plugins.PluginComponent
+                                with transform.Transform {
   val jsAddons: JSGlobalAddons {
     val global: PrepJSInterop.this.global.type
   }
@@ -28,6 +30,8 @@ abstract class PrepJSInterop extends plugins.PluginComponent with transform.Tran
   import definitions._
   import rootMirror._
   import jsDefinitions._
+
+  import scala.reflect.internal.Flags
 
   val phaseName = "jsinterop"
 
@@ -61,7 +65,10 @@ abstract class PrepJSInterop extends plugins.PluginComponent with transform.Tran
     def allowJSAny     = !inScalaCls
     def inJSAny        = inJSAnyMod || inJSAnyCls
 
-    override def transform(tree: Tree): Tree = tree match {
+    /** DefDefs in class templates that export methods to JavaScript */
+    val exporters = mutable.Map.empty[Symbol, mutable.ListBuffer[Tree]]
+
+    override def transform(tree: Tree): Tree = postTransform { tree match {
       // Catch special case of ClassDef in ModuleDef
       case cldef: ClassDef if jsAnyClassOnly && isJSAny(cldef) =>
         transformJSAny(cldef)
@@ -108,7 +115,71 @@ abstract class PrepJSInterop extends plugins.PluginComponent with transform.Tran
                        |operation requires reflection.""".stripMargin)
         super.transform(tree)
 
+
+      case ddef: DefDef =>
+        val sym = ddef.symbol
+        val exportNames = jsExport.exportNamesOf(sym)
+
+        if (!exportNames.isEmpty) {
+          // Get position of one annotation for error messages
+          def errorPos = exportNames.head._2
+          if (inJSAny) {
+            unit.error(errorPos,
+                "You may not export a method of a subclass of js.Any")
+          } else if (!sym.isPublic) {
+            unit.error(errorPos,
+                "You may not export a non-public member")
+          } else {
+            // Actually generate
+            val flags = ddef.mods.flags & ~Flags.DEFERRED | Flags.SYNTHETIC
+            val mods = Modifiers(flags)
+
+            val expDefs = for ((expName, pos) <- exportNames) yield atPos(pos) {
+              println(s"exporting ${sym.fullName} to ${exportNames}")
+              val scalaName = jsExport.scalaExportName(expName)
+
+              //println(sym.owner)
+              //println(typer.typed { Select(This(sym.owner), sym) }.tpe)
+
+              val sel: Tree = Select(This(sym.owner), sym)
+              sel.tpe = sym.tpe
+
+              println(sel.tpe)
+              val rhs = (sel /: sym.paramss) {
+                (fun,params) => Apply(fun, params map Ident)
+              }
+              val expTree = DefDef(mods, scalaName,
+                ddef.tparams, ddef.vparamss, ddef.tpt, rhs)
+              val expSym =  sym.owner.newMethodSymbol(scalaName, pos, flags)
+              expSym.setInfo(sym.tpe)
+              expTree.symbol = expSym
+
+              println(typer.silent(t => t.typedDefDef(expTree), true, expTree))
+
+              expTree
+            }
+
+            exporters.getOrElseUpdate(sym.owner,
+                mutable.ListBuffer.empty) ++= expDefs
+          }
+        }
+
+        super.transform(tree)
+
       case _ => super.transform(tree)
+    } }
+
+    private def postTransform(tree: Tree) = tree match {
+      case Template(parents, self, body) =>
+        val clsSym = tree.symbol.owner
+        val exports = exporters.get(clsSym).toIterable.flatten
+
+        // If we have exports, add them to the template
+        if (!exports.isEmpty)
+          treeCopy.Template(tree, parents, self, body ++ exports)
+        else
+          tree
+      case _ => tree
     }
 
     /**

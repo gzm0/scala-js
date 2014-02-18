@@ -34,7 +34,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
    *
    *  This can either be an obligation to export, or an already exported symbol
    */
-  private case class Export(name: String, sym: Symbol) {
+  private case class Export(name: String, sym: Symbol, pos: Position) {
     /** whether this export fulfills a given obligation */
     def fulfills(e: Export) = {
       name == e.name && sym.name == e.sym.name && (
@@ -47,8 +47,8 @@ trait JSExports extends SubComponent { self: GenJSCode =>
 
   private def localExports(sym: Symbol) = for {
     meth <- sym.tpe.decls
-    name <- exportNameOf(meth)
-  } yield Export(name, meth)
+    (name, pos) <- jsExport.exportNamesOf(meth)
+  } yield Export(name, meth, pos)
 
   private def exportBurdens(sym: Symbol) = for {
     iface <- sym.tpe.baseClasses
@@ -88,11 +88,11 @@ trait JSExports extends SubComponent { self: GenJSCode =>
 
     //sym.tpe.
 
-    println(s"Exports for ${sym.fullName}:")
+    /*println(s"Exports for ${sym.fullName}:")
     println(s" Burdens: ${burdens}")
     println(s" Super: ${superExports}")
     println(s" Local: ${localExps}")
-    println(s" Final: ${exps}")
+    println(s" Final: ${exps}")*/
     Nil
   }
 /*    val declaredExports = sym.info.decls.filter(isExported)
@@ -367,10 +367,5 @@ trait JSExports extends SubComponent { self: GenJSCode =>
 
   private def isExported(sym: Symbol) =
     sym.getAnnotation(JSExportAnnotation).isDefined
-
-  def exportNameOf(sym: Symbol): List[String] = for {
-    annot <- sym.annotations
-    if annot.symbol == JSExportAnnotation
-  } yield annot.stringArg(0).getOrElse(jsExportName(sym.unexpandedName))
 
 }
