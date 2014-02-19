@@ -13,9 +13,12 @@ import scala.collection.mutable
 
 /** Prepares classes extending js.Any for JavaScript interop
  *
- * This phase does two things:
+ * This phase does:
  * - Annotate subclasses of js.Any to be treated specially
- * - Handle extension methods to subclasses of js.Any
+ * - Rewrite calls to scala.Enumeration.Value (include name string)
+ * - Create JSExport methods: Dummy methods that are propagated
+ *   through the whole compiler chain to mark exports. This allows
+ *   exports to have the same semantics than methods.
  *
  * @author Tobias Schlatter
  */
