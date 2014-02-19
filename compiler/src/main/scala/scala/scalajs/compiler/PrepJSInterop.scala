@@ -116,6 +116,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent
         super.transform(tree)
 
       // TODO add transformers for VarDef and ValDef
+      // TODO special case constructors here
       case ddef: DefDef =>
         val baseSym = ddef.symbol
         val clsSym = baseSym.owner
@@ -124,14 +125,19 @@ abstract class PrepJSInterop extends plugins.PluginComponent
         if (!exportNames.isEmpty) {
           // Get position of one annotation for error messages
           def errorPos = exportNames.head._2
+
+          assert(!baseSym.isBridge)
+
           if (isJSAny(clsSym)) {
             unit.error(errorPos,
                 "You may not export a method of a subclass of js.Any")
           } else if (!baseSym.isPublic) {
-            unit.error(errorPos,
-                "You may not export a non-public member")
+            unit.error(errorPos, "You may not export a non-public member")
+          } else if (baseSym.isMacro)
+            unit.error(errorPos, "You may not export a macro")
+          } else if (scalaPrimitives.isPrimitive(baseSym)) {
+            unit.error(errorPos, "You may not export a primitive")
           } else {
-
             // Actually generate exporter method
             val expDefs = for ((expName, pos) <- exportNames) yield atPos(pos) {
               val scalaName = jsExport.scalaExportName(expName)

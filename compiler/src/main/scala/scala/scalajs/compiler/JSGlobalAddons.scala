@@ -46,6 +46,9 @@ trait JSGlobalAddons extends JSTrees
     /** checks if the given name is a JSExport */
     def isExportName(name: Name): Boolean = name.startsWith(exportPrefix)
 
+    /** checks if the given symbol is a JSExport */
+    def isExport(sym: Symbol): Boolean = isExportName(sym.unexpandedName)
+
   }
 
 }
