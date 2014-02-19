@@ -150,6 +150,9 @@ abstract class PrepJSInterop extends plugins.PluginComponent
               expSym.setInfo(sym.tpe)
               expTree.symbol = expSym
 
+              // FIXME remove this, or drop implementation
+              expSym.setAnnotations(exportsAnnot(sym.unexpandedName.encoded))
+
               typer.typedDefDef(expTree)
             }
 
@@ -171,8 +174,14 @@ abstract class PrepJSInterop extends plugins.PluginComponent
         // If we have exports, add them to the template
         if (!exports.isEmpty)
           treeCopy.Template(tree, parents, self, body ++ exports)
-        else
-          tree
+        else tree
+
+      case cdef: ClassDef =>
+        typer.typedClassDef(cdef)
+
+      case mdef: ModuleDef =>
+        typer.typedModuleDef(mdef)
+
       case _ => tree
     }
 
@@ -348,6 +357,9 @@ abstract class PrepJSInterop extends plugins.PluginComponent
 
   private def rawJSAnnot =
     Annotation(RawJSTypeAnnot.tpe, List.empty, ListMap.empty)
+
+  private def exportsAnnot(name: String) =
+    Annotation(ExportsAnnot.tpe, Literal(Constant(name)) :: Nil, ListMap.empty)
 
   private val ScalaEnumClass = getRequiredClass("scala.Enumeration")
 

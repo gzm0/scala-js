@@ -114,6 +114,7 @@ trait JSDefinitions { self: JSGlobalAddons =>
       def JSThisFunction_fromFunction(arity: Int) = getMemberMethod(JSThisFunctionModule, newTermName("fromFunction"+arity))
 
     lazy val RawJSTypeAnnot = getClassIfDefined("scala.scalajs.js.annotation.RawJSType")
+    lazy val ExportsAnnot = getClassIfDefined("scala.scalajs.js.annotation.Exports")
 
     lazy val RuntimeLongClass  = getRequiredClass("scala.scalajs.runtime.Long")
     lazy val RuntimeLongModule = RuntimeLongClass.companionModule

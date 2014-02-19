@@ -11,21 +11,52 @@ import js.annotation.{ JSName, JSExport }
 trait Foo {
   @JSExport
   def x: Int
+  @JSExport
+  def z(x: Int): Int
 }
 
 trait Bar extends Foo {
+  // Multiple exports
   @JSExport(name = "hello")
   @JSExport(name = "myawesomemethod")
   def x: Int
   def y(foo: String): String = "Bar" + foo
-  def z = y("hello")
-  def r = y _
+}
+
+trait Stack extends Foo {
+  // Export on absoverride
+  @JSExport
+  abstract override def x: Int = super.x + 1
 }
 
 class FooBarImpl extends Bar {
   def x: Int = 1
+  
+  // Export of overridden method without export in super
   @JSExport
   override def y(foo: String): String = "asdf" + foo
+  
+  // Forced inherited export
+  def z(x: Int) = x + 5
+  
+  @JSExport
+  val a: Int = 4
+}
+
+// Conflicting exports. Should fail!
+class Confl {
+  
+  @JSExport(name = "value")
+  def hello = "foo"
+    
+  @JSExport(name = "value")
+  def world = "bar"
+}
+
+// Exports in object
+object A {
+  @JSExport
+  def value = 1
 }
 
 class A
@@ -37,8 +68,9 @@ class C1 {
 }
 
 class C2 extends C1 {
+  // Bridged export
   @JSExport
-  override def x: A = new B
+  override def x: B = new B
 }
 
 //@JSExport(name = "fooo")
