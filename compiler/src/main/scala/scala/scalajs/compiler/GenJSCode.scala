@@ -608,7 +608,8 @@ abstract class GenJSCode extends plugins.PluginComponent
       val result = {
         if (scalaPrimitives.isPrimitive(sym)
             || sym.isDeferred // abstract method
-            || isTrivialConstructor(sym, params, rhs)) {
+            || isTrivialConstructor(sym, params, rhs)
+            || jsExport.isExportName(sym.unexpandedName)) {
           None
         } else {
           val jsParams =
@@ -722,8 +723,10 @@ abstract class GenJSCode extends plugins.PluginComponent
           excludedFlags = Flags.BRIDGE | Flags.PRIVATE | Flags.MACRO,
           requiredFlags = Flags.METHOD)
 
-      val candidates = methods filter {
-        s => !s.isConstructor && !superHasProxy(s)
+      val candidates = methods filterNot { s =>
+        s.isConstructor  ||
+        superHasProxy(s) ||
+        jsExport.isExportName(s.unexpandedName)
       }
 
       val proxies = candidates filter {
