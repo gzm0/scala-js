@@ -21,6 +21,9 @@ trait Bar extends Foo {
   @JSExport(name = "myawesomemethod")
   def x: Int
   def y(foo: String): String = "Bar" + foo
+  
+  @JSExport
+  def w: Int
 }
 
 trait Stack extends Foo {
@@ -39,6 +42,10 @@ class FooBarImpl extends Bar {
   // Forced inherited export
   def z(x: Int) = x + 5
   
+  // Export twice (in subclass and superclass)
+  @JSExport
+  def w: Int = 5
+  
   @JSExport
   val a: Int = 4
 }
@@ -46,11 +53,18 @@ class FooBarImpl extends Bar {
 // Conflicting exports. Should fail!
 class Confl {
   
+  class Box[T](val x: T)
+  
   @JSExport(name = "value")
   def hello = "foo"
     
-  @JSExport(name = "value")
+  @JSExport(name = "value_")
   def world = "bar"
+    
+  @JSExport
+  def ub(x: Box[String]): String = x.x
+  @JSExport
+  def ub(x: Box[Int]): Int = x.x 
 }
 
 // Exports in object
@@ -75,5 +89,6 @@ class C2 extends C1 {
 
 //@JSExport(name = "fooo")
 object HelloWorld {
+  
   def hello = "hello world"
 }

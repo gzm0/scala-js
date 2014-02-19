@@ -131,7 +131,11 @@ abstract class PrepJSInterop extends plugins.PluginComponent
                 "You may not export a non-public member")
           } else {
             // Actually generate
-            val flags = ddef.mods.flags & ~Flags.DEFERRED | Flags.SYNTHETIC
+            val flags = (ddef.mods.flags
+                & ~Flags.DEFERRED  // All export methods have implementations
+                & ~Flags.OVERRIDE  // No need for override since sythetic
+                | Flags.SYNTHETIC)
+
             val mods = Modifiers(flags)
 
             val expDefs = for ((expName, pos) <- exportNames) yield atPos(pos) {
@@ -143,13 +147,17 @@ abstract class PrepJSInterop extends plugins.PluginComponent
                 (fun,params) => Apply(fun, params map Ident)
               }
 
-              // Construct exporter DefDef tree, update symbol table and type it
+              // Construct exporter DefDef tree
               val expTree = DefDef(mods, scalaName,
                 ddef.tparams, ddef.vparamss, ddef.tpt, rhs)
-              val expSym =  sym.owner.newMethodSymbol(scalaName, pos, flags)
+
+              // Create symbol for new method
+              val expSym = sym.owner.newMethodSymbol(scalaName, pos, flags)
               expSym.setInfo(sym.tpe)
               expTree.symbol = expSym
 
+              // Add symbol to class
+              sym.owner.info.decls.enter(expSym)
 
               typer.typedDefDef(expTree)
             }
@@ -170,15 +178,18 @@ abstract class PrepJSInterop extends plugins.PluginComponent
         val exports = exporters.get(clsSym).toIterable.flatten
 
         // If we have exports, add them to the template
-        if (!exports.isEmpty)
+        if (!exports.isEmpty) {
+          //global.loaders.enterClass(clsSym, name, completer)
           treeCopy.Template(tree, parents, self, body ++ exports)
-        else tree
+        } else tree
 
       case cdef: ClassDef =>
-        typer.typedClassDef(cdef)
+        //typer.typedClassDef(cdef)
+        cdef
 
       case mdef: ModuleDef =>
-        typer.typedModuleDef(mdef)
+        //typer.typedModuleDef(mdef)
+        mdef
 
       case _ => tree
     }
