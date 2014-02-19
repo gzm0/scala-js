@@ -55,13 +55,13 @@ class Confl {
   
   class Box[T](val x: T)
   
-  @JSExport(name = "value")
+  @JSExport(name = "value1")
   def hello = "foo"
     
-  @JSExport(name = "value_")
+  @JSExport(name = "value2")
   def world = "bar"
     
-  @JSExport
+  @JSExport(name = "erasure")
   def ub(x: Box[String]): String = x.x
   @JSExport
   def ub(x: Box[Int]): Int = x.x 
@@ -71,6 +71,26 @@ class Confl {
 object A {
   @JSExport
   def value = 1
+
+  // Export a generic
+  @JSExport
+  def gen[T](x: T) = x
+  
+  // Export lambda ret value
+  @JSExport
+  def lambda(x: Int) = (y: Int) => x + y
+  
+  // Export multi param list
+  @JSExport
+  def multiParam(x: Int)(y: Int): Int = 1
+  
+  // Export default arguments
+  @JSExport
+  def defArg(x: Int = 1) = x
+  
+  // Something no one should export
+  @JSExport
+  def ahem[T : Comparable](x: T)(implicit y: Int) = ???
 }
 
 class A

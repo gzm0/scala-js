@@ -117,52 +117,52 @@ abstract class PrepJSInterop extends plugins.PluginComponent
 
 
       case ddef: DefDef =>
-        val sym = ddef.symbol
-        val exportNames = jsExport.exportNamesOf(sym)
+        val baseSym = ddef.symbol
+        val clsSym = baseSym.owner
+        val exportNames = jsExport.exportNamesOf(baseSym)
 
         if (!exportNames.isEmpty) {
           // Get position of one annotation for error messages
           def errorPos = exportNames.head._2
-          if (isJSAny(sym.owner)) {
+          if (isJSAny(clsSym)) {
             unit.error(errorPos,
                 "You may not export a method of a subclass of js.Any")
-          } else if (!sym.isPublic) {
+          } else if (!baseSym.isPublic) {
             unit.error(errorPos,
                 "You may not export a non-public member")
           } else {
-            // Actually generate
-            val flags = (ddef.mods.flags
-                & ~Flags.DEFERRED  // All export methods have implementations
-                & ~Flags.OVERRIDE  // No need for override since sythetic
-                | Flags.SYNTHETIC)
 
-            val mods = Modifiers(flags)
-
+            // Actually generate exporter method
             val expDefs = for ((expName, pos) <- exportNames) yield atPos(pos) {
               val scalaName = jsExport.scalaExportName(expName)
 
+              // Create symbol for new method
+              val expSym = baseSym.cloneSymbol
+
+              // Alter type for new method (lift return type to Any)
+              expSym.setInfo(retToAny(expSym.tpe))
+
+              // Change name for new method
+              expSym.name = scalaName
+
+              // Update flags
+              expSym.resetFlag(Flags.DEFERRED | Flags.OVERRIDE)
+              expSym.setFlag(Flags.SYNTHETIC)
+
+              // Add symbol to class
+              clsSym.info.decls.enter(expSym)
+
               // Construct inner function call
-              val sel: Tree = Select(This(sym.owner), sym)
-              val rhs = (sel /: sym.paramss) {
+              val sel: Tree = Select(This(clsSym), baseSym)
+              val rhs = (sel /: expSym.paramss) {
                 (fun,params) => Apply(fun, params map Ident)
               }
 
-              // Construct exporter DefDef tree
-              val expTree = DefDef(mods, scalaName,
-                ddef.tparams, ddef.vparamss, ddef.tpt, rhs)
-
-              // Create symbol for new method
-              val expSym = sym.owner.newMethodSymbol(scalaName, pos, flags)
-              expSym.setInfo(sym.tpe)
-              expTree.symbol = expSym
-
-              // Add symbol to class
-              sym.owner.info.decls.enter(expSym)
-
-              typer.typedDefDef(expTree)
+              // Construct and type the actual tree
+              typer.typedDefDef(DefDef(expSym, rhs))
             }
 
-            exporters.getOrElseUpdate(sym.owner,
+            exporters.getOrElseUpdate(clsSym,
                 mutable.ListBuffer.empty) ++= expDefs
           }
         }
@@ -302,6 +302,16 @@ abstract class PrepJSInterop extends plugins.PluginComponent
       res
     }
 
+  }
+
+  /** changes the return type of the method type tpe to Any. returns new type */
+  private def retToAny(tpe: Type): Type = tpe match {
+    case MethodType(params, result) => MethodType(params, retToAny(result))
+    case NullaryMethodType(result)  => NullaryMethodType(AnyClass.tpe)
+    case PolyType(tparams, result)  => PolyType(tparams, retToAny(result))
+    case _: TypeRef                 => AnyClass.tpe
+    case _ => abort(s"Type of method is not method type, but ${tpe} of " +
+        s"class ${tpe.getClass}")
   }
 
   private def isJSAny(sym: Symbol): Boolean =
