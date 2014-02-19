@@ -133,7 +133,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent
                 "You may not export a method of a subclass of js.Any")
           } else if (!baseSym.isPublic) {
             unit.error(errorPos, "You may not export a non-public member")
-          } else if (baseSym.isMacro)
+          } else if (baseSym.isMacro) {
             unit.error(errorPos, "You may not export a macro")
           } else if (scalaPrimitives.isPrimitive(baseSym)) {
             unit.error(errorPos, "You may not export a primitive")
