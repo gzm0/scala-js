@@ -26,69 +26,13 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-     // TODO continue
-
-    /*println(s"Exports for ${sym.fullName}:")
-    println(s" Burdens: ${burdens}")
-    println(s" Super: ${superExports}")
-    println(s" Local: ${localExps}")
-    println(s" Final: ${exps}")*/
-    Nil
-  }
-/*    val declaredExports = sym.info.decls.filter(isExported)
-    val newlyDeclaredExports = declaredExports.filterNot(isOverridingBridge)
-    val newlyDeclaredMethodNames =
-      newlyDeclaredMethods.map(_.name.toTermName).toList.distinct
-    newlyDeclaredMethodNames map (genBridge(sym, _))
-    for { (name, altBuf) <- reg.exports }
-      yield genExport(name, altBuf.toList)
-  }.toList*/
-
-  def genExport(name: String, alts: List[Symbol]) = {
-    implicit val pos = alts.head.pos
-
-    val altsByArgCount = alts.groupBy(_.tpe.params.size).toList.sortBy(_._1)
-
-    val maxArgCount = altsByArgCount.last._1
-    val formalsArgs = genFormalArgs(maxArgCount)
-
-    val cases = for {
-      (argc, methods) <- altsByArgCount
-    } yield {
-      (js.IntLiteral(argc), genBridgeSameArgc(methods, 0))
-    }
-
-    val body = {
-      if (cases.size == 1) cases.head._2
-      else {
-        js.Switch(js.DotSelect(js.Ident("arguments"), js.Ident("length")),
-            cases, genThrowTypeError())
-      }
-    }
-
-    js.MethodDef(js.StringLiteral(name), formalsArgs, body)
+    newlyDecldExportNames map { genExport(sym, _) }
   }
 
-  /** checks if a symbol is overriding a symbol we already made an export for */
-  private def isOverridingExport(sym: Symbol): Boolean = {
-    lazy val osym = sym.nextOverriddenSymbol
-    assert(jsExport.isExport(osym))
-    sym.isOverridingSymbol && !osym.owner.isInterface
-  }
-/*
-  def genBridgesForClass(sym: Symbol): List[js.Tree] = {
-    val declaredMethods = sym.info.decls.filter(isCandidateForBridge)
-    val newlyDeclaredMethods = declaredMethods.filterNot(isOverridingBridge)
-    val newlyDeclaredMethodNames =
-      newlyDeclaredMethods.map(_.name.toTermName).toList.distinct
-    newlyDeclaredMethodNames map (genBridge(sym, _))
-  }
-
-  private def genBridge(classSym: Symbol, name: TermName): js.Tree = {
+  private def genExport(classSym: Symbol, name: TermName): js.Tree = {
     val alts0 = classSym.info.member(name).alternatives
-    val alts1 = alts0.filter(isCandidateForBridge)
-    val alts = alts1.filterNot(
-        x => alts1.exists(y => (y ne x) && (y.tpe <:< x.tpe)))
+    val alts = alts0.filterNot(
+        x => alts0.exists(y => (y ne x) && (y.tpe <:< x.tpe)))
     assert(!alts.isEmpty,
         s"Ended up with no alternatives for ${classSym.fullName}::$name. " +
         s"Original set was ${alts0} with types ${alts0.map(_.tpe)}")
@@ -103,7 +47,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val cases = for {
       (argc, methods) <- altsByArgCount
     } yield {
-      (js.IntLiteral(argc), genBridgeSameArgc(methods, 0))
+      (js.IntLiteral(argc), genExportSameArgc(methods, 0))
     }
 
     val body = {
@@ -123,23 +67,25 @@ trait JSExports extends SubComponent { self: GenJSCode =>
       case x => x
     }
     js.MethodDef(js.Ident(jsName), formalsArgs, body)
-  }*/
+  }
 
-  private def genBridgeSameArgc(alts: List[Symbol], paramIndex: Int): js.Tree = {
+  private def genExportSameArgc(alts: List[Symbol], paramIndex: Int): js.Tree = {
     implicit val pos = alts.head.pos
 
     val remainingParamLists = alts map (_.tpe.params.drop(paramIndex))
 
     if (alts.size == 1) genApplyForSym(alts.head)
-    if (remainingParamLists.head.isEmpty) genTieBreak(alts)
-    else {
+    if (remainingParamLists.head.isEmpty) {
+      // TODO generate error
+      genTieBreak(alts)
+    } else {
       val altsByTypeTest = groupByWithoutHashCode(alts) {
         alt => typeTestForTpe(alt.tpe.params(paramIndex).tpe)
       }
 
       if (altsByTypeTest.size == 1) {
         // Testing this parameter is not doing any us good
-        genBridgeSameArgc(alts, paramIndex+1)
+        genExportSameArgc(alts, paramIndex+1)
       } else {
         // Sort them so that, e.g., isInstanceOf[String]
         // comes before isInstanceOf[Object]
@@ -153,7 +99,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
           implicit val pos = subAlts.head.pos
 
           def param = genFormalArg(paramIndex+1)
-          val genSubAlts = genBridgeSameArgc(subAlts, paramIndex+1)
+          val genSubAlts = genExportSameArgc(subAlts, paramIndex+1)
 
           typeTest match {
             case TypeOfTypeTest(typeString) =>
@@ -288,6 +234,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   }
 
   private def genApplyForSym(sym: Symbol): js.Tree = {
+    // TODO we need to find the original method here again!
     implicit val pos = sym.pos
     js.Return {
       js.ApplyMethod(js.This(), encodeMethodSym(sym),
