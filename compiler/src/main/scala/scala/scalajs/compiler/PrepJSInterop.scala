@@ -123,7 +123,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent
         if (!exportNames.isEmpty) {
           // Get position of one annotation for error messages
           def errorPos = exportNames.head._2
-          if (inJSAny) {
+          if (isJSAny(sym.owner)) {
             unit.error(errorPos,
                 "You may not export a method of a subclass of js.Any")
           } else if (!sym.isPublic) {
@@ -135,28 +135,22 @@ abstract class PrepJSInterop extends plugins.PluginComponent
             val mods = Modifiers(flags)
 
             val expDefs = for ((expName, pos) <- exportNames) yield atPos(pos) {
-              println(s"exporting ${sym.fullName} to ${exportNames}")
               val scalaName = jsExport.scalaExportName(expName)
 
-              //println(sym.owner)
-              //println(typer.typed { Select(This(sym.owner), sym) }.tpe)
-
+              // Construct inner function call
               val sel: Tree = Select(This(sym.owner), sym)
-              sel.tpe = sym.tpe
-
-              println(sel.tpe)
               val rhs = (sel /: sym.paramss) {
                 (fun,params) => Apply(fun, params map Ident)
               }
+
+              // Construct exporter DefDef tree, update symbol table and type it
               val expTree = DefDef(mods, scalaName,
                 ddef.tparams, ddef.vparamss, ddef.tpt, rhs)
               val expSym =  sym.owner.newMethodSymbol(scalaName, pos, flags)
               expSym.setInfo(sym.tpe)
               expTree.symbol = expSym
 
-              println(typer.silent(t => t.typedDefDef(expTree), true, expTree))
-
-              expTree
+              typer.typedDefDef(expTree)
             }
 
             exporters.getOrElseUpdate(sym.owner,
@@ -292,8 +286,10 @@ abstract class PrepJSInterop extends plugins.PluginComponent
 
   }
 
-  private def isJSAny(implDef: ImplDef) = isScalaJSDefined &&
-    (implDef.symbol.tpe.typeSymbol isSubClass JSAnyClass)
+  private def isJSAny(sym: Symbol): Boolean =
+    (sym.tpe.typeSymbol isSubClass JSAnyClass)
+
+  private def isJSAny(implDef: ImplDef): Boolean = isJSAny(implDef.symbol)
 
   private def isJSGlobalScope(implDef: ImplDef) = isScalaJSDefined &&
     (implDef.symbol.tpe.typeSymbol isSubClass JSGlobalScopeClass)
