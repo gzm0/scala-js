@@ -19,74 +19,14 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   import jsAddons._
   import definitions._
   import jsDefinitions._
-  import scalaPrimitives.isPrimitive
-
-  // TODO these checks should be done in the prep interop phase
-  /*
-  private def isCandidateForExport(sym: Symbol): Boolean = (
-     sym.isMethod      &&
-    !sym.isBridge      &&
-     sym.isPublic      &&
-    !isPrimitive(sym)  &&
-    !sym.isMacro)*/
-
-  /** Marks an export: sym is exported with a given name
-   *
-   *  This can either be an obligation to export, or an already exported symbol
-   */
-  private case class Export(name: String, sym: Symbol, pos: Position) {
-    /** whether this export fulfills a given obligation */
-    def fulfills(e: Export) = {
-      name == e.name && sym.name == e.sym.name && (
-        sym.tpe <:< e.sym.tpe ||
-        e.sym.allOverriddenSymbols.contains(sym)
-      )
-    }
-    override def toString = s"Export(${sym.fullName} --> $name)"
-  }
-
-  private def localExports(sym: Symbol) = for {
-    meth <- sym.tpe.decls
-    (name, pos) <- jsExport.exportNamesOf(meth)
-  } yield Export(name, meth, pos)
-
-  private def exportBurdens(sym: Symbol) = for {
-    iface <- sym.tpe.baseClasses
-    if iface.isInterface
-    exp   <- getExports(iface)
-  } yield exp
-
-  private def getExports(sym: Symbol): List[Export] = {
-    if (sym == ObjectClass) Nil else {
-      sym.attachments.get[List[Export]].getOrElse {
-        val exps = if (sym.isInterface) {
-          // If this is an interface, just create a simple burden list
-          localExports(sym)
-        } else {
-          // Fetch all burdens from interfaces
-          val burdens = exportBurdens(sym)
-          // Fetch stuff from super
-          val superExp = getExports(sym.superClass)
-          // Fetch my stuff
-          val thisExp = localExports(sym)
-          burdens ++ superExp ++ thisExp
-        }
-        val res = exps.toList
-        sym.updateAttachment(res)
-        res
-      }
-    }
-  }
 
   def genExportsForClass(sym: Symbol): List[js.Tree] = {
-    val superExports = getExports(sym.superClass)
-    val burdens = exportBurdens(sym)
-    val localExps = localExports(sym)
+    val decldExports = sym.info.decls.filter(jsExport.isExport _)
+    val newlyDecldExports = decldExports.filterNot(_.isOverridingSymbol)
+    val newlyDecldExportNames =
+      newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    val exps = (localExps ++ burdens).filterNot(
-        b => superExports.exists(_ fulfills b))
-
-    //sym.tpe.
+     // TODO continue
 
     /*println(s"Exports for ${sym.fullName}:")
     println(s" Burdens: ${burdens}")
@@ -129,10 +69,11 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     js.MethodDef(js.StringLiteral(name), formalsArgs, body)
   }
 
-  /** checks if a symbol is overriding a symbol we already made a bridge for */
+  /** checks if a symbol is overriding a symbol we already made an export for */
   private def isOverridingExport(sym: Symbol): Boolean = {
     lazy val osym = sym.nextOverriddenSymbol
-    sym.isOverridingSymbol && osym.isPublic && !osym.owner.isInterface
+    assert(jsExport.isExport(osym))
+    sym.isOverridingSymbol && !osym.owner.isInterface
   }
 /*
   def genBridgesForClass(sym: Symbol): List[js.Tree] = {
