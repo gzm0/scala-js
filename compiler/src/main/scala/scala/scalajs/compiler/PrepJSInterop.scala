@@ -115,7 +115,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent
                        |operation requires reflection.""".stripMargin)
         super.transform(tree)
 
-
+      // TODO add transformers for VarDef and ValDef
       case ddef: DefDef =>
         val baseSym = ddef.symbol
         val clsSym = baseSym.owner
@@ -149,6 +149,9 @@ abstract class PrepJSInterop extends plugins.PluginComponent
               expSym.resetFlag(Flags.DEFERRED | Flags.OVERRIDE)
               expSym.setFlag(Flags.SYNTHETIC)
 
+              // Remove JSExport annotations
+              expSym.removeAnnotation(JSExportAnnotation)
+
               // Add symbol to class
               clsSym.info.decls.enter(expSym)
 
@@ -179,17 +182,8 @@ abstract class PrepJSInterop extends plugins.PluginComponent
 
         // If we have exports, add them to the template
         if (!exports.isEmpty) {
-          //global.loaders.enterClass(clsSym, name, completer)
           treeCopy.Template(tree, parents, self, body ++ exports)
         } else tree
-
-      case cdef: ClassDef =>
-        //typer.typedClassDef(cdef)
-        cdef
-
-      case mdef: ModuleDef =>
-        //typer.typedModuleDef(mdef)
-        mdef
 
       case _ => tree
     }
