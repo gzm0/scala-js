@@ -35,8 +35,6 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    println(s"For class ${classSym}, exporting names ${newlyDecldExportNames}")
-
     newlyDecldExportNames map { genExport(classSym, _) }
   }
 
@@ -46,6 +44,8 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   }
 
   private def genExport(classSym: Symbol, name: TermName): js.Tree = {
+    // TODO generate properties for 0 argument methods and =_methods
+
     val alts = classSym.info.member(name).alternatives
 
     assert(!alts.isEmpty,

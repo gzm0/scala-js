@@ -20,6 +20,7 @@ trait Bar extends Foo {
   @JSExport(name = "hello")
   @JSExport(name = "myawesomemethod")
   def x: Int
+  
   def y(foo: String): String = "Bar" + foo
   
   @JSExport
@@ -37,8 +38,12 @@ class FooBarImpl extends Bar {
   
   // Export of overridden method without export in super
   @JSExport
+  // Export overloading
+  @JSExport(name = "hello")
   override def y(foo: String): String = "asdf" + foo
-  
+
+  // Export overloading
+  @JSExport(name = "hello")
   // Forced inherited export
   def z(x: Int) = x + 5
   
@@ -46,6 +51,7 @@ class FooBarImpl extends Bar {
   @JSExport
   def w: Int = 5
   
+  // Export a val
   @JSExport
   val a: Int = 4
   
@@ -82,6 +88,16 @@ class Confl {
   
   @JSExport(name = "rtType")
   def rtType(x: Int) = x
+}
+
+class GetSet {
+  @JSExport
+  def a: Int = 1
+  @JSExport
+  def a_=(x: Int) = ()
+  
+  @JSExport
+  var b: Int = 1
 }
 
 // Exports in object
