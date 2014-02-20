@@ -2686,37 +2686,18 @@ abstract class GenJSCode extends plugins.PluginComponent
           }
 
         case _ =>
-          def isJSGetter = {
-            sym.tpe.params.isEmpty && enteringPhase(currentRun.uncurryPhase) {
-              sym.tpe.isInstanceOf[NullaryMethodType]
-            }
-          }
-
-          def isJSSetter = {
-            funName.endsWith("_=") && enteringPhase(currentRun.uncurryPhase) {
-              sym.tpe.paramss match {
-                case List(List(arg)) => !isScalaRepeatedParamType(arg.tpe)
-                case _ => false
-              }
-            }
-          }
-
-          def isJSBracketAccess = {
-            isScalaJSDefined && sym.hasAnnotation(JSBracketAccessAnnotation)
-          }
-
           if (sym.hasFlag(reflect.internal.Flags.DEFAULTPARAM)) {
             js.UndefinedParam()
-          } else if (isJSGetter) {
+          } else if (isJSGetter(sym)) {
             assert(argc == 0)
             js.BracketSelect(receiver, js.StringLiteral(funName))
-          } else if (isJSSetter) {
+          } else if (isJSSetter(sym)) {
             assert(argc == 1)
             statToExpr(js.Assign(
                 js.BracketSelect(receiver,
                     js.StringLiteral(funName.substring(0, funName.length-2))),
                 args.head))
-          } else if (isJSBracketAccess) {
+          } else if (isJSBracketAccess(sym)) {
             assert(argArray.isInstanceOf[js.ArrayConstr] && (argc == 1 || argc == 2),
                 s"@JSBracketAccess methods should have 1 or 2 non-varargs arguments")
             args match {
@@ -3489,6 +3470,28 @@ abstract class GenJSCode extends plugins.PluginComponent
 
   private def isMaybeJavaScriptException(tpe: Type) =
     JavaScriptExceptionClass isSubClass tpe.typeSymbol
+
+  /** has this symbol to be translated into a JS getter (both directions)? */
+  def isJSGetter(sym: Symbol): Boolean = {
+    sym.tpe.params.isEmpty && enteringPhase(currentRun.uncurryPhase) {
+      sym.tpe.isInstanceOf[NullaryMethodType]
+    }
+  }
+
+  /** has this symbol to be translated into a JS setter (both directions)? */
+  def isJSSetter(sym: Symbol) = {
+    sym.unexpandedName.decoded.endsWith("_=") &&
+    enteringPhase(currentRun.uncurryPhase) {
+      sym.tpe.paramss match {
+        case List(List(arg)) => !isScalaRepeatedParamType(arg.tpe)
+        case _ => false
+      }
+    }
+  }
+
+  /** has this symbol to be translated into a JS bracket access (JS to Scala) */
+  def isJSBracketAccess(sym: Symbol) =
+    sym.hasAnnotation(JSBracketAccessAnnotation)
 
   /** Get JS name of Symbol if it was specified with JSName annotation */
   def jsNameOf(sym: Symbol): String = {
