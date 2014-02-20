@@ -35,7 +35,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    newlyDecldExportNames map { genExport(classSym, _) }
+    newlyDecldExportNames flatMap { genExport(classSym, _) }
   }
 
   private def isOverridingExport(sym: Symbol): Boolean = {
@@ -43,15 +43,42 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     sym.isOverridingSymbol && !osym.owner.isInterface
   }
 
-  private def genExport(classSym: Symbol, name: TermName): js.Tree = {
-    // TODO generate properties for 0 argument methods and =_methods
-
+  private def genExport(classSym: Symbol, name: TermName): List[js.Tree] = {
     val alts = classSym.info.member(name).alternatives
 
     assert(!alts.isEmpty,
         s"Ended up with no alternatives for ${classSym.fullName}::$name. " +
         s"Original set was ${alts} with types ${alts.map(_.tpe)}")
 
+    val (getset, funs) = alts.partition(s => isJSGetter(s) || isJSSetter(s))
+    val (getters, setters) = getset.partition(isJSGetter _)
+
+    def lmap[A <: List[_],B](l: A)(v: A => B) =
+      if (l.nonEmpty) Some(v(l)) else None
+
+    { lmap(funs)   (genExportFunction(_, name)) ++
+      lmap(getters)(genExportGetter  (_, name)) ++
+      lmap(setters)(genExportSetter  (_, name)) }.toList
+  }
+
+  private def genExportSetter(alts: List[Symbol], name: TermName) = {
+    assert(!alts.isEmpty)
+    implicit val pos = alts.head.pos
+    js.Skip()
+  }
+
+  private def genExportGetter(alts: List[Symbol], name: TermName) = {
+     // if the size is anything else, something went horribly wrong!
+    assert(alts.size == 1)
+    implicit val pos = alts.head.pos
+
+    val jsName = jsExport.jsExportName(name)
+    js.GetterDef(js.StringLiteral(jsName), genApplyForSym(alts.head))
+  }
+
+  /** generates the exporter function (i.e. exporter for non-properties) */
+  private def genExportFunction(alts: List[Symbol], name: TermName) = {
+    assert(!alts.isEmpty)
     implicit val pos = alts.head.pos
 
     val altsByArgCount = alts.groupBy(_.tpe.params.size).toList.sortBy(_._1)
@@ -75,7 +102,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
 
     val jsName = jsExport.jsExportName(name)
 
-    // TODO what to do with names that are not valid JS identifiers? Should
+     // TODO what to do with names that are not valid JS identifiers? Should
     // we allow them or complain when the @JSExport is declared?
 
       /*name.toString match {
@@ -144,12 +171,6 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   private def genIsInstance(value: js.Tree, tpe: Type)(
       implicit pos: Position): js.Tree = {
     encodeIsInstanceOf(value, tpe)
-  }
-
-  private def genTieBreak(alts: List[Symbol]): js.Tree = {
-    // TODO For now we just emit the first one
-    implicit val pos = alts.head.pos
-    js.Block(genApplyForSym(alts.head))
   }
 
   private sealed abstract class RTTypeTest
@@ -273,8 +294,5 @@ trait JSExports extends SubComponent { self: GenJSCode =>
 
   private def genFormalArg(index: Int)(implicit pos: Position): js.Ident =
     js.Ident("arg$" + index)
-
-  private def isExported(sym: Symbol) =
-    sym.getAnnotation(JSExportAnnotation).isDefined
 
 }
