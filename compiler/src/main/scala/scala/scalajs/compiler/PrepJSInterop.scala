@@ -149,6 +149,9 @@ abstract class PrepJSInterop extends plugins.PluginComponent
               val expSym = baseSym.cloneSymbol
 
               // Alter type for new method (lift return type to Any)
+              // The return type is lifted, in order to avoid bridge
+              // construction and to detect methods whose signature only differs
+              // in the return type
               expSym.setInfo(retToAny(expSym.tpe))
 
               // Change name for new method
@@ -173,6 +176,9 @@ abstract class PrepJSInterop extends plugins.PluginComponent
               // Construct and type the actual tree
               typer.typedDefDef(DefDef(expSym, rhs))
             }
+
+            // Reset interface flag: Any trait now contains non-empty methods
+            clsSym.resetFlag(Flags.INTERFACE)
 
             exporters.getOrElseUpdate(clsSym,
                 mutable.ListBuffer.empty) ++= expDefs

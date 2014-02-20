@@ -234,6 +234,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       // Generate members (constructor + methods)
 
       val generatedMembers = new ListBuffer[js.Tree]
+      val exportedSymbols = new ListBuffer[Symbol]
 
       generatedMembers += genConstructor(cd)
 
@@ -246,7 +247,11 @@ abstract class GenJSCode extends plugins.PluginComponent
             () // fields are added in the constructor (genConstructor(cd))
 
           case dd: DefDef =>
+            val sym = dd.symbol
             generatedMembers ++= genMethod(dd)
+
+            if (jsExport.isExport(sym))
+              exportedSymbols += sym
 
           case _ => abort("Illegal tree in gen of genClass(): " + tree)
         }
@@ -265,7 +270,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       val constructorBridge: Option[js.Tree] = None
 
       // Generate the exported members
-      val exports = genExportsForClass(sym)
+      val exports = genExportsForClass(sym, exportedSymbols.toList)
 
       // Generate the reflective call proxies (where required)
       val reflProxies = genReflCallProxies(sym)
@@ -608,8 +613,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       val result = {
         if (scalaPrimitives.isPrimitive(sym)
             || sym.isDeferred // abstract method
-            || isTrivialConstructor(sym, params, rhs)
-            || jsExport.isExport(sym)) {
+            || isTrivialConstructor(sym, params, rhs)) {
           None
         } else {
           val jsParams =

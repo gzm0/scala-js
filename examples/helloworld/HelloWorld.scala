@@ -48,6 +48,17 @@ class FooBarImpl extends Bar {
   
   @JSExport
   val a: Int = 4
+  
+  @JSExport
+  def mem = 1
+}
+
+class SubFooBarImpl extends FooBarImpl {
+  
+  // Export again (shouldn't generate method)
+  @JSExport
+  override def mem: Int = 5
+  
 }
 
 // Conflicting exports. Should fail!
@@ -61,10 +72,16 @@ class Confl {
   @JSExport(name = "value2")
   def world = "bar"
     
-  @JSExport(name = "erasure")
+  @JSExport(name = "erasure1")
   def ub(x: Box[String]): String = x.x
-  @JSExport
-  def ub(x: Box[Int]): Int = x.x 
+  @JSExport(name = "erasure")
+  def ub(x: Box[Int]): Int = x.x
+  
+  @JSExport(name = "rtType1")
+  def rtType(x: Short) = x
+  
+  @JSExport(name = "rtType")
+  def rtType(x: Int) = x
 }
 
 // Exports in object

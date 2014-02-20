@@ -20,22 +20,37 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   import definitions._
   import jsDefinitions._
 
-  def genExportsForClass(sym: Symbol): List[js.Tree] = {
-    val decldExports = sym.info.decls.filter(jsExport.isExport _)
-    val newlyDecldExports = decldExports.filterNot(_.isOverridingSymbol)
+  /**
+   * Generate exporter methods for a class
+   * @param classSym symbol of class we export for
+   * @param decldExports symbols exporter methods that have been encountered in
+   *   the class' tree. This is not the same as classSym.info.delcs since
+   *   inherited concrete methods from traits should be in this param, too
+   */
+  def genExportsForClass(
+      classSym: Symbol,
+      decldExports: List[Symbol]): List[js.Tree] = {
+
+    val newlyDecldExports = decldExports.filterNot { isOverridingExport _ }
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    newlyDecldExportNames map { genExport(sym, _) }
+    println(s"For class ${classSym}, exporting names ${newlyDecldExportNames}")
+
+    newlyDecldExportNames map { genExport(classSym, _) }
+  }
+
+  private def isOverridingExport(sym: Symbol): Boolean = {
+    lazy val osym = sym.nextOverriddenSymbol
+    sym.isOverridingSymbol && !osym.owner.isInterface
   }
 
   private def genExport(classSym: Symbol, name: TermName): js.Tree = {
-    val alts0 = classSym.info.member(name).alternatives
-    val alts = alts0.filterNot(
-        x => alts0.exists(y => (y ne x) && (y.tpe <:< x.tpe)))
+    val alts = classSym.info.member(name).alternatives
+
     assert(!alts.isEmpty,
         s"Ended up with no alternatives for ${classSym.fullName}::$name. " +
-        s"Original set was ${alts0} with types ${alts0.map(_.tpe)}")
+        s"Original set was ${alts} with types ${alts.map(_.tpe)}")
 
     implicit val pos = alts.head.pos
 
@@ -58,15 +73,20 @@ trait JSExports extends SubComponent { self: GenJSCode =>
       }
     }
 
-    val jsName = name.toString match {
+    val jsName = jsExport.jsExportName(name)
+
+    // TODO what to do with names that are not valid JS identifiers? Should
+    // we allow them or complain when the @JSExport is declared?
+
+      /*name.toString match {
       case "<init>" => "init_" // will be stolen by the JS constructor
       case "constructor" => "$constructor"
       case x if x(0).isDigit    => "$" + x
       case x if x(0) == "$"     => "$" + x
       case x if js.isKeyword(x) => "$" + x
       case x => x
-    }
-    js.MethodDef(js.Ident(jsName), formalsArgs, body)
+    }*/
+    js.MethodDef(js.StringLiteral(jsName), formalsArgs, body)
   }
 
   private def genExportSameArgc(alts: List[Symbol], paramIndex: Int): js.Tree = {
@@ -75,9 +95,11 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val remainingParamLists = alts map (_.tpe.params.drop(paramIndex))
 
     if (alts.size == 1) genApplyForSym(alts.head)
-    if (remainingParamLists.head.isEmpty) {
-      // TODO generate error
-      genTieBreak(alts)
+    else if (remainingParamLists.head.isEmpty) {
+      currentUnit.error(pos,
+          s"""Cannot disambiguate overloads for exported method ${alts.head.name} with types
+             |  ${alts.map(_.tpe).mkString("\n  ")}""".stripMargin)
+      js.Return(js.Undefined())
     } else {
       val altsByTypeTest = groupByWithoutHashCode(alts) {
         alt => typeTestForTpe(alt.tpe.params(paramIndex).tpe)
@@ -234,7 +256,6 @@ trait JSExports extends SubComponent { self: GenJSCode =>
   }
 
   private def genApplyForSym(sym: Symbol): js.Tree = {
-    // TODO we need to find the original method here again!
     implicit val pos = sym.pos
     js.Return {
       js.ApplyMethod(js.This(), encodeMethodSym(sym),
