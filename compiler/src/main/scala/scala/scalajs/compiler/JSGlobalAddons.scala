@@ -49,6 +49,7 @@ trait JSGlobalAddons extends JSTrees
       annot <- (if (sym.isAccessor) sym.accessed else sym).annotations
       if annot.symbol == JSExportAnnotation
     } yield {
+      // TODO this doesn't de-construct annotation correctly
       val prop = annot.stringArg(1).map(_.toBoolean).getOrElse(isJSGetOrSet(sym))
       val name = annot.stringArg(0).getOrElse {
         val decN = sym.unexpandedName.decoded

@@ -101,6 +101,9 @@ class GetSet {
   
   @JSExport
   var b: Int = 1
+  
+  @JSExport
+  def bad(x: String, y: Int) = 1
 }
 
 // Exports in object

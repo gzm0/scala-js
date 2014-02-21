@@ -29,8 +29,6 @@ trait PrepJSExports { this: PrepJSInterop =>
     // Helper function for errors
     def err(msg: String) = { currentUnit.error(exportNames.head.pos, msg); Nil }
 
-    // TODO check that properties have right method types
-
     if (exportNames.isEmpty)
       Nil
     else if (isJSAny(baseSym.owner))
@@ -48,8 +46,20 @@ trait PrepJSExports { this: PrepJSInterop =>
       clsSym.resetFlag(Flags.INTERFACE)
 
       // Actually generate exporter methods
-      for (spec @ jsInterop.ExportSpec(_, _, pos) <- exportNames)
-        yield atPos(pos) { genExportDef(baseSym, spec) }
+      for (spec @ jsInterop.ExportSpec(_, prop, pos) <- exportNames) yield {
+        // Check that if we do a property, that we have the right type
+        if (prop &&
+            !jsInterop.isSetterTpe(baseSym) &&
+            !jsInterop.isGetterTpe(baseSym)) {
+          currentUnit.error(pos,
+              s"""You cannot export ${baseSym.name} as a property, since it does not have an appropriate type.
+                 |Acceptable types for properties are nullary method types (getters) and single argument, unit-return
+                 |methods (setters)""".stripMargin)
+          EmptyTree
+
+        // If check is fine, actually generate tree
+        } else atPos(pos) { genExportDef(baseSym, spec) }
+      }
     }
   }
 
