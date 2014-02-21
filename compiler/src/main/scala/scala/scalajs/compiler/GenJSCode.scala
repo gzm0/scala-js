@@ -250,7 +250,7 @@ abstract class GenJSCode extends plugins.PluginComponent
             val sym = dd.symbol
             generatedMembers ++= genMethod(dd)
 
-            if (jsExport.isExport(sym))
+            if (jsInterop.isExport(sym))
               exportedSymbols += sym
 
           case _ => abort("Illegal tree in gen of genClass(): " + tree)
@@ -730,7 +730,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       val candidates = methods filterNot { s =>
         s.isConstructor  ||
         superHasProxy(s) ||
-        jsExport.isExport(s)
+        jsInterop.isExport(s)
       }
 
       val proxies = candidates filter {
@@ -811,10 +811,13 @@ abstract class GenJSCode extends plugins.PluginComponent
       }
 
       // For simplicity, this export is generated in place
-      val exportedAccessor = jsExport.exportNamesOf(sym) map {
-        case (name, p) =>
+      val exportedAccessor = jsInterop.exportSpecsOf(sym) map {
+        case jsInterop.ExportSpec(name, false, p) =>
           implicit val pos = p
           js.Select(envField("g"), js.StringLiteral(name)) := accessorName
+        case jsInterop.ExportSpec(_, true, p) =>
+          currentUnit.error(p, "An object cannot be exported as a property")
+          js.Skip()
       }
 
       js.Block(List(createModuleInstanceField, createAccessor) ++
@@ -2688,16 +2691,16 @@ abstract class GenJSCode extends plugins.PluginComponent
         case _ =>
           if (sym.hasFlag(reflect.internal.Flags.DEFAULTPARAM)) {
             js.UndefinedParam()
-          } else if (isJSGetter(sym)) {
+          } else if (jsInterop.isJSGetter(sym)) {
             assert(argc == 0)
             js.BracketSelect(receiver, js.StringLiteral(funName))
-          } else if (isJSSetter(sym)) {
+          } else if (jsInterop.isJSSetter(sym)) {
             assert(argc == 1)
             statToExpr(js.Assign(
                 js.BracketSelect(receiver,
                     js.StringLiteral(funName.substring(0, funName.length-2))),
                 args.head))
-          } else if (isJSBracketAccess(sym)) {
+          } else if (jsInterop.isJSBracketAccess(sym)) {
             assert(argArray.isInstanceOf[js.ArrayConstr] && (argc == 1 || argc == 2),
                 s"@JSBracketAccess methods should have 1 or 2 non-varargs arguments")
             args match {
@@ -3470,28 +3473,6 @@ abstract class GenJSCode extends plugins.PluginComponent
 
   private def isMaybeJavaScriptException(tpe: Type) =
     JavaScriptExceptionClass isSubClass tpe.typeSymbol
-
-  /** has this symbol to be translated into a JS getter (both directions)? */
-  def isJSGetter(sym: Symbol): Boolean = {
-    sym.tpe.params.isEmpty && enteringPhase(currentRun.uncurryPhase) {
-      sym.tpe.isInstanceOf[NullaryMethodType]
-    }
-  }
-
-  /** has this symbol to be translated into a JS setter (both directions)? */
-  def isJSSetter(sym: Symbol) = {
-    sym.unexpandedName.decoded.endsWith("_=") &&
-    enteringPhase(currentRun.uncurryPhase) {
-      sym.tpe.paramss match {
-        case List(List(arg)) => !isScalaRepeatedParamType(arg.tpe)
-        case _ => false
-      }
-    }
-  }
-
-  /** has this symbol to be translated into a JS bracket access (JS to Scala) */
-  def isJSBracketAccess(sym: Symbol) =
-    sym.hasAnnotation(JSBracketAccessAnnotation)
 
   /** Get JS name of Symbol if it was specified with JSName annotation */
   def jsNameOf(sym: Symbol): String = {

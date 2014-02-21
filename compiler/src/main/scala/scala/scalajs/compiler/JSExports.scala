@@ -35,7 +35,9 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    newlyDecldExportNames flatMap { genExport(classSym, _) }
+    // TODO separate getters and setters
+
+    newlyDecldExportNames map { genExportFunction(classSym, _) }
   }
 
   private def isOverridingExport(sym: Symbol): Boolean = {
@@ -50,15 +52,19 @@ trait JSExports extends SubComponent { self: GenJSCode =>
         s"Ended up with no alternatives for ${classSym.fullName}::$name. " +
         s"Original set was ${alts} with types ${alts.map(_.tpe)}")
 
-    val (getset, funs) = alts.partition(s => isJSGetter(s) || isJSSetter(s))
-    val (getters, setters) = getset.partition(isJSGetter _)
+    // TODO, we have to regroup stuff here for getters and setters (they don't have the smame names)
+
+    val (getset, funs) = alts.partition(jsInterop.isJSGetOrSet _)
 
     def lmap[A <: List[_],B](l: A)(v: A => B) =
       if (l.nonEmpty) Some(v(l)) else None
 
-    { lmap(funs)   (genExportFunction(_, name)) ++
-      lmap(getters)(genExportGetter  (_, name)) ++
-      lmap(setters)(genExportSetter  (_, name)) }.toList
+    //{ lmap(funs)  (genExportFunction(_, name)) ++
+      //lmap(getset)(genExportGetSet(_, name)) }.toList
+
+    // TODO fix this
+
+    Nil
   }
 
   private def genExportSetter(alts: List[Symbol], name: TermName) = {
@@ -67,18 +73,32 @@ trait JSExports extends SubComponent { self: GenJSCode =>
     js.Skip()
   }
 
-  private def genExportGetter(alts: List[Symbol], name: TermName) = {
-     // if the size is anything else, something went horribly wrong!
-    assert(alts.size == 1)
+  private def genExportGetSet(alts: List[Symbol], name: TermName) = {
+    assert(!alts.isEmpty)
     implicit val pos = alts.head.pos
 
-    val jsName = jsExport.jsExportName(name)
-    js.GetterDef(js.StringLiteral(jsName), genApplyForSym(alts.head))
+
+    val (get, set) = alts.partition(jsInterop.isJSGetter _)
+
+    val getter = {
+      // if we have more than one getter, something went horribly wrong
+      assert(get.size <= 1)
+
+    }
+
+    val jsName = jsInterop.jsExportName(name)
+    js.PropertyDef(js.StringLiteral(jsName), genApplyForSym(alts.head), js.Ident("foo"), js.EmptyTree)
   }
 
-  /** generates the exporter function (i.e. exporter for non-properties) */
-  private def genExportFunction(alts: List[Symbol], name: TermName) = {
-    assert(!alts.isEmpty)
+  /** generates the exporter function (i.e. exporter for non-properties) for
+   *  a given name */
+  private def genExportFunction(classSym: Symbol, name: TermName) = {
+    val alts = classSym.info.member(name).alternatives
+
+    assert(!alts.isEmpty,
+        s"Ended up with no alternatives for ${classSym.fullName}::$name. " +
+        s"Original set was ${alts} with types ${alts.map(_.tpe)}")
+
     implicit val pos = alts.head.pos
 
     val altsByArgCount = alts.groupBy(_.tpe.params.size).toList.sortBy(_._1)
@@ -100,7 +120,7 @@ trait JSExports extends SubComponent { self: GenJSCode =>
       }
     }
 
-    val jsName = jsExport.jsExportName(name)
+    val jsName = jsInterop.jsExportName(name)
 
      // TODO what to do with names that are not valid JS identifiers? Should
     // we allow them or complain when the @JSExport is declared?

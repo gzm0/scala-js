@@ -19,91 +19,83 @@ trait PrepJSExports { this: PrepJSInterop =>
 
   import scala.reflect.internal.Flags
 
-
   // TODO special case constructors here
-  def genExportMember(member: ValOrDefDef): List[Tree] = member match {
-    case ddef: DefDef => genExportSym(ddef.symbol)
-    case vdef: ValDef =>
-      // TODO this does currently not work, since getter and setter are not yet
-      // defined
-      val baseSym = vdef.symbol
-      val getter = baseSym.getter(baseSym.owner)
-      val setter = baseSym.setter(baseSym.owner)
-      for {
-        sym <- getter :: setter :: Nil
-        if sym != NoSymbol
-        exp <- genExportSym(sym)
-      } yield exp
-  }
-
-  private def genExportSym(baseSym: Symbol) = {
+  def genExportMember(ddef: DefDef): List[Tree] = {
+    val baseSym = ddef.symbol
     val clsSym = baseSym.owner
-    val exportNames = jsExport.exportNamesOf(baseSym)
 
-    // Position of one annotation for error messages
-    def errorPos = exportNames.head._2
+    val exportNames = jsInterop.exportSpecsOf(baseSym)
 
-    if (exportNames.isEmpty || !checkExportAllowed(baseSym, errorPos)) {
+    println(s"exporting: ${baseSym.fullName}")
+    println(s"flags: ${baseSym.flagBitsToString(baseSym.flags)}")
+    println(s"to names: ${exportNames}")
+
+    // Helper function for errors
+    def err(msg: String) = { currentUnit.error(exportNames.head.pos, msg); Nil }
+
+    if (exportNames.isEmpty)
       Nil
-    } else {
+    else if (isJSAny(baseSym.owner))
+      err("You may not export a method of a subclass of js.Any")
+    else if (!baseSym.isPublic)
+      err("You may not export a non-public member")
+    else if (baseSym.isMacro)
+      err("You may not export a macro")
+    else if (scalaPrimitives.isPrimitive(baseSym))
+      err("You may not export a primitive")
+    else {
       assert(!baseSym.isBridge)
 
       // Reset interface flag: Any trait will contain non-empty methods
       clsSym.resetFlag(Flags.INTERFACE)
 
       // Actually generate exporter methods
-      for ((expName, pos) <- exportNames) yield atPos(pos) {
-        val scalaName = jsExport.scalaExportName(expName)
-
-        // Create symbol for new method
-        val expSym = baseSym.cloneSymbol
-
-        // Alter type for new method (lift return type to Any)
-        // The return type is lifted, in order to avoid bridge
-        // construction and to detect methods whose signature only differs
-        // in the return type
-        expSym.setInfo(retToAny(expSym.tpe))
-
-        // Change name for new method
-        expSym.name = scalaName
-
-        // Update flags
-        expSym.resetFlag(Flags.DEFERRED | Flags.OVERRIDE)
-        expSym.setFlag(Flags.SYNTHETIC)
-
-        // Remove JSExport annotations
-        expSym.removeAnnotation(JSExportAnnotation)
-
-        // Add symbol to class
-        clsSym.info.decls.enter(expSym)
-
-        // Construct inner function call
-        val sel: Tree = Select(This(clsSym), baseSym)
-        val rhs = (sel /: expSym.paramss) {
-          (fun,params) => Apply(fun, params map Ident)
-        }
-
-        // Construct and type the actual tree
-        typer.typedDefDef(DefDef(expSym, rhs))
-      }
+      for (spec @ jsInterop.ExportSpec(_, _, pos) <- exportNames)
+        yield atPos(pos) { genExportDef(baseSym, spec) }
     }
   }
 
-  private def checkExportAllowed(memSym: Symbol, pos: Position) = {
-    if (isJSAny(memSym.owner)) {
-      currentUnit.error(pos,
-          "You may not export a method of a subclass of js.Any")
-      false
-    } else if (!memSym.isPublic) {
-      currentUnit.error(pos, "You may not export a non-public member")
-      false
-    } else if (memSym.isMacro) {
-      currentUnit.error(pos, "You may not export a macro")
-      false
-    } else if (scalaPrimitives.isPrimitive(memSym)) {
-      currentUnit.error(pos, "You may not export a primitive")
-      false
-    } else true
+  /** generate an exporter for a DefDef */
+  private def genExportDef(defSym: Symbol, expSpec: jsInterop.ExportSpec) = {
+    val clsSym = defSym.owner
+    val scalaName = jsInterop.scalaExportName(expSpec)
+
+    // Create symbol for new method
+    val expSym = defSym.cloneSymbol
+
+    // Set position of symbol
+    expSym.pos = expSpec.pos
+
+    // Alter type for new method (lift return type to Any)
+    // The return type is lifted, in order to avoid bridge
+    // construction and to detect methods whose signature only differs
+    // in the return type
+    expSym.setInfo(retToAny(expSym.tpe))
+
+    // Change name for new method
+    expSym.name = scalaName
+
+    // Update flags
+    expSym.setFlag(Flags.SYNTHETIC)
+    expSym.resetFlag(
+        Flags.DEFERRED |  // We always have a body now
+        Flags.OVERRIDE    // Synthetic methods need not bother with this
+    )
+
+    // Remove JSExport annotations
+    expSym.removeAnnotation(JSExportAnnotation)
+
+    // Add symbol to class
+    clsSym.info.decls.enter(expSym)
+
+    // Construct inner function call
+    val sel: Tree = Select(This(clsSym), defSym)
+    val rhs = (sel /: expSym.paramss) {
+      (fun,params) => Apply(fun, params map Ident)
+    }
+
+    // Construct and type the actual tree
+    typer.typedDefDef(DefDef(expSym, rhs))
   }
 
   /** changes the return type of the method type tpe to Any. returns new type */

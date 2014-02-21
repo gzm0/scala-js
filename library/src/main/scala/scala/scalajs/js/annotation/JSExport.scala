@@ -11,7 +11,9 @@
 package scala.scalajs.js.annotation
 
 /** Specifies that the given entity should be exported for use in raw JS */
-class JSExport private (name: Option[String] = None) extends scala.annotation.StaticAnnotation {
+class JSExport private (name: Option[String] = None, prop: Option[Boolean] = None) extends scala.annotation.StaticAnnotation {
   def this() = this(None)
-  def this(name: String) = this(Some(name))
+  def this(name: String) = this(Some(name), None)
+  def this(prop: Boolean) = this(None, Some(prop))
+  def this(name: String, prop: Boolean) = this(Some(name), Some(prop))
 }

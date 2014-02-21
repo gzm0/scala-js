@@ -117,7 +117,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent
                        |operation requires reflection.""".stripMargin)
         super.transform(tree)
 
-      case ddef: ValOrDefDef =>
+      case ddef: DefDef =>
         // Generate exporters for this ddef if required
         exporters.getOrElseUpdate(ddef.symbol.owner,
             mutable.ListBuffer.empty) ++= genExportMember(ddef)

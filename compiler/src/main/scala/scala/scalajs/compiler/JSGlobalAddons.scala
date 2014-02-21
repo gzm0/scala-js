@@ -25,23 +25,46 @@ trait JSGlobalAddons extends JSTrees
       JSGlobalAddons.this.asInstanceOf[ThisJSGlobalAddons]
   }
 
-  /** global JSExport related helpers */
-  object jsExport {
+  /** global javascript interop related helpers */
+  object jsInterop {
     import global._
     import jsDefinitions._
+    import definitions._
 
-    private val exportPrefix = "$js$exported$"
+    import scala.reflect.NameTransformer
 
-    /** retrieves the names a sym should be exported to from its annotations */
-    def exportNamesOf(sym: Symbol): List[(String, Position)] = for {
-      annot <- sym.annotations
+    private val exportPrefix =  "$js$exported$"
+    private val methodExportPrefix = exportPrefix + "meth$"
+    private val propExportPrefix = exportPrefix + "prop$"
+
+    case class ExportSpec(name: String, prop: Boolean, pos: Position)
+
+    /** retrieves the names a sym should be exported to from its annotations
+     *
+     *  Note that for accessor symbols, the annotations of the accessed symbol
+     *  are used, rather than the annotations of the accessor itself.
+     */
+    def exportSpecsOf(sym: Symbol): List[ExportSpec] = for {
+      annot <- (if (sym.isAccessor) sym.accessed else sym).annotations
       if annot.symbol == JSExportAnnotation
-      name = annot.stringArg(0).getOrElse(sym.unexpandedName.encoded)
-      pos  = annot.pos
-    } yield (name, pos)
+    } yield {
+      val prop = annot.stringArg(1).map(_.toBoolean).getOrElse(isJSGetOrSet(sym))
+      val name = annot.stringArg(0).getOrElse {
+        val decN = sym.unexpandedName.decoded
+        if (prop && isJSSetterTpe(sym)) {
+          if (!decN.endsWith("_=")) decN.substring(0, decN.length - 2)
+          else decN
+        } else sym.unexpandedName.decoded
+      }
+      ExportSpec(name, prop, annot.pos)
+    }
 
-    /** mangles a name to a JSExported name */
-    def scalaExportName(name: String): Name = newTermName(exportPrefix + name)
+    /** creates a name for an export specification */
+    def scalaExportName(spec: ExportSpec): Name = {
+      val pref = if (spec.prop) propExportPrefix else methodExportPrefix
+      val encname = NameTransformer.encode(spec.name)
+      newTermName(pref + encname)
+    }
 
     /** checks if the given name is a JSExport */
     def isExportName(name: Name): Boolean = name.startsWith(exportPrefix)
@@ -54,6 +77,34 @@ trait JSGlobalAddons extends JSTrees
       assert(isExportName(name))
       name.encoded.substring(exportPrefix.length)
     }
+
+    def isJSGetOrSet(sym: Symbol): Boolean = isJSGetter(sym) || isJSSetter(sym)
+
+    /** has this symbol to be translated into a JS getter (both directions)? */
+    def isJSGetter(sym: Symbol): Boolean = {
+      sym.tpe.params.isEmpty && enteringPhase(currentRun.uncurryPhase) {
+        sym.tpe.isInstanceOf[NullaryMethodType]
+      }
+    }
+
+    /** has this symbol to be translated into a JS setter (both directions)? */
+    def isJSSetter(sym: Symbol) = {
+      sym.unexpandedName.decoded.endsWith("_=") &&
+      isJSSetterTpe(sym)
+    }
+
+    private def isJSSetterTpe(sym: Symbol) = {
+      enteringPhase(currentRun.uncurryPhase) {
+        sym.tpe.paramss match {
+          case List(List(arg)) => !isScalaRepeatedParamType(arg.tpe)
+          case _ => false
+        }
+      }
+    }
+
+    /** has this symbol to be translated into a JS bracket access (JS to Scala) */
+    def isJSBracketAccess(sym: Symbol) =
+      sym.hasAnnotation(JSBracketAccessAnnotation)
 
   }
 
