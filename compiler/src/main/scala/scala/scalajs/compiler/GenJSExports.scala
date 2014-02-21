@@ -38,8 +38,24 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     newlyDecldExportNames map { genExport(classSym, _) }
   }
 
-  def genConstructorExports(classSym: Symbol) = {
+  def genConstructorExports(classSym: Symbol): List[js.Tree] = {
+    val constructors = classSym.tpe.member(nme.CONSTRUCTOR).alternatives
+/*
 
+            case Some(js.MethodDef(_, args, body)) =>
+          val jsConstructorVar = envField("classes") DOT classIdent
+          js.Block(
+              js.DocComment("@constructor"),
+              jsConstructorVar := js.Function(args, js.Block(
+                  js.ApplyMethod(classVar, js.Ident("call"), List(js.This())),
+                  body)),
+              jsConstructorVar DOT "prototype" := classVar DOT "prototype")
+
+        case _ =>
+          js.Skip()
+*/
+
+Nil
   }
 
 
