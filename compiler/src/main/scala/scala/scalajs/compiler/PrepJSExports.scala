@@ -26,12 +26,10 @@ trait PrepJSExports { this: PrepJSInterop =>
 
     val exportNames = jsInterop.exportSpecsOf(baseSym)
 
-    println(s"exporting: ${baseSym.fullName}")
-    println(s"flags: ${baseSym.flagBitsToString(baseSym.flags)}")
-    println(s"to names: ${exportNames}")
-
     // Helper function for errors
     def err(msg: String) = { currentUnit.error(exportNames.head.pos, msg); Nil }
+
+    // TODO check that properties have right method types
 
     if (exportNames.isEmpty)
       Nil

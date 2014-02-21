@@ -97,6 +97,9 @@ class GetSet {
   def a_=(x: Int) = ()
   
   @JSExport
+  def a_=(x: String) = ()
+  
+  @JSExport
   var b: Int = 1
 }
 

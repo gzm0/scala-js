@@ -6,6 +6,7 @@
 package scala.scalajs.compiler
 
 import scala.tools.nsc._
+import scala.reflect.internal.util.NoPosition
 
 /** Additions to Global meaningful for the JavaScript backend
  *
@@ -51,10 +52,9 @@ trait JSGlobalAddons extends JSTrees
       val prop = annot.stringArg(1).map(_.toBoolean).getOrElse(isJSGetOrSet(sym))
       val name = annot.stringArg(0).getOrElse {
         val decN = sym.unexpandedName.decoded
-        if (prop && isJSSetterTpe(sym)) {
-          if (!decN.endsWith("_=")) decN.substring(0, decN.length - 2)
-          else decN
-        } else sym.unexpandedName.decoded
+        if (prop && isSetterTpe(sym) && decN.endsWith("_="))
+          decN.substring(0, decN.length - 2)
+        else decN
       }
       ExportSpec(name, prop, annot.pos)
     }
@@ -72,28 +72,47 @@ trait JSGlobalAddons extends JSTrees
     /** checks if the given symbol is a JSExport */
     def isExport(sym: Symbol): Boolean = isExportName(sym.unexpandedName)
 
-    /** retrieves the originally assigned JS name of this export */
-    def jsExportName(name: Name): String = {
-      assert(isExportName(name))
-      name.encoded.substring(exportPrefix.length)
+    /** retrieves the originally assigned export spec of this export. note that
+     *  it will have an invalid position
+     */
+    def jsExportSpec(name: Name): ExportSpec = {
+      def dropPrefix(prefix: String) ={
+        if (name.startsWith(prefix)) {
+          // We can't encode right away due to $ separators
+          val enc = name.encoded.substring(prefix.length)
+          Some(NameTransformer.decode(enc))
+        } else None
+      }
+
+      def expSpec(prop: Boolean) =
+        (name: String) => ExportSpec(name, prop, global.NoPosition)
+
+      dropPrefix(methodExportPrefix).map(expSpec(false)) orElse
+      dropPrefix(propExportPrefix).map(expSpec(true)) getOrElse
+      sys.error("non-exported name passed to jsExportSpec")
     }
 
     def isJSGetOrSet(sym: Symbol): Boolean = isJSGetter(sym) || isJSSetter(sym)
 
     /** has this symbol to be translated into a JS getter (both directions)? */
     def isJSGetter(sym: Symbol): Boolean = {
-      sym.tpe.params.isEmpty && enteringPhase(currentRun.uncurryPhase) {
-        sym.tpe.isInstanceOf[NullaryMethodType]
-      }
+      sym.tpe.params.isEmpty && isGetterTpe(sym)
     }
 
     /** has this symbol to be translated into a JS setter (both directions)? */
     def isJSSetter(sym: Symbol) = {
       sym.unexpandedName.decoded.endsWith("_=") &&
-      isJSSetterTpe(sym)
+      isSetterTpe(sym)
     }
 
-    private def isJSSetterTpe(sym: Symbol) = {
+    /** is this symbol a NullaryMethod */
+    def isGetterTpe(sym: Symbol) = enteringPhase(currentRun.uncurryPhase) {
+      sym.tpe.isInstanceOf[NullaryMethodType]
+    }
+
+    /** is this symbol a method with a single argument and Unit return type */
+    def isSetterTpe(sym: Symbol) = {
+      sym.tpe.resultType.typeSymbol == UnitClass &&
       enteringPhase(currentRun.uncurryPhase) {
         sym.tpe.paramss match {
           case List(List(arg)) => !isScalaRepeatedParamType(arg.tpe)

@@ -19,7 +19,7 @@ import scala.annotation.tailrec
 abstract class GenJSCode extends plugins.PluginComponent
                             with TypeKinds
                             with JSEncoding
-                            with JSExports
+                            with GenJSExports
                             with JSDesugaring
                             with GenJSFiles {
   val jsAddons: JSGlobalAddons {
