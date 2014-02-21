@@ -45,12 +45,14 @@ trait PrepJSExports { this: PrepJSInterop =>
       // Reset interface flag: Any trait will contain non-empty methods
       clsSym.resetFlag(Flags.INTERFACE)
 
+      lazy val propertyType =
+        jsInterop.isSetterTpe(baseSym) ||
+        jsInterop.isGetterTpe(baseSym)
+
       // Actually generate exporter methods
       for (spec @ jsInterop.ExportSpec(_, prop, pos) <- exportNames) yield {
         // Check that if we do a property, that we have the right type
-        if (prop &&
-            !jsInterop.isSetterTpe(baseSym) &&
-            !jsInterop.isGetterTpe(baseSym)) {
+        if (prop && !propertyType) {
           currentUnit.error(pos,
               s"""You cannot export ${baseSym.name} as a property, since it does not have an appropriate type.
                  |Acceptable types for properties are nullary method types (getters) and single argument, unit-return
