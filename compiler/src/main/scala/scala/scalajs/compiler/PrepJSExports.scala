@@ -80,7 +80,8 @@ trait PrepJSExports { this: PrepJSInterop =>
     // The return type is lifted, in order to avoid bridge
     // construction and to detect methods whose signature only differs
     // in the return type
-    expSym.setInfo(retToAny(expSym.tpe))
+    if (!defSym.isConstructor)
+      expSym.setInfo(retToAny(expSym.tpe))
 
     // Change name for new method
     expSym.name = scalaName

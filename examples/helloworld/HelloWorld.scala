@@ -90,6 +90,14 @@ class Confl {
   def rtType(x: Int) = x
 }
 
+@JSExport
+class Constructable(x: Int) {
+  println(x)
+  
+  @JSExport
+  def this() = this(5)
+}
+
 class GetSet {
   @JSExport
   def a: Int = 1
