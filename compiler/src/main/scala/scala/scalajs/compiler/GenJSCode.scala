@@ -267,18 +267,11 @@ abstract class GenJSCode extends plugins.PluginComponent
 
       gen(impl)
 
-      // Generate the bridges, then steal the constructor bridges (1 at most)
-/*      val bridges0 = genBridgesForClass(sym)
-      val (constructorBridges0, bridges) = bridges0.partition {
-        case js.MethodDef(js.Ident("init_", _), _, _) => true
-        case _ => false
-      }
-      assert(constructorBridges0.size <= 1)
-      val constructorBridge = constructorBridges0.headOption*/
-      val constructorBridge: Option[js.Tree] = None
-
       // Generate the exported members
       val exports = genMemberExports(sym, exportedSymbols.toList)
+
+      // Generate exported constructors
+      val exportedConstructors = genConstructorExports(sym)
 
       // Generate the reflective call proxies (where required)
       val reflProxies = genReflCallProxies(sym)
@@ -301,29 +294,6 @@ abstract class GenJSCode extends plugins.PluginComponent
             inheritableConstructorVar DOT "prototype" := classVar DOT "prototype")
       }
 
-      /* JS-friendly constructor
-       *
-       * ScalaJS.classes.classIdent = function(<args of the constructor bridge>) {
-       *   ScalaJS.c.classIdent.call(this);
-       *   <body of the constructor bridge>
-       * }
-       * ScalaJS.classes.prototype = Class.prototype;
-       */
-
-      val createJSConstructorStat = constructorBridge match {
-        case Some(js.MethodDef(_, args, body)) =>
-          val jsConstructorVar = envField("classes") DOT classIdent
-          js.Block(
-              js.DocComment("@constructor"),
-              jsConstructorVar := js.Function(args, js.Block(
-                  js.ApplyMethod(classVar, js.Ident("call"), List(js.This())),
-                  body)),
-              jsConstructorVar DOT "prototype" := classVar DOT "prototype")
-
-        case _ =>
-          js.Skip()
-      }
-
       // Instance tests
 
       val instanceTestMethods = genInstanceTestMethods(cd)
@@ -341,11 +311,11 @@ abstract class GenJSCode extends plugins.PluginComponent
       // Bring it all together
 
       val everything = js.Block(
-          classDefinition,
-          createInheritableConstructor,
-          createJSConstructorStat,
-          instanceTestMethods,
-          createDataStat)
+          classDefinition +:
+          createInheritableConstructor +:
+          exportedConstructors :+
+          instanceTestMethods :+
+          createDataStat :_*)
 
       currentClassSym = null
 
