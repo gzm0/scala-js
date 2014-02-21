@@ -270,7 +270,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       val constructorBridge: Option[js.Tree] = None
 
       // Generate the exported members
-      val exports = genExportsForClass(sym, exportedSymbols.toList)
+      val exports = genMemberExports(sym, exportedSymbols.toList)
 
       // Generate the reflective call proxies (where required)
       val reflProxies = genReflCallProxies(sym)
