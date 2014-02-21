@@ -19,7 +19,6 @@ trait PrepJSExports { this: PrepJSInterop =>
 
   import scala.reflect.internal.Flags
 
-  // TODO special case constructors here
   def genExportMember(ddef: DefDef): List[Tree] = {
     val baseSym = ddef.symbol
     val clsSym = baseSym.owner
@@ -29,7 +28,9 @@ trait PrepJSExports { this: PrepJSInterop =>
     // Helper function for errors
     def err(msg: String) = { currentUnit.error(exportNames.head.pos, msg); Nil }
 
-    if (exportNames.isEmpty)
+    if (exportNames.isEmpty || baseSym.isConstructor)
+      // we can generate constructors entirely in the backend, since they
+      // do not need inheritance and such.
       Nil
     else if (isJSAny(baseSym.owner))
       err("You may not export a method of a subclass of js.Any")

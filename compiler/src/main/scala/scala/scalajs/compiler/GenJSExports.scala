@@ -27,7 +27,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
    *   the class' tree. This is not the same as classSym.info.delcs since
    *   inherited concrete methods from traits should be in this param, too
    */
-  def genExportsForClass(
+  def genMemberExports(
       classSym: Symbol,
       decldExports: List[Symbol]): List[js.Tree] = {
 
@@ -35,10 +35,13 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    // TODO how do we handle constructors?
-
     newlyDecldExportNames map { genExport(classSym, _) }
   }
+
+  def genConstructorExports(classSym: Symbol) = {
+
+  }
+
 
   private def isOverridingExport(sym: Symbol): Boolean = {
     lazy val osym = sym.nextOverriddenSymbol
