@@ -91,6 +91,7 @@ class Confl {
 }
 
 @JSExport
+@JSExport(name = "foo")
 class Constructable(x: Int) {
   println(x)
   

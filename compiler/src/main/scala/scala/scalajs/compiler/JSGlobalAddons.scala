@@ -45,19 +45,30 @@ trait JSGlobalAddons extends JSTrees
      *  Note that for accessor symbols, the annotations of the accessed symbol
      *  are used, rather than the annotations of the accessor itself.
      */
-    def exportSpecsOf(sym: Symbol): List[ExportSpec] = for {
-      annot <- (if (sym.isAccessor) sym.accessed else sym).annotations
-      if annot.symbol == JSExportAnnotation
-    } yield {
-      // TODO this doesn't de-construct annotation correctly
-      val prop = annot.stringArg(1).map(_.toBoolean).getOrElse(isJSGetOrSet(sym))
-      val name = annot.stringArg(0).getOrElse {
-        val decN = sym.unexpandedName.decoded
-        if (prop && isSetterTpe(sym) && decN.endsWith("_="))
-          decN.substring(0, decN.length - 2)
-        else decN
+    def exportSpecsOf(sym: Symbol): List[ExportSpec] = {
+      val trgSym = {
+        // For accessors, look on the val/var def
+        if (sym.isAccessor) sym.accessed
+        // For primary constructors, look on the class itself
+        else if (sym.isPrimaryConstructor) sym.owner
+        else sym
       }
-      ExportSpec(name, prop, annot.pos)
+
+      for {
+        annot <- trgSym.annotations
+        if annot.symbol == JSExportAnnotation
+      } yield {
+        // TODO this doesn't de-construct annotation correctly
+        val prop = annot.stringArg(1).map(_.toBoolean).getOrElse(isJSGetOrSet(sym))
+        val name = annot.stringArg(0).getOrElse {
+          val nmeSym = if (sym.isConstructor) sym.owner else sym
+          val decN = nmeSym.unexpandedName.decoded
+          if (prop && isSetterTpe(sym) && decN.endsWith("_="))
+            decN.substring(0, decN.length - 2)
+          else decN
+        }
+        ExportSpec(name, prop, annot.pos)
+      }
     }
 
     /** creates a name for an export specification */

@@ -263,7 +263,7 @@ abstract class PrepJSInterop extends plugins.PluginComponent
         s"class ${tpe.getClass}")
   }
 
-  private def isJSAny(sym: Symbol): Boolean =
+  def isJSAny(sym: Symbol): Boolean =
     sym.tpe.typeSymbol isSubClass JSAnyClass
 
   private def isJSAny(implDef: ImplDef): Boolean = isJSAny(implDef.symbol)

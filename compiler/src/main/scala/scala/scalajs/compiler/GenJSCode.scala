@@ -258,6 +258,8 @@ abstract class GenJSCode extends plugins.PluginComponent
             val sym = dd.symbol
             generatedMembers ++= genMethod(dd)
 
+            // We add symbols that we have to export here. This way we also
+            // get inherited stuff that is implemented in this class.
             if (jsInterop.isExport(sym))
               exportedSymbols += sym
 

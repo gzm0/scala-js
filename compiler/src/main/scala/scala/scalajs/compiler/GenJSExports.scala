@@ -35,27 +35,52 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     val newlyDecldExportNames =
       newlyDecldExports.map(_.name.toTermName).toList.distinct
 
-    newlyDecldExportNames map { genExport(classSym, _) }
+    newlyDecldExportNames map { genMemberExport(classSym, _) }
   }
 
   def genConstructorExports(classSym: Symbol): List[js.Tree] = {
     val constructors = classSym.tpe.member(nme.CONSTRUCTOR).alternatives
-/*
 
-            case Some(js.MethodDef(_, args, body)) =>
-          val jsConstructorVar = envField("classes") DOT classIdent
-          js.Block(
-              js.DocComment("@constructor"),
-              jsConstructorVar := js.Function(args, js.Block(
-                  js.ApplyMethod(classVar, js.Ident("call"), List(js.This())),
-                  body)),
-              jsConstructorVar DOT "prototype" := classVar DOT "prototype")
+    /** fetch name from an export spec if it is not a property */
+    def errPropOrName(spec: jsInterop.ExportSpec) = if (spec.prop) {
+      currentUnit.error(spec.pos,
+          "You cannot export a constructor as a property")
+      None
+    } else Some(spec.name)
 
-        case _ =>
-          js.Skip()
-*/
+    // Generate exports from constructors and their annotations
+    val ctorExports = for {
+      ctor    <- constructors
+      expSpec <- jsInterop.exportSpecsOf(ctor)
+      jsName    <- errPropOrName(expSpec)
+    } yield (jsName, ctor)
 
-Nil
+    val exports = for {
+      (jsName, specs) <- ctorExports.groupBy(_._1)
+    } yield {
+      import js.TreeDSL._
+
+      val ctors = specs.map(_._2)
+      implicit val pos = ctors.head.pos
+
+      val js.MethodDef(_, args, body) = genExportMethod(ctors, jsName)
+
+      val jsCtor = envField("c") DOT encodeClassFullNameIdent(classSym)
+      val expCtorVar = js.Select(envField("g"), js.StringLiteral(jsName))
+
+      js.Block(
+        js.DocComment("@constructor"),
+        expCtorVar := js.Function(args, js.Block(
+          // Call the js constructor while passing the current this
+          js.ApplyMethod(jsCtor, js.Ident("call"), List(js.This())),
+          body
+        ))
+      )
+
+    }
+
+    exports.toList
+
   }
 
 
@@ -64,7 +89,7 @@ Nil
     sym.isOverridingSymbol && !osym.owner.isInterface
   }
 
-  private def genExport(classSym: Symbol, name: TermName): js.Tree = {
+  private def genMemberExport(classSym: Symbol, name: TermName): js.Tree = {
     val alts = classSym.info.member(name).alternatives
 
     assert(!alts.isEmpty,
