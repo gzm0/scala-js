@@ -23,10 +23,10 @@ trait PrepJSExports { this: PrepJSInterop =>
     val baseSym = ddef.symbol
     val clsSym = baseSym.owner
 
-    val exportNames = jsInterop.exportSpecsOf(baseSym)
+    val exportNames = jsInterop.exportsOf(baseSym)
 
     // Helper function for errors
-    def err(msg: String) = { currentUnit.error(exportNames.head.pos, msg); Nil }
+    def err(msg: String) = { currentUnit.error(exportNames.head._2, msg); Nil }
 
     if (exportNames.isEmpty || baseSym.isConstructor)
       // we can generate constructors entirely in the backend, since they
@@ -46,42 +46,30 @@ trait PrepJSExports { this: PrepJSInterop =>
       // Reset interface flag: Any trait will contain non-empty methods
       clsSym.resetFlag(Flags.INTERFACE)
 
-      lazy val propertyType =
-        jsInterop.isSetterTpe(baseSym) ||
-        jsInterop.isGetterTpe(baseSym)
-
       // Actually generate exporter methods
-      for (spec @ jsInterop.ExportSpec(_, prop, pos) <- exportNames) yield {
-        // Check that if we do a property, that we have the right type
-        if (prop && !propertyType) {
-          currentUnit.error(pos,
-              s"""You cannot export ${baseSym.name} as a property, since it does not have an appropriate type.
-                 |Acceptable types for properties are nullary method types (getters) and single argument, unit-return
-                 |methods (setters)""".stripMargin)
-          EmptyTree
-
-        // If check is fine, actually generate tree
-        } else atPos(pos) { genExportDef(baseSym, spec) }
-      }
+      for ((jsName, pos) <- exportNames)
+        yield atPos(pos) { genExportDef(baseSym, jsName, pos) }
     }
   }
 
   /** generate an exporter for a DefDef */
-  private def genExportDef(defSym: Symbol, expSpec: jsInterop.ExportSpec) = {
+  private def genExportDef(defSym: Symbol, jsName: String, pos: Position) = {
     val clsSym = defSym.owner
-    val scalaName = jsInterop.scalaExportName(expSpec)
+    val scalaName =
+      jsInterop.scalaExportName(jsName, jsInterop.isJSProperty(defSym))
 
     // Create symbol for new method
     val expSym = defSym.cloneSymbol
 
     // Set position of symbol
-    expSym.pos = expSpec.pos
+    expSym.pos = pos
 
     // Alter type for new method (lift return type to Any)
     // The return type is lifted, in order to avoid bridge
     // construction and to detect methods whose signature only differs
     // in the return type
     if (!defSym.isConstructor)
+      // TODO we have issues with boxing here!
       expSym.setInfo(retToAny(expSym.tpe))
 
     // Change name for new method

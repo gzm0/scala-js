@@ -799,13 +799,9 @@ abstract class GenJSCode extends plugins.PluginComponent
       }
 
       // For simplicity, this export is generated in place
-      val exportedAccessor = jsInterop.exportSpecsOf(sym) map {
-        case jsInterop.ExportSpec(name, false, p) =>
+      val exportedAccessor = jsInterop.exportsOf(sym) map { case (name, p) =>
           implicit val pos = p
           js.Select(envField("g"), js.StringLiteral(name)) := accessorName
-        case jsInterop.ExportSpec(_, true, p) =>
-          currentUnit.error(p, "An object cannot be exported as a property")
-          js.Skip()
       }
 
       js.Block(List(createModuleInstanceField, createAccessor) ++

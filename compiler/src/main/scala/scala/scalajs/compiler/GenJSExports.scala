@@ -41,18 +41,10 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
   def genConstructorExports(classSym: Symbol): List[js.Tree] = {
     val constructors = classSym.tpe.member(nme.CONSTRUCTOR).alternatives
 
-    /** fetch name from an export spec if it is not a property */
-    def errPropOrName(spec: jsInterop.ExportSpec) = if (spec.prop) {
-      currentUnit.error(spec.pos,
-          "You cannot export a constructor as a property")
-      None
-    } else Some(spec.name)
-
     // Generate exports from constructors and their annotations
     val ctorExports = for {
-      ctor    <- constructors
-      expSpec <- jsInterop.exportSpecsOf(ctor)
-      jsName    <- errPropOrName(expSpec)
+      ctor        <- constructors
+      (jsName, _) <- jsInterop.exportsOf(ctor)
     } yield (jsName, ctor)
 
     val exports = for {
@@ -96,7 +88,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
         s"Ended up with no alternatives for ${classSym.fullName}::$name. " +
         s"Original set was ${alts} with types ${alts.map(_.tpe)}")
 
-    val jsInterop.ExportSpec(jsName, isProp, _) = jsInterop.jsExportSpec(name)
+    val (jsName, isProp) = jsInterop.jsExportInfo(name)
 
     if (isProp)
       genExportProperty(alts, jsName)
@@ -109,7 +101,9 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     assert(!alts.isEmpty)
     implicit val pos = alts.head.pos
 
-    val (getter, setters) = alts.partition(jsInterop.isGetterTpe( _))
+    // Separate getters and setters. Somehow isJSGetter doesn't work here. Hence
+    // we just check the parameter list length.
+    val (getter, setters) = alts.partition(_.tpe.params.isEmpty)
 
     // if we have more than one getter, something went horribly wrong
     assert(getter.size <= 1,

@@ -34,6 +34,7 @@ trait Stack extends Foo {
 }
 
 class FooBarImpl extends Bar {
+  @JSExport(name = "hello")
   def x: Int = 1
   
   // Export of overridden method without export in super
