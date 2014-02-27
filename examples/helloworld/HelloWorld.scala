@@ -123,7 +123,10 @@ object A {
 
   // Export a generic
   @JSExport
-  def gen[T](x: T) = x
+  def gen[T <: AnyRef](x: T) = x
+  
+  // Export a bad generic (no bound on return type)
+  //def genBad[T](x: T) = x
   
   // Export lambda ret value
   @JSExport
@@ -145,9 +148,15 @@ object A {
 class A
 class B extends A
 
+class VC(val i: Int) extends AnyVal
+
 class C1 {
   @JSExport
   def x: A = new A
+  
+  // Export with value class return type
+  @JSExport
+  def valueClassRet(a: Int) = new VC(a)
 }
 
 class C2 extends C1 {

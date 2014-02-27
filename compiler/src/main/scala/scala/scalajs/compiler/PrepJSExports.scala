@@ -5,6 +5,8 @@
 
 package scala.scalajs.compiler
 
+import scala.annotation.tailrec
+
 /**
  *  Prepare export generation
  *
@@ -40,7 +42,11 @@ trait PrepJSExports { this: PrepJSInterop =>
       err("You may not export a macro")
     else if (scalaPrimitives.isPrimitive(baseSym))
       err("You may not export a primitive")
-    else {
+    else if (!hasAllowedRetType(baseSym.tpe)) {
+      err("""You may not export a method whose return type is neither a subtype of
+            |AnyRef nor a concrete subtype of AnyVal (i.e. a value class or a
+            |primitive value type).""".stripMargin)
+    } else {
       assert(!baseSym.isBridge)
 
       // Reset interface flag: Any trait will contain non-empty methods
@@ -67,9 +73,11 @@ trait PrepJSExports { this: PrepJSInterop =>
     // Alter type for new method (lift return type to Any)
     // The return type is lifted, in order to avoid bridge
     // construction and to detect methods whose signature only differs
-    // in the return type
+    // in the return type.
+    // Attention: This will cause boxes for primitive value types and value
+    // classes. However, since we have restricted the return types, we can
+    // always safely remove these boxes again in the back-end.
     if (!defSym.isConstructor)
-      // TODO we have issues with boxing here!
       expSym.setInfo(retToAny(expSym.tpe))
 
     // Change name for new method
@@ -108,6 +116,27 @@ trait PrepJSExports { this: PrepJSInterop =>
         s"class ${tpe.getClass}")
   }
 
+  /** checks whether the type is subtype of AnyRef (or generic with bounds),
+   *  a primitive value type, or a value class */
+  @tailrec
+  private def hasAllowedRetType(tpe: Type): Boolean = {
+    val sym = tpe.typeSymbol // this may be NoSymbol
 
+    (tpe <:< AnyRefClass.tpe) ||
+    sym.isPrimitiveValueClass ||
+    sym.isDerivedValueClass || {
+      tpe match {
+        case MethodType(_, retTpe)     => hasAllowedRetType(retTpe)
+        case NullaryMethodType(retTpe) => hasAllowedRetType(retTpe)
+        // Note that in the PolyType case, the return type may be polymorphic,
+        // but the conformance test correctly works with bounds.
+        // Therefore, `T <: AnyRef` is a valid return type.
+        case PolyType(_, retTpe)       => hasAllowedRetType(retTpe)
+        case _ =>
+          println(s"found type: $tpe class: ${tpe.getClass}")
+          false
+      }
+    }
+  }
 
 }

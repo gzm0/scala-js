@@ -256,12 +256,15 @@ abstract class GenJSCode extends plugins.PluginComponent
 
           case dd: DefDef =>
             val sym = dd.symbol
-            generatedMembers ++= genMethod(dd)
 
-            // We add symbols that we have to export here. This way we also
-            // get inherited stuff that is implemented in this class.
-            if (jsInterop.isExport(sym))
+            if (jsInterop.isExport(sym)) {
+              generatedMembers += genExportForwarder(dd)
+              // We add symbols that we have to export here. This way we also
+              // get inherited stuff that is implemented in this class.
               exportedSymbols += sym
+            } else {
+              generatedMembers ++= genMethod(dd)
+            }
 
           case _ => abort("Illegal tree in gen of genClass(): " + tree)
         }
@@ -754,6 +757,59 @@ abstract class GenJSCode extends plugins.PluginComponent
       val body = js.Return(value)
 
       js.MethodDef(encodeMethodSym(sym, reflProxy = true), jsParams, body)
+    }
+
+    /** Generate a method definition for an export forwarder. This is similar
+     *  to genMethod but does not handle tail recursion and removes any boxing
+     *  introduced by the erasure phase.
+     */
+    def genExportForwarder(dd: DefDef) = {
+      implicit val pos = dd.pos
+      val sym = dd.symbol
+
+      // Prepare params
+      val vparamss = dd.vparamss
+
+      assert(vparamss.isEmpty || vparamss.tail.isEmpty,
+          "Malformed parameter list: " + vparamss)
+      val params = if (vparamss.isEmpty) Nil else vparamss.head map (_.symbol)
+
+      val jsParams =
+        for (param <- params)
+          yield encodeLocalSym(param, freshName)(param.pos)
+
+      // Prepare RHS
+      def isBox(sym: Symbol) = currentRun.runDefinitions.isBox(sym)
+
+      def genFwdApply(tree: Tree) = tree match {
+        case Apply(fun @ Select(receiver, _), _) =>
+          js.ApplyMethod(
+              genExpr(receiver),
+              encodeMethodSym(fun.symbol),
+              jsParams)
+        case _ => abort("Unexpected tree")
+      }
+
+      val jsRhs = dd.rhs match {
+        // Unwrap boxes
+        case Apply(fun, List(body)) if isBox(fun.symbol) =>
+          js.Return(genFwdApply(body))
+        // Unwrap boxes to ValueClasses
+        case Apply(Select(New(_), _), List(body)) =>
+          js.Return(genFwdApply(body))
+        // Drop boxed units
+        case Block(List(body), expr) if expr.symbol == BoxedUnit_UNIT =>
+          exprToStat(genFwdApply(body))
+        // Normal case (no boxing happened)
+        // Note that we do not need to handle unit return specially here,
+        // since they are always boxed.
+        case body: Apply =>
+          js.Return(genFwdApply(body))
+        case _ =>
+          abort("Unexpected tree")
+      }
+
+      js.MethodDef(encodeMethodSym(sym), jsParams, jsRhs)
     }
 
     // Generate a module accessor ----------------------------------------------
