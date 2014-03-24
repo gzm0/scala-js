@@ -46,7 +46,11 @@ trait PrepJSExports { this: PrepJSInterop =>
             |AnyRef nor a concrete subtype of AnyVal (i.e. a value class or a
             |primitive value type).""".stripMargin)
     else if (hasIllegalRepeatedParam(baseSym))
-      err(s"In an exported $memType, a *-parameter must come last (through all parameter lists)")
+      err(s"In an exported $memType, a *-parameter must come last " +
+        "(through all parameter lists)")
+    else if (hasIllegalDefaultParam(baseSym))
+      err(s"In an exported $memType, all parameters with defaults " +
+        "must be at the end")
     else if (forScaladoc) {
       /* Don't do anything under scaladoc because the uncurry phase does not
        * exist in that setting (see bug #323). It's no big deal because we do
@@ -170,6 +174,14 @@ trait PrepJSExports { this: PrepJSInterop =>
   private def hasIllegalRepeatedParam(sym: Symbol): Boolean = {
     val params = sym.paramss.flatten
     params.nonEmpty && params.init.exists(isRepeated _)
+  }
+
+  /** checks whether there are default parameters not at the end of
+    * the flattened parameter list
+    */
+  private def hasIllegalDefaultParam(sym: Symbol): Boolean = {
+    val isDefParam = (_: Symbol).hasFlag(Flags.DEFAULTPARAM)
+    sym.paramss.flatten.reverse.dropWhile(isDefParam).exists(isDefParam)
   }
 
 }

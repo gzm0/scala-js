@@ -149,12 +149,27 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
 
       val hasVarArg = varArgMeths.nonEmpty
 
-      // Group normal methods by argument count
-      val normalByArgCount = normalMeths.groupBy(_.tpe.params.size)
+      // Group normal methods by argument count. Note that methods
+      // with default parameters have multiple possible argument
+      // counts.
+      def argCounts(params: List[Symbol]) = {
+        val dParam = params.indexWhere(_.hasFlag(Flags.DEFAULTPARAM))
+        if (dParam == -1)
+          List(params.size)
+        else
+          (dParam + 1) to params.size
+      }
+
+      val normalByArgCount = (
+        for {
+          method <- normalMeths
+          argc   <- argCounts(method.tpe.params)
+        } yield (argc, method)
+      ).groupBy(_._1).mapValues(_.map(_._2))
 
       // Argument counts (for varArgs, this is minimal count)
       val argcS = (normalByArgCount.toList.map(_._1)
-          ++ varArgMeths.map(_.tpe.params.size - 1)).sorted
+          ++ varArgMeths.map(_.tpe.params.size - 1)).distinct.sorted
 
       val formalArgs = genFormalArgs(argcS.last)
 

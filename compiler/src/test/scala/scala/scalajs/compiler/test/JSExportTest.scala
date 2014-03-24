@@ -234,6 +234,23 @@ class JSExportTest extends DirectTest with TestHelpers {
   }
 
   @Test
+  def noMiddleDefaultParam = {
+
+    """
+    class A {
+      @JSExport
+      def method(x: Int = 1)(y: String) = 1
+    }
+    """ hasErrors 
+    """
+      |newSource1.scala:4: error: In an exported method, all parameters with defaults must be at the end
+      |      @JSExport
+      |       ^
+    """
+
+  }
+
+  @Test
   def noExportTrait = {
 
     """
