@@ -11,8 +11,8 @@ import js.annotation.{ JSName, JSExport }
 @JSExport
 object HelloWorld extends App {
 
-  @JSExport
-  def a(a: Int, b: Int = 5) = a + b
+  @JSExport("fooooooo")
+  def a(a: Int)(b: Int = 5)(c: Int = 7) = a + b
 
   val x = this.asInstanceOf[js.Dynamic]
 

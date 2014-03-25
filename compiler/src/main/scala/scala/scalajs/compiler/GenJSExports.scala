@@ -149,27 +149,12 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
 
       val hasVarArg = varArgMeths.nonEmpty
 
-      // Group normal methods by argument count. Note that methods
-      // with default parameters have multiple possible argument
-      // counts.
-      def argCounts(params: List[Symbol]) = {
-        val dParam = params.indexWhere(_.hasFlag(Flags.DEFAULTPARAM))
-        if (dParam == -1)
-          List(params.size)
-        else
-          (dParam + 1) to params.size
-      }
-
-      val normalByArgCount = (
-        for {
-          method <- normalMeths
-          argc   <- argCounts(method.tpe.params)
-        } yield (argc, method)
-      ).groupBy(_._1).mapValues(_.map(_._2))
+      // Create a map: argCount -> methods (methods may appear multiple times)
+      val normalByArgCount = groupByArgCounts(normalMeths)
 
       // Argument counts (for varArgs, this is minimal count)
-      val argcS = (normalByArgCount.toList.map(_._1)
-          ++ varArgMeths.map(_.tpe.params.size - 1)).distinct.sorted
+      val argcS = (normalByArgCount.keySet
+          ++ varArgMeths.map(_.tpe.params.size - 1)).toList.sorted
 
       val formalArgs = genFormalArgs(argcS.last)
 
@@ -228,7 +213,15 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
       js.MethodDef(js.StringLiteral(jsName), formalArgs, body)
     }
 
-    private def genExportSameArgc(alts: List[Symbol], paramIndex: Int): js.Tree = {
+    /**
+     * Resolve method calls to [[alts]] while assuming they have the same
+     * parameter count.
+     * @param alts Alternative methods
+     * @param paramIndex Index where to start disambiguation
+     */
+    private def genExportSameArgc(alts: List[Symbol],
+        paramIndex: Int): js.Tree = {
+
       implicit val pos = alts.head.pos
 
       if (alts.size == 1)
@@ -293,9 +286,15 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
       }
     }
 
+    /**
+     * Generate a call to the method [[sym]] while using the formalArguments
+     * and potentially the argument array. Also inserts default parameters if
+     * required.
+     */
     private def genApplyForSym(sym: Symbol): js.Tree = {
       implicit val pos = sym.pos
 
+      // the (single) type of the repeated parameter if any
       val repeatedTpe = enteringPhase(currentRun.uncurryPhase) {
         for {
           param <- sym.paramss.flatten.lastOption
@@ -306,17 +305,45 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
       val normalArgc = sym.tpe.params.size -
         (if (repeatedTpe.isDefined) 1 else 0)
 
-      val lastArg = repeatedTpe map { tpe =>
+      // optional repeated parameter list
+      val jsVarArg = repeatedTpe map { tpe =>
         // Construct a new JSArraySeq with optional boxing
         genNew(JSArraySeqClass, JSArraySeq_ctor,
           List(js.Ident("arguments"), js.IntLiteral(normalArgc),
               genBoxFunction(tpe)))
       }
 
-      js.Return {
-        js.ApplyMethod(js.This(), encodeMethodSym(sym),
-            genFormalArgs(normalArgc) ++ lastArg)
+      // normal arguments
+      val jsArgs = genFormalArgs(normalArgc)
+
+      // Generate JS code to arguments using default getters
+      val jsDefaultArgPrep = for {
+        (jsArg, (param, i)) <- jsArgs zip sym.tpe.params.zipWithIndex
+        if param.hasFlag(Flags.DEFAULTPARAM)
+      } yield {
+        import js.TreeDSL._
+
+        // If argument is undefined, call default getter
+        IF (jsArg === js.Undefined()) {
+          val defaultGetter = sym.owner.tpe.member(
+              nme.defaultGetterName(sym.name, i+1))
+
+          assert(defaultGetter.exists)
+          assert(!defaultGetter.isOverloaded)
+
+          // Pass previous arguments to defaultGetter
+          jsArg := js.ApplyMethod(js.This(), encodeMethodSym(defaultGetter),
+              jsArgs.take(defaultGetter.tpe.params.size))
+
+        } ELSE js.Skip() // inference for withoutElse doesn't work
       }
+
+      val jsReturn = js.Return {
+        js.ApplyMethod(js.This(), encodeMethodSym(sym),
+          jsArgs ++ jsVarArg)
+      }
+
+      js.Block(jsDefaultArgPrep :+ jsReturn)
     }
 
     private def genBoxFunction(tpe: Type)(implicit pos: Position) = {
@@ -461,6 +488,25 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     }
 
     m.toList
+  }
+
+  /** groups methods by argument count. Note that methods with default
+   *  parameters have multiple possible argument counts.
+   */
+  private def groupByArgCounts(methods: List[Symbol]) = {
+    // Possible argument counts for a parameter list
+    def argCounts(params: List[Symbol]) = {
+      val dParam = params.indexWhere { _.hasFlag(Flags.DEFAULTPARAM) }
+      if (dParam == -1) List(params.size)
+      else dParam to params.size
+    }
+
+    val counts = for {
+      method <- methods
+      argc   <- argCounts(method.tpe.params)
+    } yield (argc, method)
+
+    counts.groupBy(_._1).mapValues(_.map(_._2))
   }
 
   private def genThrowTypeError()(
