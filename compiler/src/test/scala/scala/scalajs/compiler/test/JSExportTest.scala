@@ -110,6 +110,16 @@ class JSExportTest extends DirectTest with TestHelpers {
       |      @JSExport
       |       ^
     """
+
+    """
+    class Confl {
+      @JSExport
+      def foo(x: Int = 1) = x
+      @JSExport
+      def foo(x: String*) = x
+    }
+    """ hasErrors ""
+
   }
 
   @Test
@@ -462,6 +472,19 @@ class JSExportTest extends DirectTest with TestHelpers {
 
   }
 
-  // TODO add no crash on double default
+  @Test
+  def gracefulDoubleDefaultFail = {
+    // This used to blow up (i.e. not just fail), because PrepJSExports asked
+    // for the symbol of the default parameter getter of [[y]], and asserted its
+    // not overloaded. Since the Scala compiler only fails later on this, the
+    // assert got triggered and made the compiler crash
+    """
+    class A {
+      @JSExport
+      def foo(x: String, y: String = "hello") = x
+      def foo(x: Int, y: String = "bar") = x
+    }
+    """ fails()
+  }
 
 }

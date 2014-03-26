@@ -264,8 +264,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
             if (ps.size <= paramIndex || isRepeated(ps(paramIndex))) {
               assert(isRepeated(ps.last))
               repeatedToSingle(ps.last.tpe)
-            } else
-              ps(paramIndex).tpe
+            } else ps(paramIndex).tpe
           }
 
           typeTestForTpe(tpe)
