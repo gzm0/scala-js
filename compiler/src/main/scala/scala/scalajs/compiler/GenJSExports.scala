@@ -158,23 +158,65 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
 
       val formalArgs = genFormalArgs(argcS.last)
 
+      // Create a map: argCount -> varArgMethods
+      // but only for argument counts we have other methods for
+      val varArgsByArgCount = argcS.map { argc =>
+        // We have argc + 1, since a parameter list may also be empty
+        // (unlike a normal parameter)
+        (argc, varArgMeths.filter(_.tpe.params.size <= argc + 1).toSet)
+      }.toMap
+
+      def allByArgCount(argc: Int) = varArgsByArgCount(argc) ++
+        normalByArgCount.getOrElse(argc, Set.empty)
+
+      @tailrec
+      def genCases(
+        argcS:   List[Int], // List of ArgCounts still to be handled
+        argcAcc: List[Int], // ArgCount cases delegated
+        acc:     List[(js.Tree, js.Tree)] // Result
+      ): List[(js.Tree, js.Tree)] = argcS match {
+        case Nil => acc.reverse
+        case argc :: Nil if !normalByArgCount.contains(argc) =>
+          // Only a varArg got added in this last case. But this
+          // corresponds to the default case we are going to
+          // generate. Therefore, don't add anything.
+          genCases(Nil, Nil, acc)
+        case argc :: Nil =>
+          val newTree = genForArgs(argc :: argcAcc, argc)
+          genCases(Nil, Nil, newTree :: acc)
+        case argc :: argcS@(nextArgc :: _) if (
+          normalByArgCount(argc)  == normalByArgCount(nextArgc) &&
+          varArgsByArgCount(argc) == varArgsByArgCount(nextArgc)
+        ) =>
+          genCases(argcS, argc :: argAcc, acc)
+        case argc :: argcS@(nextArgc :: _) =>
+          val newTree = genForArgs(argc :: argAcc, argc)
+          genCases(argcS, Nil, newTree :: acc)
+      }
+
+      def genForArgs(argcSr: List[Int], argc: Int) = {
+        val normal = normalByArgCount(argc)
+        val varArg = varArgsByArgCount(argc)
+
+        if (varArg.isEmpty)
+          genMultiValCase(argcSr, genExportSameArgc(normal, 0))
+        else if (normal.isEmpty)
+          genMultiValCase(
+      }
+
       // Generate cases by argument count
       val nestedCases = for {
         (argc, nextArgc) <- argcS.zipAll(argcS.tail, -1, -1)
       } yield {
         // Fetch methods with this argc
         val methods = normalByArgCount.getOrElse(argc, Nil)
+        val vArgs   = varArgsByArgCount(argc)
 
         if (nextArgc == -1 && methods.isEmpty) {
           // We are in the last argc case and we have only varargs. This is
           // the default case. Don't generate anything
           Nil
         } else {
-          // Include varArg methods that apply to this arg count
-          // We have argc + 1, since a parameter list may also be empty
-          // (unlike a normal parameter)
-          val vArgs = varArgMeths.filter(_.tpe.params.size <= argc + 1)
-
           // The full overload resolution
           val baseCaseBody = genExportSameArgc(methods ++ vArgs, 0)
 
@@ -190,7 +232,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
         }
       }
 
-      val cases = nestedCases.flatten
+      val cases = genCases(argcS, Nil, Nil)
 
       val defaultCase = {
         if (!hasVarArg)
@@ -506,7 +548,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
       argc   <- argCounts(method.tpe.params)
     } yield (argc, method)
 
-    counts.groupBy(_._1).mapValues(_.map(_._2))
+    counts.groupBy(_._1).mapValues(_.map(_._2).toSet)
   }
 
   private def genThrowTypeError()(
@@ -521,15 +563,26 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     js.Ident("arg$" + index)
 
 
-  private def genMultiValCase(is: Seq[Int], body: => js.Tree)(
+  /**
+   * Generate a JS tree like:
+   *    
+   *    case x1:
+   *    case x2:
+   *    case x3:
+   *      <body>
+   * 
+   * @param ris literals on cases in reverse order
+   * @param body the body to put in the last statement
+   */
+  private def genMultiValCase(ris: Seq[Int], body: => js.Tree)(
       implicit pos: Position): List[(js.Tree,js.Tree)] = {
 
     if (is.isEmpty) Nil
     else {
-      val bodyCase = (js.IntLiteral(is.last), body)
-      val emptyCases = is.init.map(i => (js.IntLiteral(i), js.Skip()))
+      val bodyCase = (js.IntLiteral(ris.head), body)
+      val emptyCases = ris.tail.map(i => (js.IntLiteral(i), js.Skip()))
 
-      (emptyCases :+ bodyCase).toList
+      (emptyCases.reverse :+ bodyCase).toList
     }
   }
 
