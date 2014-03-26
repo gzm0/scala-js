@@ -15,10 +15,13 @@ object HelloWorld extends App {
   def a(a: Int)(b: Int = 5)(c: Int = 7) = a + b + c
 
   //@JSExport
-  //def a(a: Int, b: String) = a
+  //def a(a: Int)(b: String = "asdf") = a
+  
+  @JSExport
+  def a(a: Int, b: String) = a
 
-  //@JSExport
-  //def a(a: Int, b: Int, c: String) = a
+  @JSExport
+  def a(a: Int, b: Int, c: String) = a
 
   val x = this.asInstanceOf[js.Dynamic]
 

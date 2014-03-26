@@ -264,7 +264,8 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
             if (ps.size <= paramIndex || isRepeated(ps(paramIndex))) {
               assert(isRepeated(ps.last))
               repeatedToSingle(ps.last.tpe)
-            } else ps(paramIndex).tpe
+            } else
+              ps(paramIndex).tpe
           }
 
           typeTestForTpe(tpe)
@@ -285,18 +286,30 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
             val (typeTest, subAlts) = elem
             implicit val pos = subAlts.head.pos
 
-            def param = genFormalArg(paramIndex+1)
+            val param = genFormalArg(paramIndex+1)
             val genSubAlts = genExportSameArgc(subAlts, paramIndex+1)
+
+            def hasDefaultParam = subAlts.exists { p =>
+              val params = p.tpe.params
+              params.size > paramIndex &&
+              params(paramIndex).hasFlag(Flags.DEFAULTPARAM)
+            }
+
+            def orUndef(cond: js.Tree) = if (!hasDefaultParam) cond else {
+              js.BinaryOp("||", cond, js.BinaryOp("===", param, js.Undefined()))
+            }
 
             typeTest match {
               case TypeOfTypeTest(typeString) =>
-                js.If(
-                    js.BinaryOp("===", js.UnaryOp("typeof", param),
-                        js.StringLiteral(typeString)),
-                    genSubAlts, elsep)
+                js.If(orUndef {
+                  js.BinaryOp("===", js.UnaryOp("typeof", param),
+                      js.StringLiteral(typeString))
+                }, genSubAlts, elsep)
 
               case InstanceOfTypeTest(tpe) =>
-                js.If(encodeIsInstanceOf(param, tpe)._1, genSubAlts, elsep)
+                js.If(orUndef {
+                  encodeIsInstanceOf(param, tpe)._1
+                }, genSubAlts, elsep)
 
               case NoTypeTest =>
                 genSubAlts // note: elsep is discarded, obviously
@@ -434,7 +447,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
           case (NoTypeTest, _) => false
 
           case (TypeOfTypeTest(s1), TypeOfTypeTest(s2)) =>
-            s1 <= s2
+            s1 == "undefined" || (s1 <= s2) && s2 != "undefined"
 
           case (InstanceOfTypeTest(t1), InstanceOfTypeTest(t2)) =>
             t1 <:< t2

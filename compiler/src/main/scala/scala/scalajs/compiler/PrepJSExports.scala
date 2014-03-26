@@ -143,16 +143,20 @@ trait PrepJSExports { this: PrepJSInterop =>
       clsSym.tpe.member(nme.defaultGetterName(trgMethod.name, paramPos))
 
     assert(trgGetter.exists)
-    assert(!trgGetter.isOverloaded)
 
-    val expGetter = trgGetter.cloneSymbol
+    // Although the following must be true in a correct program, we cannot
+    // assert, since a graceful failure message is only generated later
+    if (!trgGetter.isOverloaded) {
+      val expGetter = trgGetter.cloneSymbol
 
-    expGetter.name = nme.defaultGetterName(exporter.name, paramPos)
-    expGetter.pos  = pos
+      expGetter.name = nme.defaultGetterName(exporter.name, paramPos)
+      expGetter.pos  = pos
 
-    clsSym.info.decls.enter(expGetter)
+      clsSym.info.decls.enter(expGetter)
 
-    genProxyDefDef(clsSym, trgGetter, expGetter, pos)
+      genProxyDefDef(clsSym, trgGetter, expGetter, pos)
+
+    } else EmptyTree
   }
 
   /** generate a DefDef tree (from [[proxySym]]) that calls [[trgSym]] */

@@ -241,7 +241,7 @@ class JSExportTest extends DirectTest with TestHelpers {
       @JSExport
       def method(x: Int = 1)(y: String) = 1
     }
-    """ hasErrors 
+    """ hasErrors
     """
       |newSource1.scala:4: error: In an exported method, all parameters with defaults must be at the end
       |      @JSExport
@@ -461,5 +461,7 @@ class JSExportTest extends DirectTest with TestHelpers {
     """
 
   }
+
+  // TODO add no crash on double default
 
 }
