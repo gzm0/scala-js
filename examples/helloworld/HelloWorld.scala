@@ -27,7 +27,7 @@ object HelloWorld extends App {
   def a(a: Int, b: Int, c: String) = a
 
   @JSExport
-  def foo(x: Int = 1) = x
+  def foo(y: Int, x: Int = 1) = x
   @JSExport
   def foo(x: String*) = x
   

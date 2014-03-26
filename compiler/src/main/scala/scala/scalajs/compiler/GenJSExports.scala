@@ -203,7 +203,8 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
         if methods.nonEmpty
         if !(methods == varArgMeths.toSet) // exclude default case
       } yield {
-        val caseBody = genExportSameArgc(methods.toList, 0)
+        val caseBody =
+          genExportSameArgc(methods.toList, 0, Some(argcs.min))
         val argcList = argcs.toList.sortBy(- _)
         genMultiValCase(argcList, caseBody)
       }
@@ -238,18 +239,21 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
      * parameter count.
      * @param alts Alternative methods
      * @param paramIndex Index where to start disambiguation
+     * @param maxArgc only use that many arguments
      */
     private def genExportSameArgc(alts: List[Symbol],
-        paramIndex: Int): js.Tree = {
+        paramIndex: Int, maxArgc: Option[Int] = None): js.Tree = {
 
       implicit val pos = alts.head.pos
 
       if (alts.size == 1)
         genApplyForSym(alts.head)
-      else if (!alts.exists(_.tpe.params.size > paramIndex)) {
-        // We reach here in two cases:
+      else if (maxArgc.exists(_ <= paramIndex) ||
+        !alts.exists(_.tpe.params.size > paramIndex)) {
+        // We reach here in three cases:
         // 1. The parameter list has been exhausted
-        // 2. We only have (more than once) repeated parameters left
+        // 2. The optional argument count restriction has triggered
+        // 3. We only have (more than once) repeated parameters left
         // Therefore, we should fail
         currentUnit.error(pos,
             s"""Cannot disambiguate overloads for exported method ${alts.head.name} with types
