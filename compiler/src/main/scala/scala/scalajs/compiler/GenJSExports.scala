@@ -193,27 +193,32 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
       // Verify stuff about caseDefinitions
       assert({
         val argcs = caseDefinitions.values.flatten.toList
-        argcs == argcs.distinct &&
+        argcs == argcs.distinct
         argcs.forall(_ <= maxArgc)
-      }, "every argc should only appear only once")
+      }, "every argc should appear only once and be lower than max")
 
       // Generate a case block for each (methods, argCounts) tuple
-      val nestedCases = for {
+      val cases = for {
         (methods, argcs) <- caseDefinitions
         if methods.nonEmpty
-        if !(methods == varArgMeths.toSet) // exclude default case
-      } yield {
-        val caseBody =
-          genExportSameArgc(methods.toList, 0, Some(argcs.min))
-        val argcList = argcs.toList.sortBy(- _)
-        genMultiValCase(argcList, caseBody)
-      }
 
-      val cases = nestedCases.flatten.toList
+        // exclude default case we're generating anyways for varargs
+        if methods != varArgMeths.toSet
+
+        // body of case to disambiguates methods with current count
+        caseBody =
+          genExportSameArgc(methods.toList, 0, Some(argcs.min))
+
+        // argc in reverse order
+        argcList = argcs.toList.sortBy(- _)
+
+        // A case statement for each argc. Last one contains body
+        caseStmt <- genMultiValCase(argcList, caseBody)
+      } yield caseStmt
 
       val hasVarArg = varArgMeths.nonEmpty
 
-      val defaultCase = {
+      def defaultCase = {
         if (!hasVarArg)
           genThrowTypeError()
         else
@@ -227,7 +232,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
           cases.head._2
         else {
           js.Switch(js.DotSelect(js.Ident("arguments"), js.Ident("length")),
-              cases, defaultCase)
+              cases.toList, defaultCase)
         }
       }
 

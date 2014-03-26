@@ -9,33 +9,75 @@ import scala.scalajs.js
 import js.annotation.{ JSName, JSExport }
 
 @JSExport
-object HelloWorld extends App {
+object HelloWorld {
+  @JSExport
+  def main() {
+    sayHelloFromDOM()
+    sayHelloFromTypedDOM()
+    sayHelloFromJQuery()
+    sayHelloFromTypedJQuery()
+  }
 
-  @JSExport
-  def a(a: Int)(b: Int = 5)(c: Int = 7) = a + b + c
+  def sayHelloFromDOM() {
+    val document = js.Dynamic.global.document
+    val playground = document.getElementById("playground")
 
-  @JSExport
-  def b(a: Int)(b: String = "asdf") = s"$a $b"
-  
-  @JSExport
-  def b(a: Int, b: js.Undefined) = "woot"
-  
-  @JSExport
-  def a(a: Int, b: String) = a
+    val newP = document.createElement("p")
+    newP.innerHTML = "Hello world! <i>-- DOM</i>"
+    playground.appendChild(newP)
+  }
 
-  @JSExport
-  def a(a: Int, b: Int, c: String) = a
+  def sayHelloFromTypedDOM() {
+    val document = window.document
+    val playground = document.getElementById("playground")
 
-  @JSExport
-  def foo(y: Int, x: Int = 1) = x
-  @JSExport
-  def foo(x: String*) = x
-  
-  val x = this.asInstanceOf[js.Dynamic]
+    val newP = document.createElement("p")
+    newP.innerHTML = "Hello world! <i>-- typed DOM</i>"
+    playground.appendChild(newP)
+  }
 
-  println(x.a(1, ()))
-  println(x.a(1,2))
-  println(x.b(1))
-  println(x.b(1, ()))
+  def sayHelloFromJQuery() {
+    // val $ is fine too, but not very recommended in Scala code
+    val jQuery = js.Dynamic.global.jQuery
+    val newP = jQuery("<p>").html("Hello world! <i>-- jQuery</i>")
+    newP.appendTo(jQuery("#playground"))
+  }
 
+  def sayHelloFromTypedJQuery() {
+    val jQuery = helloworld.JQuery
+    val newP = jQuery("<p>").html("Hello world! <i>-- typed jQuery</i>")
+    newP.appendTo(jQuery("#playground"))
+  }
+}
+
+object window extends js.GlobalScope {
+  val document: DOMDocument = ???
+
+  def alert(msg: js.String): Unit = ???
+}
+
+trait DOMDocument extends js.Object {
+  def getElementById(id: js.String): DOMElement
+  def createElement(tag: js.String): DOMElement
+}
+
+trait DOMElement extends js.Object {
+  var innerHTML: js.String
+
+  def appendChild(child: DOMElement): Unit
+}
+
+@JSName("jQuery")
+object JQuery extends js.Object {
+  def apply(selector: js.String): JQuery = ???
+}
+
+trait JQuery extends js.Object {
+  def text(value: js.String): JQuery
+  def text(): js.String
+
+  def html(value: js.String): JQuery
+  def html(): js.String
+
+  def appendTo(parent: JQuery): JQuery
 }
