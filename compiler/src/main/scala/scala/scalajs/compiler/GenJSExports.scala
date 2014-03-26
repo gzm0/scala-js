@@ -141,98 +141,76 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     private def genExportMethod(alts: List[Symbol], jsName: String) = {
       implicit val pos = alts.head.pos
 
+      assert(alts.nonEmpty,
+          "need at least one alternative to generate exporter method")
+
       // Factor out methods with variable argument lists. Note that they can
       // only be at the end of the lists as enforced by PrepJSExports
-      val (varArgMeths, normalMeths) = enteringPhase(currentRun.uncurryPhase) {
-        alts.partition(_.paramss.flatten.lastOption.exists(isRepeated _))
+      val (varArgMeths, normalMeths) = alts.partition(hasRepeatedParam _)
+
+      // Highest non-repeated argument count
+      val maxArgc = (
+          // We have argc - 1, since a repeated parameter list may also be empty
+          // (unlike a normal parameter)
+          varArgMeths.map(_.tpe.params.size - 1) ++
+          normalMeths.map(_.tpe.params.size)
+      ).max
+
+      val formalArgs = genFormalArgs(maxArgc)
+
+      // Calculates possible arg counts for normal method
+      def argCounts(sym: Symbol) = {
+        val params = sym.tpe.params
+        // Find default param
+        val dParam = params.indexWhere { _.hasFlag(Flags.DEFAULTPARAM) }
+        if (dParam == -1) Seq(params.size)
+        else dParam to params.size
       }
 
-      val hasVarArg = varArgMeths.nonEmpty
+      // Generate tuples (argc, method)
+      val methodArgCounts = {
+        // Normal methods
+        for {
+          method <- normalMeths
+          argc   <- argCounts(method)
+        } yield (argc, method)
+      } ++ {
+        // Repeated parameter methods
+        for {
+          method <- varArgMeths
+          argc   <- method.tpe.params.size - 1 to maxArgc
+        } yield (argc, method)
+      }
 
       // Create a map: argCount -> methods (methods may appear multiple times)
-      val normalByArgCount = groupByArgCounts(normalMeths)
+      val methodByArgCount =
+        methodArgCounts.groupBy(_._1).mapValues(_.map(_._2).toSet)
 
-      // Argument counts (for varArgs, this is minimal count)
-      val argcS = (normalByArgCount.keySet
-          ++ varArgMeths.map(_.tpe.params.size - 1)).toList.sorted
+      // Create tuples: (methods, argCounts). This will be the cases we generate
+      val caseDefinitions =
+        methodByArgCount.groupBy(_._2).mapValues(_.keySet)
 
-      val formalArgs = genFormalArgs(argcS.last)
+      // Verify stuff about caseDefinitions
+      assert({
+        val argcs = caseDefinitions.values.flatten.toList
+        argcs == argcs.distinct &&
+        argcs.forall(_ <= maxArgc)
+      }, "every argc should only appear only once")
 
-      // Create a map: argCount -> varArgMethods
-      // but only for argument counts we have other methods for
-      val varArgsByArgCount = argcS.map { argc =>
-        // We have argc + 1, since a parameter list may also be empty
-        // (unlike a normal parameter)
-        (argc, varArgMeths.filter(_.tpe.params.size <= argc + 1).toSet)
-      }.toMap
-
-      def allByArgCount(argc: Int) = varArgsByArgCount(argc) ++
-        normalByArgCount.getOrElse(argc, Set.empty)
-
-      @tailrec
-      def genCases(
-        argcS:   List[Int], // List of ArgCounts still to be handled
-        argcAcc: List[Int], // ArgCount cases delegated
-        acc:     List[(js.Tree, js.Tree)] // Result
-      ): List[(js.Tree, js.Tree)] = argcS match {
-        case Nil => acc.reverse
-        case argc :: Nil if !normalByArgCount.contains(argc) =>
-          // Only a varArg got added in this last case. But this
-          // corresponds to the default case we are going to
-          // generate. Therefore, don't add anything.
-          genCases(Nil, Nil, acc)
-        case argc :: Nil =>
-          val newTree = genForArgs(argc :: argcAcc, argc)
-          genCases(Nil, Nil, newTree :: acc)
-        case argc :: argcS@(nextArgc :: _) if (
-          normalByArgCount(argc)  == normalByArgCount(nextArgc) &&
-          varArgsByArgCount(argc) == varArgsByArgCount(nextArgc)
-        ) =>
-          genCases(argcS, argc :: argAcc, acc)
-        case argc :: argcS@(nextArgc :: _) =>
-          val newTree = genForArgs(argc :: argAcc, argc)
-          genCases(argcS, Nil, newTree :: acc)
-      }
-
-      def genForArgs(argcSr: List[Int], argc: Int) = {
-        val normal = normalByArgCount(argc)
-        val varArg = varArgsByArgCount(argc)
-
-        if (varArg.isEmpty)
-          genMultiValCase(argcSr, genExportSameArgc(normal, 0))
-        else if (normal.isEmpty)
-          genMultiValCase(
-      }
-
-      // Generate cases by argument count
+      // Generate a case block for each (methods, argCounts) tuple
       val nestedCases = for {
-        (argc, nextArgc) <- argcS.zipAll(argcS.tail, -1, -1)
+        (methods, argcs) <- caseDefinitions
+        if methods.nonEmpty
+        if !(methods == varArgMeths.toSet) // exclude default case
       } yield {
-        // Fetch methods with this argc
-        val methods = normalByArgCount.getOrElse(argc, Nil)
-        val vArgs   = varArgsByArgCount(argc)
-
-        if (nextArgc == -1 && methods.isEmpty) {
-          // We are in the last argc case and we have only varargs. This is
-          // the default case. Don't generate anything
-          Nil
-        } else {
-          // The full overload resolution
-          val baseCaseBody = genExportSameArgc(methods ++ vArgs, 0)
-
-          if (methods.nonEmpty && vArgs.nonEmpty)
-            (js.IntLiteral(argc), baseCaseBody) ::
-            genMultiValCase(argc + 1 until nextArgc,
-              genExportSameArgc(vArgs, 0))
-          else if (methods.nonEmpty)
-            (js.IntLiteral(argc), baseCaseBody) :: Nil
-          else
-            genMultiValCase(argc until nextArgc, baseCaseBody)
-
-        }
+        val caseBody = genExportSameArgc(methods.toList, 0)
+        val argcList = argcs.toList.sortBy(- _)
+        genMultiValCase(argcList, caseBody)
       }
 
-      val cases = genCases(argcS, Nil, Nil)
+      val cases = nestedCases.flatten.toList
+
+      val hasVarArg = varArgMeths.nonEmpty
 
       val defaultCase = {
         if (!hasVarArg)
@@ -532,25 +510,6 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
     m.toList
   }
 
-  /** groups methods by argument count. Note that methods with default
-   *  parameters have multiple possible argument counts.
-   */
-  private def groupByArgCounts(methods: List[Symbol]) = {
-    // Possible argument counts for a parameter list
-    def argCounts(params: List[Symbol]) = {
-      val dParam = params.indexWhere { _.hasFlag(Flags.DEFAULTPARAM) }
-      if (dParam == -1) List(params.size)
-      else dParam to params.size
-    }
-
-    val counts = for {
-      method <- methods
-      argc   <- argCounts(method.tpe.params)
-    } yield (argc, method)
-
-    counts.groupBy(_._1).mapValues(_.map(_._2).toSet)
-  }
-
   private def genThrowTypeError()(
       implicit pos: Position): js.Tree = {
     js.Throw(js.StringLiteral("No matching overload"))
@@ -565,25 +524,30 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
 
   /**
    * Generate a JS tree like:
-   *    
+   *
    *    case x1:
    *    case x2:
    *    case x3:
    *      <body>
-   * 
+   *
    * @param ris literals on cases in reverse order
    * @param body the body to put in the last statement
    */
   private def genMultiValCase(ris: Seq[Int], body: => js.Tree)(
       implicit pos: Position): List[(js.Tree,js.Tree)] = {
 
-    if (is.isEmpty) Nil
+    if (ris.isEmpty) Nil
     else {
       val bodyCase = (js.IntLiteral(ris.head), body)
       val emptyCases = ris.tail.map(i => (js.IntLiteral(i), js.Skip()))
 
       (emptyCases.reverse :+ bodyCase).toList
     }
+  }
+
+  private def hasRepeatedParam(sym: Symbol) =
+    enteringPhase(currentRun.uncurryPhase) {
+      sym.paramss.flatten.lastOption.exists(isRepeated _)
   }
 
 }
