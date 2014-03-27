@@ -281,7 +281,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
 
         if (altsByTypeTest.size == 1) {
           // Testing this parameter is not doing any us good
-          genExportSameArgc(alts, paramIndex+1)
+          genExportSameArgc(alts, paramIndex+1, maxArgc)
         } else {
           // Sort them so that, e.g., isInstanceOf[String]
           // comes before isInstanceOf[Object]
@@ -295,7 +295,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
             implicit val pos = subAlts.head.pos
 
             val param = genFormalArg(paramIndex+1)
-            val genSubAlts = genExportSameArgc(subAlts, paramIndex+1)
+            val genSubAlts = genExportSameArgc(subAlts, paramIndex+1, maxArgc)
 
             def hasDefaultParam = subAlts.exists { p =>
               val params = p.tpe.params

@@ -127,6 +127,22 @@ class JSExportTest extends DirectTest with TestHelpers {
       |       ^
     """
 
+    """
+    class Confl {
+      @JSExport
+      def foo(x: Int, y: String)(z: Int = 1) = x
+      @JSExport
+      def foo(x: Short, y: String)(z: String*) = x
+    }
+    """ hasErrors
+    """
+      |newSource1.scala:4: error: Cannot disambiguate overloads for exported method $js$exported$meth$foo with types
+      |  (x: Int, y: String, z: Int)Object
+      |  (x: Short, y: String, z: Seq)Object
+      |      @JSExport
+      |       ^
+    """
+
   }
 
   @Test
