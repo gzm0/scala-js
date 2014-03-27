@@ -193,7 +193,7 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
       // Verify stuff about caseDefinitions
       assert({
         val argcs = caseDefinitions.values.flatten.toList
-        argcs == argcs.distinct
+        argcs == argcs.distinct &&
         argcs.forall(_ <= maxArgc)
       }, "every argc should appear only once and be lower than max")
 
