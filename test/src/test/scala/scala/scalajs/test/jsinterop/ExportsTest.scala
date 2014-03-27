@@ -458,6 +458,22 @@ object ExportsTest extends JasmineTest {
       expect(obj.x).toEqual(5)
     }
 
+    it("should offer export for classes with repeated parameters in ctor") {
+      val constr = js.Dynamic.global.ExportedVarArgClass
+      expect(js.Dynamic.newInstance(constr)().result).toEqual("")
+      expect(js.Dynamic.newInstance(constr)("a").result).toEqual("a")
+      expect(js.Dynamic.newInstance(constr)("a", "b").result).toEqual("a|b")
+      expect(js.Dynamic.newInstance(constr)("a", "b", "c").result).toEqual("a|b|c")
+      expect(js.Dynamic.newInstance(constr)(5, "a").result).toEqual("Number: <5>|a")
+    }
+
+    it("should offer export for classes with default parameters in ctor") {
+      val constr = js.Dynamic.global.ExportedDefaultArgClass
+      expect(js.Dynamic.newInstance(constr)(1,2,3).result).toEqual(6)
+      expect(js.Dynamic.newInstance(constr)(1).result).toEqual(106)
+      expect(js.Dynamic.newInstance(constr)(1,2).result).toEqual(103)
+    }
+
     it("should correctly disambiguate overloads involving longs") {
 
       class Foo {
@@ -530,6 +546,26 @@ object ExportedObject {
 class ExportedClass(_x: Int) {
   @JSExport
   val x = _x
+}
+
+@JSExport
+class ExportedVarArgClass(x: String*) {
+
+  @JSExport
+  def this(x: Int, y: String) = this(s"Number: <$x>", y)
+
+  @JSExport
+  def result = x.mkString("|")
+}
+
+@JSExport
+class ExportedDefaultArgClass(x: Int, y: Int, z: Int) {
+
+  @JSExport
+  def this(x: Int, y: Int = 5) = this(x, y, 100)
+
+  @JSExport
+  def result = x + y + z
 }
 
 @JSExport("org.ExportedUnderOrgObject")

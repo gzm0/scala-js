@@ -366,14 +366,24 @@ trait GenJSExports extends SubComponent { self: GenJSCode =>
 
         // If argument is undefined, call default getter
         IF (jsArg === js.Undefined()) {
-          val defaultGetter = sym.owner.tpe.member(
+          val trgSym = {
+            if (sym.isClassConstructor) sym.owner.companionModule
+            else sym.owner
+          }
+          val defaultGetter = trgSym.tpe.member(
               nme.defaultGetterName(sym.name, i+1))
 
-          assert(defaultGetter.exists)
+          assert(defaultGetter.exists,
+              s"need default getter for method ${sym.fullName}")
           assert(!defaultGetter.isOverloaded)
 
+          val trgTree = {
+            if (sym.isClassConstructor) genLoadModule(trgSym)
+            else js.This()
+          }
+
           // Pass previous arguments to defaultGetter
-          jsArg := js.ApplyMethod(js.This(), encodeMethodSym(defaultGetter),
+          jsArg := js.ApplyMethod(trgTree, encodeMethodSym(defaultGetter),
               jsArgs.take(defaultGetter.tpe.params.size))
 
         } ELSE js.Skip() // inference for withoutElse doesn't work
