@@ -1,0 +1,170 @@
+Update IR cache|476473936
+Linker: Compute reachability|8865889381
+Linker: Assemble LinkedClasses|172564680
+Linker: Check IR|1294392521
+Linker|10371500672
+Optimizer: Incremental part|344717869
+Optimizer: Optimizer part|9259859537
+Optimizer|9635430263
+Refiner: Compute reachability|463867691
+Refiner: Assemble LinkedClasses|32148270
+Refiner|521908706
+Emitter: Generate classes|2660389781
+Emitter: Write trees|17608953
+Emitter: Generate classes|1496074613
+Emitter: Write trees|5215394
+Emitter|4258360597
+BasicBackend: Write result|2029362780
+Update IR cache|633652799
+Linker: Compute reachability|8578597746
+Linker: Assemble LinkedClasses|165645091
+Linker: Check IR|1171686970
+Linker|9967420898
+Optimizer: Incremental part|416668646
+Optimizer: Optimizer part|8964017921
+Optimizer|9408532952
+Refiner: Compute reachability|526931203
+Refiner: Assemble LinkedClasses|24940619
+Refiner|578122149
+Emitter: Generate classes|2507678281
+Emitter: Write trees|23981947
+Emitter: Generate classes|1536283917
+Emitter: Write trees|4907478
+Emitter|4151084219
+BasicBackend: Write result|1621591917
+Update IR cache|650963143
+Linker: Compute reachability|8504650211
+Linker: Assemble LinkedClasses|137772248
+Linker: Check IR|1272127372
+Linker|9975116174
+Optimizer: Incremental part|438786434
+Optimizer: Optimizer part|8813389857
+Optimizer|9288513992
+Refiner: Compute reachability|459165172
+Refiner: Assemble LinkedClasses|27085753
+Refiner|510151579
+Emitter: Generate classes|2595244699
+Emitter: Write trees|28024598
+Emitter: Generate classes|1462383002
+Emitter: Write trees|11083744
+Emitter|4174070273
+BasicBackend: Write result|1613745079
+Update IR cache|686981404
+Linker: Compute reachability|9138489236
+Linker: Assemble LinkedClasses|175949225
+Linker: Check IR|1327526407
+Linker|10713155689
+Optimizer: Incremental part|436242818
+Optimizer: Optimizer part|8906534925
+Optimizer|9377287601
+Refiner: Compute reachability|378271337
+Refiner: Assemble LinkedClasses|26135733
+Refiner|432222232
+Emitter: Generate classes|2515268370
+Emitter: Write trees|26649304
+Emitter: Generate classes|1458137627
+Emitter: Write trees|10493733
+Emitter|4090436445
+BasicBackend: Write result|1872084955
+Update IR cache|611167261
+Linker: Compute reachability|8860779973
+Linker: Assemble LinkedClasses|171796140
+Linker: Check IR|1260316436
+Linker|10380619987
+Optimizer: Incremental part|395485329
+Optimizer: Optimizer part|8507198194
+Optimizer|8936038108
+Refiner: Compute reachability|422176509
+Refiner: Assemble LinkedClasses|24932846
+Refiner|474369370
+Emitter: Generate classes|2548626828
+Emitter: Write trees|28145963
+Emitter: Generate classes|1545464839
+Emitter: Write trees|5040606
+Emitter|4205587908
+BasicBackend: Write result|1722788318
+Update IR cache|674866217
+Linker: Compute reachability|8969138777
+Linker: Assemble LinkedClasses|171433160
+Linker: Check IR|1279390216
+Linker|10474331347
+Optimizer: Incremental part|465678895
+Optimizer: Optimizer part|9000697305
+Optimizer|9498267765
+Refiner: Compute reachability|427084701
+Refiner: Assemble LinkedClasses|25252698
+Refiner|478627878
+Emitter: Generate classes|2542372572
+Emitter: Write trees|22491081
+Emitter: Generate classes|1473626952
+Emitter: Write trees|6076381
+Emitter|4122428707
+BasicBackend: Write result|1553575691
+Update IR cache|691614728
+Linker: Compute reachability|8752967725
+Linker: Assemble LinkedClasses|188343080
+Linker: Check IR|1267493895
+Linker|10304563752
+Optimizer: Incremental part|492402399
+Optimizer: Optimizer part|9084993000
+Optimizer|9610691222
+Refiner: Compute reachability|436403115
+Refiner: Assemble LinkedClasses|24609093
+Refiner|487763748
+Emitter: Generate classes|2588136628
+Emitter: Write trees|26817060
+Emitter: Generate classes|1444811993
+Emitter: Write trees|8305381
+Emitter|4143616462
+BasicBackend: Write result|1519877758
+Update IR cache|653607469
+Linker: Compute reachability|8878181384
+Linker: Assemble LinkedClasses|161214792
+Linker: Check IR|1282194434
+Linker|10389594434
+Optimizer: Incremental part|393735232
+Optimizer: Optimizer part|8340353121
+Optimizer|8759236120
+Refiner: Compute reachability|477072820
+Refiner: Assemble LinkedClasses|24788132
+Refiner|525526301
+Emitter: Generate classes|2630811026
+Emitter: Write trees|24736967
+Emitter: Generate classes|1458525105
+Emitter: Write trees|4955908
+Emitter|4196700252
+BasicBackend: Write result|2030752452
+Update IR cache|625754672
+Linker: Compute reachability|8931733545
+Linker: Assemble LinkedClasses|151611379
+Linker: Check IR|1340631998
+Linker|10497068974
+Optimizer: Incremental part|506928195
+Optimizer: Optimizer part|8901819581
+Optimizer|9437410105
+Refiner: Compute reachability|399795667
+Refiner: Assemble LinkedClasses|24608268
+Refiner|450994014
+Emitter: Generate classes|2641365875
+Emitter: Write trees|27906169
+Emitter: Generate classes|1435574559
+Emitter: Write trees|4903668
+Emitter|4188749580
+BasicBackend: Write result|1640596556
+Update IR cache|670638252
+Linker: Compute reachability|8638890134
+Linker: Assemble LinkedClasses|201009879
+Linker: Check IR|1313628498
+Linker|10228735721
+Optimizer: Incremental part|379302259
+Optimizer: Optimizer part|9521174030
+Optimizer|9935314295
+Refiner: Compute reachability|439127374
+Refiner: Assemble LinkedClasses|24754964
+Refiner|491421147
+Emitter: Generate classes|2680883414
+Emitter: Write trees|21493398
+Emitter: Generate classes|1413369525
+Emitter: Write trees|4976782
+Emitter|4198167791
+BasicBackend: Write result|1655677734

@@ -1,0 +1,210 @@
+Update IR cache|540336720
+Linker: Compute reachability|8602361759
+Linker: Assemble LinkedClasses|152924831
+Linker: Check IR|1289031103
+Linker|10089418523
+Optimizer: Incremental part|509756865
+Optimizer: Optimizer part|8662876871
+Optimizer|9206121900
+Refiner: Compute reachability|419174848
+Refiner: Assemble LinkedClasses|31282597
+Refiner|475760059
+Module Splitter: Calculate Dependency Info|4295207
+Module Splitter: Analyze Modules|162578
+Module Splitter: Assemble Modules|18384093
+Module Splitter|23691475
+Emitter: Generate Classes|2847300876
+Emitter: Write trees|19143287
+Emitter: Generate Classes|1568945771
+Emitter: Write trees|6268392
+Emitter|4490830576
+BasicBackend: Write result|1654084260
+Update IR cache|647018351
+Linker: Compute reachability|8868938331
+Linker: Assemble LinkedClasses|155930014
+Linker: Check IR|1277329485
+Linker|10379129599
+Optimizer: Incremental part|493488049
+Optimizer: Optimizer part|8733631899
+Optimizer|9261510687
+Refiner: Compute reachability|386536036
+Refiner: Assemble LinkedClasses|29410534
+Refiner|441497577
+Module Splitter: Calculate Dependency Info|4202618
+Module Splitter: Analyze Modules|176464
+Module Splitter: Assemble Modules|18614848
+Module Splitter|24087235
+Emitter: Generate Classes|2678997347
+Emitter: Write trees|19567081
+Emitter: Generate Classes|1508947068
+Emitter: Write trees|6133592
+Emitter|4265937235
+BasicBackend: Write result|1550681981
+Update IR cache|682189406
+Linker: Compute reachability|9377493558
+Linker: Assemble LinkedClasses|157669341
+Linker: Check IR|1279977528
+Linker|10905120518
+Optimizer: Incremental part|438303071
+Optimizer: Optimizer part|8939122237
+Optimizer|9402886011
+Refiner: Compute reachability|477567032
+Refiner: Assemble LinkedClasses|35945879
+Refiner|546919632
+Module Splitter: Calculate Dependency Info|4192101
+Module Splitter: Analyze Modules|175090
+Module Splitter: Assemble Modules|18769043
+Module Splitter|24259744
+Emitter: Generate Classes|2724264064
+Emitter: Write trees|21652575
+Emitter: Generate Classes|1482913452
+Emitter: Write trees|6165632
+Emitter|4323467704
+BasicBackend: Write result|2168727099
+Update IR cache|705795427
+Linker: Compute reachability|8431243050
+Linker: Assemble LinkedClasses|182826340
+Linker: Check IR|1291627886
+Linker|10001529532
+Optimizer: Incremental part|513620997
+Optimizer: Optimizer part|9512098695
+Optimizer|10058686018
+Refiner: Compute reachability|490952364
+Refiner: Assemble LinkedClasses|31633375
+Refiner|545747752
+Module Splitter: Calculate Dependency Info|4472259
+Module Splitter: Analyze Modules|187760
+Module Splitter: Assemble Modules|19261767
+Module Splitter|25049770
+Emitter: Generate Classes|2662018000
+Emitter: Write trees|20146129
+Emitter: Generate Classes|1560956995
+Emitter: Write trees|5811218
+Emitter|4302124926
+BasicBackend: Write result|2005638000
+Update IR cache|667031553
+Linker: Compute reachability|9263294937
+Linker: Assemble LinkedClasses|153629712
+Linker: Check IR|1229226886
+Linker|10729582872
+Optimizer: Incremental part|375704177
+Optimizer: Optimizer part|8772973299
+Optimizer|9182326011
+Refiner: Compute reachability|404829931
+Refiner: Assemble LinkedClasses|29788811
+Refiner|461474687
+Module Splitter: Calculate Dependency Info|4057482
+Module Splitter: Analyze Modules|174746
+Module Splitter: Assemble Modules|18662994
+Module Splitter|24029791
+Emitter: Generate Classes|2726475330
+Emitter: Write trees|20131550
+Emitter: Generate Classes|1472006508
+Emitter: Write trees|6112914
+Emitter|4276076196
+BasicBackend: Write result|1609790964
+Update IR cache|686029623
+Linker: Compute reachability|8654008289
+Linker: Assemble LinkedClasses|193941913
+Linker: Check IR|1251826702
+Linker|10177247206
+Optimizer: Incremental part|482054414
+Optimizer: Optimizer part|9753010851
+Optimizer|10267081422
+Refiner: Compute reachability|486581470
+Refiner: Assemble LinkedClasses|30871815
+Refiner|542390180
+Module Splitter: Calculate Dependency Info|4529004
+Module Splitter: Analyze Modules|184768
+Module Splitter: Assemble Modules|24591160
+Module Splitter|30456255
+Emitter: Generate Classes|2640690027
+Emitter: Write trees|20127563
+Emitter: Generate Classes|1545809415
+Emitter: Write trees|5819053
+Emitter|4266491741
+BasicBackend: Write result|1608589865
+Update IR cache|667125122
+Linker: Compute reachability|8594659410
+Linker: Assemble LinkedClasses|177796452
+Linker: Check IR|1263768866
+Linker|10123923304
+Optimizer: Incremental part|384471187
+Optimizer: Optimizer part|8520658972
+Optimizer|8939030040
+Refiner: Compute reachability|456561159
+Refiner: Assemble LinkedClasses|31644038
+Refiner|517751723
+Module Splitter: Calculate Dependency Info|4261319
+Module Splitter: Analyze Modules|169424
+Module Splitter: Assemble Modules|20630344
+Module Splitter|26160667
+Emitter: Generate Classes|2750124179
+Emitter: Write trees|21050006
+Emitter: Generate Classes|1515601870
+Emitter: Write trees|5824559
+Emitter|4349051633
+BasicBackend: Write result|2095977980
+Update IR cache|684163119
+Linker: Compute reachability|8592412194
+Linker: Assemble LinkedClasses|169953042
+Linker: Check IR|1247976788
+Linker|10109812676
+Optimizer: Incremental part|400890430
+Optimizer: Optimizer part|8985773713
+Optimizer|9412084962
+Refiner: Compute reachability|436608303
+Refiner: Assemble LinkedClasses|29338928
+Refiner|493362852
+Module Splitter: Calculate Dependency Info|4074424
+Module Splitter: Analyze Modules|181163
+Module Splitter: Assemble Modules|18503387
+Module Splitter|23848066
+Emitter: Generate Classes|2836512745
+Emitter: Write trees|19965067
+Emitter: Generate Classes|1488151105
+Emitter: Write trees|6128304
+Emitter|4401944393
+BasicBackend: Write result|2282134522
+Update IR cache|718243898
+Linker: Compute reachability|8724037085
+Linker: Assemble LinkedClasses|168906041
+Linker: Check IR|1337732857
+Linker|10309614542
+Optimizer: Incremental part|496854811
+Optimizer: Optimizer part|9629834663
+Optimizer|10154650015
+Refiner: Compute reachability|537062224
+Refiner: Assemble LinkedClasses|32358639
+Refiner|594060783
+Module Splitter: Calculate Dependency Info|4515149
+Module Splitter: Analyze Modules|188817
+Module Splitter: Assemble Modules|19389883
+Module Splitter|25240125
+Emitter: Generate Classes|2742515464
+Emitter: Write trees|21438414
+Emitter: Generate Classes|1538513469
+Emitter: Write trees|6108117
+Emitter|4381714774
+BasicBackend: Write result|1544978545
+Update IR cache|659297470
+Linker: Compute reachability|8564496300
+Linker: Assemble LinkedClasses|151064979
+Linker: Check IR|1163138522
+Linker|9957255839
+Optimizer: Incremental part|387163485
+Optimizer: Optimizer part|8817538845
+Optimizer|9243042311
+Refiner: Compute reachability|398974151
+Refiner: Assemble LinkedClasses|31745428
+Refiner|457247412
+Module Splitter: Calculate Dependency Info|4236038
+Module Splitter: Analyze Modules|185083
+Module Splitter: Assemble Modules|18833445
+Module Splitter|24386145
+Emitter: Generate Classes|2684761094
+Emitter: Write trees|20413348
+Emitter: Generate Classes|1479932262
+Emitter: Write trees|5636085
+Emitter|4241758498
+BasicBackend: Write result|1733507041
