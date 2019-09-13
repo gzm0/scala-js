@@ -120,39 +120,45 @@ object NodeJSEnv {
       }
     }
 
+    def requireCommonJSModule(module: Path): String =
+      s"""require("${escapeJS(toFile(module).getAbsolutePath)}")"""
+
+    def importESModule(module: Path): String =
+      s"""import("${escapeJS(toFile(module).toURI.toASCIIString)}")"""
+
+    def execInputExpr(input: Input): String = input match {
+      case Input.Script(script)         => runScript(script)
+      case Input.CommonJSModule(module) => requireCommonJSModule(module)
+      case Input.ESModule(module)       => importESModule(module)
+    }
+
     val p = new PrintStream(out, false, "UTF8")
-
     try {
-      val async = input.foldLeft(false) { (async, input) =>
-        def maybeAsync(expr: String) = {
-          if (!async) p.println(expr + ";");
-          else p.println(s".then(_ => $expr)")
-          async
+      if (!input.exists(_.isInstanceOf[Input.ESModule])) {
+        /* If there is no ES module in the input, we can do everything
+         * synchronously, and directly on the standard input.
+         */
+        for (item <- input)
+          p.println(execInputExpr(item) + ";")
+      } else {
+        /* If there is at least one ES module, we must asynchronous chain things,
+         * and we must use an actual file to feed code to Node.js (because
+         * `import()` cannot be used from the standard input).
+         */
+        val importChain = input.foldLeft("Promise.resolve()") { (prev, item) =>
+          s"$prev.\n  then(${execInputExpr(item)})"
         }
-
-        input match {
-          case Input.Script(script) =>
-            maybeAsync(runScript(script))
-
-          case Input.CommonJSModule(module) =>
-            maybeAsync(s"""require("${escapeJS(toFile(module).getAbsolutePath)}")""")
-
-          case Input.ESModule(module) =>
-            val i = s"""import("${escapeJS(toFile(module).toURI.toASCIIString)}")"""
-            if (async) p.println(s".then(_ => $i)")
-            else i
-
-            true
-        }
-      }
-
-      if (async) {
-        p.println(
-          """.catch(e => {
+        val importerFileContent = {
+          s"""
+            |$importChain.catch(e => {
             |  console.error(e);
             |  process.exit(1);
             |});
-          """.stripMargin)
+          """.stripMargin
+        }
+        val f = createTmpFile("importer.js")
+        Files.write(f.toPath, importerFileContent.getBytes(StandardCharsets.UTF_8))
+        p.println(s"""require("${escapeJS(f.getAbsolutePath)}");""")
       }
     } finally {
       p.close()
