@@ -1,0 +1,16 @@
+set scalaJSLinkerConfig in testSuite.v2_12 ~= (_.withModuleKind(ModuleKind.ESModule))
+[info] Defining testSuite2_12 / scalaJSLinkerConfig
+[info] The new value will be used by testSuite2_12 / Bootstrap / fastOptJS / scalaJSLinker, testSuite2_12 / Bootstrap / fullOptJS / scalaJSLinker and 11 others.
+[info] 	Run `last` for details.
+[info] Reapplying settings...
+[info] Detected JDK version 9
+[info] Set current project to Scala.js (in build file:/home/tschlatt/20p/scala-js/)
+sbt:Scala.js> testSuite2_12/test:fullOptJS
+[info] Full optimizing /home/tschlatt/20p/scala-js/test-suite/js/.2.12/target/scala-2.12/scalajs-test-suite-test-opt.js
+[error] JSC_INVALID_MODULE_PATH. Invalid module path "querystring" for resolution mode "BROWSER" at virtualfile-scala.js-ir line 88 : 9
+[error] JSC_INVALID_MODULE_PATH. Invalid module path "string_decoder" for resolution mode "BROWSER" at virtualfile-scala.js-ir line 102 : 8
+[error] JSC_INVALID_MODULE_PATH. Invalid module path "buffer" for resolution mode "BROWSER" at virtualfile-scala.js-ir line 115 : 9
+[error] Closure: 3 error(s), 0 warning(s)
+[error] There were errors when applying the Google Closure Compiler
+[error] (testSuite2_12 / Test / fullOptJS) There were errors when applying the Google Closure Compiler
+[error] Total time: 44 s, completed Mar 23, 2020, 7:59:50 PM

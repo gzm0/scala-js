@@ -32,14 +32,14 @@ import java.net.URI
 
 private[closure] object ClosureAstTransformer {
   def transformScript(tree: Tree, featureSet: FeatureSet,
-      relativizeBaseURI: Option[URI]): Node = {
-    val transformer = new ClosureAstTransformer(featureSet, relativizeBaseURI)
-    transformer.transformScript(tree)
+      isESModule: Boolean, relativizeBaseURI: Option[URI]): Node = {
+    val transformer = new ClosureAstTransformer(featureSet, isESModule, relativizeBaseURI)
+    transformer.transformScript(trees)
   }
 }
 
 private class ClosureAstTransformer(featureSet: FeatureSet,
-    relativizeBaseURI: Option[URI]) {
+    isESModule: Boolean, relativizeBaseURI: Option[URI]) {
   private val dummySourceName = new java.net.URI("virtualfile:scala.js-ir")
 
   def transformScript(tree: Tree): Node = {
@@ -49,19 +49,27 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
      * only a means of putting together several statements in one `js.Tree`
      * (in fact, they automatically flatten themselves out upon construction).
      */
-    val script = setNodePosition(new Node(Token.SCRIPT), NoPosition)
-
-    tree match {
+    def addTreeToNode(node: Node) = tree match {
       case Block(stats) =>
-        transformBlockStats(stats)(NoPosition).foreach(script.addChildToBack(_))
+        transformBlockStats(stats)(NoPosition).foreach(node.addChildToBack(_))
 
       case Skip() =>
+        // ignore
 
       case tree =>
-        script.addChildToBack(transformStat(tree)(NoPosition))
+        node.addChildToBack(transformStat(tree)(NoPosition))
     }
 
+    val script = setNodePosition(new Node(Token.SCRIPT), NoPosition)
     script.putProp(Node.FEATURE_SET, featureSet)
+
+    if (isESModule) {
+      val module = setNodePosition(new Node(Token.MODULE_BODY), NoPosition)
+      addTreeToNode(module)
+      script.addChildToBack(module)
+    } else {
+      addTreeToNode(script)
+    }
 
     script
   }
@@ -206,6 +214,39 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
             className.fold(new Node(Token.EMPTY))(transformName(_)),
             parentClass.fold(new Node(Token.EMPTY))(transformExpr(_)),
             membersBlock)
+
+      case Import(bindings, from) =>
+        var default = setNodePosition(new Node(Token.EMPTY), pos)
+        val specs = setNodePosition(new Node(Token.IMPORT_SPECS), pos)
+        for ((name, ident) <- bindings) {
+          if (name.name == "default") {
+            default = transformName(ident)
+          } else {
+            specs.addChildToBack(setNodePosition(new Node(Token.IMPORT_SPEC,
+                transformName(name), transformName(ident)), pos))
+          }
+        }
+
+        new Node(Token.IMPORT, default, specs, transformExpr(from))
+
+      case ImportNamespace(binding, from) =>
+        val defaultBinding = setNodePosition(new Node(Token.EMPTY), pos)
+        val specs = setNodePosition(
+            Node.newString(Token.IMPORT_STAR, binding.name), binding.pos)
+
+        new Node(Token.IMPORT, defaultBinding, specs, transformExpr(from))
+
+      case Export(bindings) =>
+        val specs = setNodePosition(new Node(Token.EXPORT_SPECS), pos)
+        for ((ident, name) <- bindings) {
+          specs.addChildToBack(setNodePosition(new Node(Token.EXPORT_SPEC,
+              transformName(ident), transformName(name)), pos))
+        }
+
+        val export = new Node(Token.EXPORT, specs)
+        export.putBooleanProp(Node.EXPORT_ALL_FROM, false);
+        export.putBooleanProp(Node.EXPORT_DEFAULT, false);
+        export
 
       case _ =>
         // We just assume it is an expression
@@ -424,6 +465,11 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
   def transformName(ident: Ident)(implicit parentPos: Position): Node =
     setNodePosition(Node.newString(Token.NAME, ident.name),
         ident.pos orElse parentPos)
+
+  def transformName(exportName: ExportName)(implicit parentPos: Position): Node = {
+    setNodePosition(Node.newString(Token.NAME, exportName.name),
+        exportName.pos orElse parentPos)
+  }
 
   def transformLabel(ident: Ident)(implicit parentPos: Position): Node =
     setNodePosition(Node.newString(Token.LABEL_NAME, ident.name),

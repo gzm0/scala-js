@@ -130,7 +130,10 @@ private[emitter] object CoreJSLib {
           str("assumingES6") -> bool(useECMAScript2015),
           str("productionMode") -> bool(productionMode),
           str("linkerVersion") -> str(ScalaJSVersions.current),
-          str("fileLevelThis") -> This()
+          str("fileLevelThis") -> (
+              // Closure complains about top-level `this` in an ESModule.
+              if (moduleKind == ModuleKind.ESModule) Undefined() else This()
+          )
       )))
 
       buf += coreJSLibVarDef("linkingInfo", linkingInfo)

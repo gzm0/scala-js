@@ -49,9 +49,6 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
       s"Cannot use features $esFeatures with the Closure Compiler " +
       "because they allow to use BigInts")
 
-  require(moduleKind != ModuleKind.ESModule,
-      s"Cannot use module kind $moduleKind with the Closure Compiler")
-
   private[this] val emitter = {
     val emitterConfig = Emitter.Config(config.commonConfig.coreSpec)
       .withOptimizeBracketSelects(false)
@@ -106,7 +103,9 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
 
   private def buildModule(tree: js.Tree): JSModule = {
     val root = ClosureAstTransformer.transformScript(tree,
-        languageMode.toFeatureSet(), config.relativizeSourceMapBase)
+        languageMode.toFeatureSet(),
+      moduleKind == ModuleKind.ESModule,
+      config.relativizeSourceMapBase)
 
     val module = new JSModule("Scala.js")
     module.add(new CompilerInput(new SyntheticAst(root)))
@@ -213,6 +212,8 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
     CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options)
 
     options.setLanguage(languageMode)
+    options.setEs6ModuleTranspilation(ClosureOptions.Es6ModuleTranspilation.NONE)
+    options.setEnableModuleRewriting(false)
     options.setWarningLevel(DiagnosticGroups.GLOBAL_THIS, CheckLevel.OFF)
     options.setWarningLevel(DiagnosticGroups.DUPLICATE_VARS, CheckLevel.OFF)
     options.setWarningLevel(DiagnosticGroups.CHECK_REGEXP, CheckLevel.OFF)
