@@ -107,8 +107,17 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
       moduleKind == ModuleKind.ESModule,
       config.relativizeSourceMapBase)
 
+    val moduleType = moduleKind match {
+      case ModuleKind.NoModule       => CompilerInput.ModuleType.NONE
+      case ModuleKind.CommonJSModule => CompilerInput.ModuleType.COMMONJS
+      case ModuleKind.ESModule       => CompilerInput.ModuleType.ES6
+    }
+
+    val input = new CompilerInput(new SyntheticAst(root))
+    input.setJsModuleType(moduleType)
+
     val module = new JSModule("Scala.js")
-    module.add(new CompilerInput(new SyntheticAst(root)))
+    module.add(input)
     module
   }
 
