@@ -502,7 +502,37 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
         }
 
       case ApplyDynamicImport(flags, className, method, args) =>
-        ApplyDynamicImport(flags, className, method, args.map(transformExpr(_)))
+        val targs = args.map(transformExpr(_))
+
+        val inlined = for {
+          targetMethod <- staticCall(className, MemberNamespace.forStaticCall(flags), method.name)
+          (importTarget, importSpec) <- targetMethod.inlineDynamicImportTarget
+        } yield {
+          val MethodDef(_, _, _, params, _, Some(body)) = getMethodBody(targetMethod)
+
+          val moduleParam = {
+            val localName =
+              freshLocalNameWithoutOriginalName(LocalName("module"), mutable = false)
+            ParamDef(LocalIdent(localName), NoOriginalName, AnyType, mutable = false, rest = false)
+          }
+
+          val importBinding = {
+            importTarget -> importSpec.path.foldLeft[Tree](moduleParam.ref) { (x, n) =>
+              JSSelect(x, StringLiteral(n))
+            }
+          }
+
+          // TODO: Apply import binding.
+          val (newCaptures, newBody) = transformIsolatedBody(Some(targetMethod), NoType, params, AnyType,
+              body, scope.implsBeingInlined)
+
+          // TODO: Fix this for CommonJS
+          JSMethodApply(
+              JSImportCall(StringLiteral(importSpec.module)), StringLiteral("then"), 
+              Closure(arrow = true, newCaptures, List(moduleParam), newBody, targs) :: Nil)
+        }
+
+        inlined.getOrElse(ApplyDynamicImport(flags, className, method, targs))
 
       case tree: UnaryOp =>
         trampoline {
@@ -650,10 +680,21 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
       case CreateJSClass(className, captureValues) =>
         CreateJSClass(className, captureValues.map(transformExpr))
 
+      case LoadJSModule(className) =>
+        // TODO: This gives bad positions.
+        scope.env.nativeClassReplacement.getOrElse(className, tree)
+
+      case LoadJSConstructor(className) =>
+        // TODO: This gives bad positions.
+        scope.env.nativeClassReplacement.getOrElse(className, tree)
+
+      case SelectJSNativeMember(className, member) =>
+        // TODO: This gives bad positions.
+        scope.env.nativeMemberReplacement.getOrElse((className, member.name), tree)
+
       // Trees that need not be transformed
 
       case _:Skip | _:Debugger | _:LoadModule | _:SelectStatic |
-          _:SelectJSNativeMember | _:LoadJSConstructor | _:LoadJSModule |
           _:JSLinkingInfo | _:JSGlobalRef | _:JSTypeOfGlobalRef | _:Literal =>
         tree
 
@@ -4733,7 +4774,10 @@ private[optimizer] object OptimizerCore {
   private class OptEnv(
       val thisLocalDef: Option[LocalDef],
       val localDefs: Map[LocalName, LocalDef],
-      val labelInfos: Map[LabelName, LabelInfo]) {
+      val labelInfos: Map[LabelName, LabelInfo],
+      val nativeClassReplacement: Map[ClassName, Tree],
+      val nativeMemberReplacement: Map[(ClassName, MethodName), Tree]
+  ) {
 
     def withThisLocalDef(rep: LocalDef): OptEnv =
       new OptEnv(Some(rep), localDefs, labelInfos)
@@ -5299,6 +5343,7 @@ private[optimizer] object OptimizerCore {
     def inlineable: Boolean
     def shouldInline: Boolean
     def isForwarder: Boolean
+    def inlineDynamicImportTarget: Option[(NativeImportTarget, JSNativeLoadSpec.Import)]
 
     final def is(className: ClassName, methodName: MethodName): Boolean =
       this.enclosingClassName == className && this.methodName == methodName
@@ -5318,6 +5363,8 @@ private[optimizer] object OptimizerCore {
     final def inlineable: Boolean = attributes.inlineable
     final def shouldInline: Boolean = attributes.shouldInline
     final def isForwarder: Boolean = attributes.isForwarder
+    final def inlineDynamicImportTarget: Option[(NativeImportTarget, JSNativeLoadSpec.Import)] =
+      attributes.inlineDynamicImportTarget
 
     protected def computeNewAttributes(): Attributes = {
       val MethodDef(_, MethodIdent(methodName), _, params, _, optBody) = originalDef
@@ -5388,7 +5435,27 @@ private[optimizer] object OptimizerCore {
         }
       }
 
-      MethodImpl.Attributes(inlineable, shouldInline, isForwarder)
+      val inlineDynamicImportTarget = body match {
+        case MaybeUnbox(SelectJSNativeMember(className, member), _) =>
+          Some(???)
+
+        case MaybeUnbox(JSFunctionApply(SelectJSNativeMember(className, member), _), _) =>
+          Some(???)
+
+        case MaybeUnbox(JSSelect(LoadJSModule(className), _), _) =>
+          Some(???)
+
+        case MaybeUnbox(JSMethodApply(LoadJSModule(className), _, _), _) =>
+          Some(???)
+
+        case JSNew(LoadJSConstructor(className), args) =>
+          Some(???)
+
+        case _ =>
+          None
+      }
+
+      MethodImpl.Attributes(inlineable, shouldInline, isForwarder, inlineDynamicImportTarget)
     }
   }
 
@@ -5396,7 +5463,8 @@ private[optimizer] object OptimizerCore {
     final case class Attributes(
         inlineable: Boolean,
         shouldInline: Boolean,
-        isForwarder: Boolean
+        isForwarder: Boolean,
+        inlineDynamicImportTarget: Option[String]
     )
   }
 
@@ -5614,4 +5682,11 @@ private[optimizer] object OptimizerCore {
       new FieldID(ownerClassName, fieldDef.name.name)
   }
 
+  private sealed trait NativeImportTarget
+
+  private object NativeImportTarget {
+    final case class JSClass(className: ClassName) extends NativeImportTarget
+    final case class JSNativeMember(className: ClassName,
+        member: MethodName) extends NativeImportTarget
+  }
 }
