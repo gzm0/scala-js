@@ -1066,17 +1066,11 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
               case RecordSelect(record, field) if noExtractYet =>
                 RecordSelect(rec(record), field)(arg.tpe)
 
-              case Transient(ZeroOf(runtimeClass)) =>
-                Transient(ZeroOf(rec(runtimeClass)))
               case Transient(NumberOfLeadingZeroes(num)) =>
                 Transient(NumberOfLeadingZeroes(rec(num)))
               case Transient(ObjectClassName(obj)) =>
                 Transient(ObjectClassName(rec(obj)))
 
-              case Transient(NativeArrayWrapper(elemClass, nativeArray)) if noExtractYet =>
-                val newNativeArray = rec(nativeArray)
-                val newElemClass = rec(elemClass)
-                Transient(NativeArrayWrapper(newElemClass, newNativeArray)(arg.tpe))
               case Transient(ArrayToTypedArray(expr, primRef)) if noExtractYet =>
                 Transient(ArrayToTypedArray(rec(expr), primRef))
               case Transient(TypedArrayToArray(expr, primRef)) if noExtractYet =>
@@ -1255,8 +1249,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
         case GetClass(arg)           => test(arg) // may NPE but that is UB.
 
         // Transients preserving pureness
-        case Transient(ZeroOf(runtimeClass)) =>
-          test(runtimeClass) // may NPE but that is UB.
         case Transient(NumberOfLeadingZeroes(num)) =>
           test(num)
         case Transient(ObjectClassName(obj)) =>
@@ -1279,8 +1271,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
           allowUnpure && (captureValues forall test)
 
         // Transients preserving side-effect freedom
-        case Transient(NativeArrayWrapper(elemClass, nativeArray)) =>
-          allowUnpure && test(elemClass) && test(nativeArray) // may NPE but that is UB.
         case Transient(ArrayToTypedArray(expr, primRef)) =>
           allowUnpure && test(expr) // may NPE but that is UB.
 
@@ -1753,16 +1743,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
         case IdentityHashCode(expr) =>
           unnest(expr) { (newExpr, env) =>
             redo(IdentityHashCode(newExpr))(env)
-          }
-
-        case Transient(ZeroOf(runtimeClass)) =>
-          unnest(runtimeClass) { (newRuntimeClass, env) =>
-            redo(Transient(ZeroOf(newRuntimeClass)))(env)
-          }
-
-        case Transient(NativeArrayWrapper(elemClass, nativeArray)) =>
-          unnest(elemClass, nativeArray) { (newElemClass, newNativeArray, env) =>
-            redo(Transient(NativeArrayWrapper(newElemClass, newNativeArray)(rhs.tpe)))(env)
           }
 
         case Transient(NumberOfLeadingZeroes(num)) =>
@@ -2601,27 +2581,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
           genCallHelper("systemIdentityHashCode", transformExprNoChar(expr))
 
         // Transients
-
-        case Transient(ZeroOf(runtimeClass)) =>
-          js.DotSelect(
-              js.DotSelect(transformExprNoChar(runtimeClass), js.Ident("jl_Class__f_data")),
-              js.Ident("zero"))
-
-        case Transient(NativeArrayWrapper(elemClass, nativeArray)) =>
-          val newNativeArray = transformExprNoChar(nativeArray)
-          elemClass match {
-            case ClassOf(elemTypeRef) =>
-              val arrayTypeRef = ArrayTypeRef.of(elemTypeRef)
-              extractWithGlobals(
-                  genNativeArrayWrapper(arrayTypeRef, newNativeArray))
-            case _ =>
-              val elemClassData = js.DotSelect(
-                  transformExprNoChar(elemClass),
-                  js.Ident("jl_Class__f_data"))
-              val arrayClassData = js.Apply(
-                  js.DotSelect(elemClassData, js.Ident("getArrayOf")), Nil)
-              js.Apply(arrayClassData DOT "wrapArray", newNativeArray :: Nil)
-          }
 
         case Transient(NumberOfLeadingZeroes(num)) =>
           genCallHelper("clz32", transformExprNoChar(num))

@@ -392,11 +392,10 @@ private[emitter] object CoreJSLib {
     }
 
     private def assignCachedL0(): Tree = {
-      condTree(!allowBigIntsForLongs)(Block(
+      condTree(!allowBigIntsForLongs)(
         globalVar("L0", CoreVar) := genScalaClassNew(
-            LongImpl.RuntimeLongClass, LongImpl.initFromParts, 0, 0),
-        genClassDataOf(LongRef) DOT "zero" := globalVar("L0", CoreVar)
-      ))
+            LongImpl.RuntimeLongClass, LongImpl.initFromParts, 0, 0)
+      )
     }
 
     private def definePropertyName(): Tree = {
@@ -1225,7 +1224,6 @@ private[emitter] object CoreJSLib {
               privateFieldSet("componentData", Null()),
               privateFieldSet("arrayBase", Null()),
               privateFieldSet("arrayDepth", int(0)),
-              privateFieldSet("zero", Null()),
               privateFieldSet("arrayEncodedName", str("")),
               privateFieldSet("_classOf", Undefined()),
               privateFieldSet("_arrayOf", Undefined()),
@@ -1235,8 +1233,6 @@ private[emitter] object CoreJSLib {
                * `isAssignableFrom` for the rationale of this decomposition.
                */
               privateFieldSet("isAssignableFromFun", Undefined()),
-
-              privateFieldSet("wrapArray", Undefined()),
 
               publicFieldSet("name", str("")),
               publicFieldSet("isPrimitive", bool(false)),
@@ -1249,7 +1245,6 @@ private[emitter] object CoreJSLib {
       }
 
       val initPrim = {
-        val zero = varRef("zero")
         val arrayEncodedName = varRef("arrayEncodedName")
         val displayName = varRef("displayName")
         val arrayClass = varRef("arrayClass")
@@ -1259,10 +1254,9 @@ private[emitter] object CoreJSLib {
         val depth = varRef("depth")
         val obj = varRef("obj")
         MethodDef(static = false, Ident("initPrim"),
-            paramList(zero, arrayEncodedName, displayName, arrayClass, typedArrayClass), {
+            paramList(arrayEncodedName, displayName, arrayClass, typedArrayClass), {
           Block(
               privateFieldSet("ancestors", ObjectConstr(Nil)),
-              privateFieldSet("zero", zero),
               privateFieldSet("arrayEncodedName", arrayEncodedName),
               const(self, This()), // capture `this` for use in arrow fun
               privateFieldSet("isAssignableFromFun",
@@ -1357,7 +1351,6 @@ private[emitter] object CoreJSLib {
         val self = varRef("self")
         val that = varRef("that")
         val obj = varRef("obj")
-        val array = varRef("array")
         MethodDef(static = false, Ident("initSpecializedArray"),
             paramList(componentData, arrayClass, typedArrayClass, isAssignableFromFun), {
           Block(
@@ -1365,17 +1358,6 @@ private[emitter] object CoreJSLib {
               const(self, This()), // capture `this` for use in arrow fun
               privateFieldSet("isAssignableFromFun", isAssignableFromFun || {
                 genArrowFunction(paramList(that), Return(self === that))
-              }),
-              privateFieldSet("wrapArray", {
-                If(typedArrayClass, {
-                  genArrowFunction(paramList(array), {
-                    Return(New(arrayClass, New(typedArrayClass, array :: Nil) :: Nil))
-                  })
-                }, {
-                  genArrowFunction(paramList(array), {
-                    Return(New(arrayClass, array :: Nil))
-                  })
-                })
               }),
               publicFieldSet("isInstance",
                   genArrowFunction(paramList(obj), Return(obj instanceof arrayClass))),
@@ -1393,7 +1375,6 @@ private[emitter] object CoreJSLib {
         val that = varRef("that")
         val self = varRef("self")
         val obj = varRef("obj")
-        val array = varRef("array")
         MethodDef(static = false, Ident("initArray"),
             paramList(componentData), {
           val ArrayClassDef = {
@@ -1462,9 +1443,6 @@ private[emitter] object CoreJSLib {
                 })
               }),
               privateFieldSet("isAssignableFromFun", isAssignableFromFun),
-              privateFieldSet("wrapArray", genArrowFunction(paramList(array), {
-                Return(New(ArrayClass, array :: Nil))
-              })),
               const(self, This()), // don't rely on the lambda being called with `this` as receiver
               publicFieldSet("isInstance", genArrowFunction(paramList(obj), {
                 val data = varRef("data")
@@ -1718,19 +1696,6 @@ private[emitter] object CoreJSLib {
       }
 
       val prims = for (primRef <- orderedPrimRefs) yield {
-        /* Zero value, for use by the intrinsified code of
-         * `scala.collection.mutable.ArrayBuilder.genericArrayBuilderResult`.
-         * This code is Scala-specific, and "unboxes" `null` as the zero of
-         * primitive types. For `void`, it is even more special, as it produces
-         * a boxed Unit value, which is `undefined` (although `VoidRef`/`NoType`
-         * doesn't have a zero value per se).
-         */
-        val zero = primRef match {
-          case VoidRef                          => Undefined()
-          case LongRef if !allowBigIntsForLongs => Null() // set later when $L0 is initialized
-          case _                                => genZeroOf(primRef)
-        }
-
         val typedArrayClass = getArrayUnderlyingTypedArrayClassRef(primRef) match {
           case Some(typedArrayClassWithGlobals) =>
             extractWithGlobals(typedArrayClassWithGlobals)
@@ -1740,7 +1705,7 @@ private[emitter] object CoreJSLib {
 
         extractWithGlobals(globalVarDef("d", primRef, {
           Apply(New(globalVar("TypeData", CoreVar), Nil) DOT "initPrim",
-              List(zero, str(primRef.charCode.toString()),
+              List(str(primRef.charCode.toString()),
                   str(primRef.displayName),
                   if (primRef == VoidRef) Undefined()
                   else genArrayConstrOf(ArrayTypeRef(primRef, 1)),

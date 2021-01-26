@@ -48,46 +48,6 @@ object Transients {
     }
   }
 
-  final case class ZeroOf(runtimeClass: Tree) extends Transient.Value {
-    /* The concrete value of ZeroOf will of course have a more concrete type.
-     * However, if we knew this type, we could simply emit a plain literal.
-     */
-    val tpe: Type = AnyType
-
-    def traverse(traverser: Traverser): Unit =
-      traverser.traverse(runtimeClass)
-
-    def transform(transformer: Transformer, isStat: Boolean)(
-        implicit pos: Position): Tree = {
-      Transient(ZeroOf(transformer.transformExpr(runtimeClass)))
-    }
-
-    def printIR(out: IRTreePrinter): Unit = {
-      out.print("$zeroOf")
-      out.printArgs(List(runtimeClass))
-    }
-  }
-
-  final case class NativeArrayWrapper(elemClass: Tree, nativeArray: Tree)(val tpe: Type)
-      extends Transient.Value {
-
-    def traverse(traverser: Traverser): Unit = {
-      traverser.traverse(elemClass)
-      traverser.traverse(nativeArray)
-    }
-
-    def transform(transformer: Transformer, isStat: Boolean)(
-        implicit pos: Position): Tree = {
-      Transient(NativeArrayWrapper(transformer.transformExpr(elemClass),
-          transformer.transformExpr(nativeArray))(tpe))
-    }
-
-    def printIR(out: IRTreePrinter): Unit = {
-      out.print("$nativeArrayWrapper")
-      out.printArgs(List(elemClass, nativeArray))
-    }
-  }
-
   final case class NumberOfLeadingZeroes(num: Tree) extends Transient.Value {
     val tpe: Type = IntType
 

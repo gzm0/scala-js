@@ -2079,39 +2079,6 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
             ClassType(LongImpl.RuntimeLongClass), isStat, usePreTransform)(
             cont)
 
-      // scala.collection.mutable.ArrayBuilder
-
-      case GenericArrayBuilderResult =>
-        val List(runtimeClass, array) = newArgs
-        val (resultType, isExact) = runtimeClass match {
-          case ClassOf(elemTypeRef) => (ArrayType(ArrayTypeRef.of(elemTypeRef)), true)
-          case _                    => (AnyType, false)
-        }
-        cont(PreTransTree(
-            Transient(NativeArrayWrapper(runtimeClass, array)(resultType)),
-            RefinedType(resultType, isExact = isExact, isNullable = false)))
-
-      case ArrayBuilderZeroOf =>
-        contTree(finishTransformExpr(targs.head) match {
-          case ClassOf(PrimRef(tpe)) =>
-            /* Note that for CharType we produce a literal int instead of char.
-             * This ensures that we fill up the JS array with numbers 0 rather
-             * than boxed '\0'. We need to do this because the result() method
-             * (see intrinsic right above) will directly feed that JS array to
-             * `makeNativeArrayWrapper`, which expects an array of numbers when
-             * builing an `Array[Char]`.
-             */
-            tpe match {
-              case CharType => IntLiteral(0)
-              case NoType   => Undefined()
-              case _        => zeroOf(tpe)
-            }
-          case ClassOf(_) =>
-            Null()
-          case runtimeClass =>
-            Transient(ZeroOf(runtimeClass))
-        })
-
       // java.lang.Class
 
       case ClassGetComponentType =>
@@ -5036,10 +5003,7 @@ private[optimizer] object OptimizerCore {
     final val LongDivideUnsigned = LongCompare + 1
     final val LongRemainderUnsigned = LongDivideUnsigned + 1
 
-    final val ArrayBuilderZeroOf = LongRemainderUnsigned + 1
-    final val GenericArrayBuilderResult = ArrayBuilderZeroOf + 1
-
-    final val ClassGetComponentType = GenericArrayBuilderResult + 1
+    final val ClassGetComponentType = LongRemainderUnsigned + 1
     final val ClassGetName = ClassGetComponentType + 1
 
     final val ArrayNewInstance = ClassGetName + 1
@@ -5092,10 +5056,6 @@ private[optimizer] object OptimizerCore {
         ),
         ClassName("java.lang.Integer$") -> List(
             m("numberOfLeadingZeros", List(I), I) -> IntegerNLZ
-        ),
-        ClassName("scala.collection.mutable.ArrayBuilder$") -> List(
-            m("scala$collection$mutable$ArrayBuilder$$zeroOf", List(ClassClassRef), O) -> ArrayBuilderZeroOf,
-            m("scala$collection$mutable$ArrayBuilder$$genericArrayBuilderResult", List(ClassClassRef, JSArrayClassRef), O) -> GenericArrayBuilderResult
         ),
         ClassName("java.lang.Class") -> List(
             m("getComponentType", Nil, ClassClassRef) -> ClassGetComponentType,
