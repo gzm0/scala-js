@@ -152,15 +152,6 @@ object Trees {
 
   sealed case class Assign(lhs: Tree, rhs: Tree)(
       implicit val pos: Position) extends Tree {
-    require(lhs match {
-      case _:VarRef | _:Select | _:SelectStatic | _:ArraySelect |
-          _:RecordSelect | _:JSPrivateSelect | _:JSSelect | _:JSSuperSelect |
-          _:JSGlobalRef =>
-        true
-      case _ =>
-        false
-    }, s"Invalid lhs for Assign: $lhs")
-
     val tpe = NoType // cannot be in expression position
   }
 
@@ -256,8 +247,6 @@ object Trees {
   sealed case class Apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent,
       args: List[Tree])(
       val tpe: Type)(implicit val pos: Position) extends Tree {
-
-    require(!flags.isPrivate, "invalid flag Private for Apply")
   }
 
   /** Apply an instance method with static dispatch (e.g., super calls). */
@@ -275,9 +264,6 @@ object Trees {
       method: MethodIdent, args: List[Tree])(
       implicit val pos: Position) extends Tree {
     val tpe = AnyType
-
-    require(!flags.isPrivate, "invalid flag Private for ApplyDynamicImport")
-    require(!flags.isConstructor, "invalid flag Constructor for ApplyDynamicImport")
   }
 
   /** Unary operation (always preserves pureness). */
@@ -437,8 +423,6 @@ object Trees {
 
   sealed case class NewArray(typeRef: ArrayTypeRef, lengths: List[Tree])(
       implicit val pos: Position) extends Tree {
-    require(lengths.nonEmpty && lengths.size <= typeRef.dimensions)
-
     val tpe = ArrayType(typeRef)
   }
 
@@ -797,12 +781,7 @@ object Trees {
 
   sealed case class JSGlobalRef(name: String)(
       implicit val pos: Position) extends Tree {
-    import JSGlobalRef._
-
     val tpe = AnyType
-
-    require(isValidJSGlobalRefName(name),
-        s"`$name` is not a valid global ref name")
   }
 
   object JSGlobalRef {

@@ -648,7 +648,12 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
             }
           case VarRef(LocalIdent(name)) if !env.locals(name).mutable =>
             reportError(i"Assignment to immutable variable $name.")
+
+          case _:ArraySelect | _:RecordSelect | _:JSPrivateSelect | _:JSSelect |
+              _:JSSuperSelect | _:JSGlobalRef =>
+
           case _ =>
+            reportError(i"Invalid lhs for Assign")
         }
         val lhsTpe = typecheckExpr(select, env)
         typecheckExpect(rhs, env, lhsTpe)
@@ -932,7 +937,12 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
         checkApplyGeneric(method, i"$className.$method", args, tree.tpe,
             isStatic = true)
 
-      case ApplyDynamicImport(_, className, MethodIdent(method), args) =>
+      case ApplyDynamicImport(flags, className, MethodIdent(method), args) =>
+        if (flags.isPrivate)
+          reportError("Illegal flag for ApplyDynamicImport: Private")
+        if (flags.isConstructor)
+          reportError("Illegal flag for ApplyDynamicImport: Constructor")
+
         val clazz = lookupClass(className)
         val methodFullName = i"$className.$method"
 
@@ -997,6 +1007,12 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
       case NewArray(typeRef, lengths) =>
         checkArrayTypeRef(typeRef)
+
+        if (lengths.isEmpty || lengths.size <= typeRef.dimensions) {
+          reportError(i"Illegal dimensions: lengths: ${lenghts.size}, " +
+              s"typeRef: ${typeRef.dimensions}")
+        }
+
         for (length <- lengths)
           typecheckExpect(length, env, IntType)
 
@@ -1126,7 +1142,9 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
           typecheckExpr(value, env)
         }
 
-      case JSGlobalRef(_) =>
+      case JSGlobalRef(name) =>
+        if (!JSGlobalRef.isValidJSGlobalRefName(name))
+          reportError("invalid global ref name")
 
       case JSTypeOfGlobalRef(_) =>
 
@@ -1279,6 +1297,9 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
       case _ =>
         // ok
     }
+
+    if (typeRef.dimensions <= 0)
+      reportError(i"Invalid array dimensions:${typeRef.dimensions}")
   }
 
   private def inferMethodType(methodName: MethodName, isStatic: Boolean)(
