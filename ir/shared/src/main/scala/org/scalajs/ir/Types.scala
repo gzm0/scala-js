@@ -256,6 +256,11 @@ object Types {
   final case class ArrayTypeRef(base: NonArrayTypeRef, dimensions: Int)
       extends TypeRef {
 
+    require(dimensions > 0, "invalid array dimensions")
+
+    require(typeRef.base != VoidRef && typeRef.base != NullRef && typeRef.base != NothingRef,
+        s"invalid array base type: ${typeRef.base}")
+
     def displayName: String = "[" * dimensions + base.displayName
   }
 

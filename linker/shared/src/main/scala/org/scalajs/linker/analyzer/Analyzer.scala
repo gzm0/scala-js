@@ -452,8 +452,7 @@ private final class Analyzer(config: CommonPhaseConfig,
     val isJSClass = data.kind.isJSClass
     val isJSType = data.kind.isJSType
     val isAnyClass = isScalaClass || isJSClass
-    val isNativeJSClass =
-      kind == ClassKind.NativeJSClass || kind == ClassKind.NativeJSModuleClass
+    val isNativeJSClass = data.kind.isNativeJSClass
 
     // Note: j.l.Object is special and is validated upfront
 
@@ -974,6 +973,9 @@ private final class Analyzer(config: CommonPhaseConfig,
         for (className <- data.referencedFieldClasses)
           lookupClass(className)(_ => ())
 
+        for (jsNativeLoadSpec <- data.jsNativeLoadSpec)
+          validateLoadSpec(jsNativeLoadSpec, jsNativeMember = None)
+
         if (isScalaClass) {
           accessData()
 
@@ -1001,13 +1003,6 @@ private final class Analyzer(config: CommonPhaseConfig,
             tryLookupStaticLikeMethod(MemberNamespace.StaticConstructor,
                 ClassInitializerName).foreach {
               staticInit => staticInit.reachStatic()
-            }
-          } else {
-            data.jsNativeLoadSpec match {
-              case None =>
-                _errors += MissingJSNativeLoadSpec(this, from)
-              case Some(jsNativeLoadSpec) =>
-                validateLoadSpec(jsNativeLoadSpec, jsNativeMember = None)
             }
           }
 

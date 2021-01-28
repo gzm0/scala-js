@@ -74,7 +74,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
       checkJSClassCaptures(classDef)
       checkClassInitializer(classDef)
       checkJSSuperClass(classDef)
-      checkJSNativeLoadSpec(classDef)
       checkStaticMembers(classDef)
       checkDuplicateMembers(classDef)
 
@@ -120,20 +119,12 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
     implicit val ctx = ErrorContext(classDef)
 
     for (classCaptures <- classDef.jsClassCaptures) {
-      if (classDef.kind != ClassKind.JSClass) {
-        reportError(
-            i"Class ${classDef.name} which is not a non-native JS class " +
-            "cannot have class captures")
-      }
-
       classCaptures.foldLeft(Set.empty[LocalName]) {
         case (alreadyDeclared, p @ ParamDef(ident, _, tpe, mutable, rest)) =>
           implicit val ctx = ErrorContext(p)
           val name = ident.name
           if (alreadyDeclared(name))
             reportError(i"Duplicate JS class capture '$name'")
-          if (tpe == NoType)
-            reportError(i"The JS class capture $name cannot have type NoType")
           if (mutable)
             reportError(i"The JS class capture $name cannot be mutable")
           if (rest)
@@ -174,27 +165,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
         val env = Env.fromSignature(NoType, classDef.jsClassCaptures, Nil)
         typecheckExpect(tree, env, AnyType)
       }
-    } else {
-      if (classDef.jsSuperClass.isDefined)
-        reportError("Only non-native JS types may have a jsSuperClass")
-    }
-  }
-
-  private def checkJSNativeLoadSpec(classDef: LinkedClass): Unit = {
-    implicit val ctx = ErrorContext(classDef)
-
-    classDef.kind match {
-      case ClassKind.NativeJSClass | ClassKind.NativeJSModuleClass =>
-        if (classDef.jsNativeLoadSpec.isEmpty) {
-          reportError(
-              i"Native JS type ${classDef.name} must have a jsNativeLoadSpec")
-        }
-      case _ =>
-        if (classDef.jsNativeLoadSpec.isDefined) {
-          reportError(
-              i"Non-native JS type ${classDef.name} must not have a " +
-              "jsNativeLoadSpec")
-        }
     }
   }
 
@@ -326,9 +296,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
   private def checkFieldDef(fieldDef: AnyFieldDef, classDef: LinkedClass): Unit = {
     implicit val ctx = ErrorContext(fieldDef)
 
-    if (fieldDef.flags.namespace.isPrivate)
-      reportError("A field cannot be private")
-
     fieldDef match {
       case _: FieldDef =>
         // ok
@@ -337,9 +304,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
           reportError(i"Illegal JS field '$name' in Scala class")
         typecheckExpect(name, Env.empty, AnyType)
     }
-
-    if (fieldDef.ftpe == NoType || fieldDef.ftpe == NothingType)
-      reportError(i"FieldDef cannot have type ${fieldDef.ftpe}")
   }
 
   private def checkMethodDef(methodDef: MethodDef,
@@ -353,9 +317,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
     val static = namespace.isStatic
     val isConstructor = namespace == MemberNamespace.Constructor
 
-    if (flags.isMutable)
-      reportError("A method cannot have the flag Mutable")
-
     if (classDef.kind.isJSClass && !static) {
       reportError(i"Non exported instance method $name is illegal in JS class")
       return // things would go too badly otherwise
@@ -363,20 +324,12 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
     for (ParamDef(name, _, tpe, _, rest) <- params) {
       checkDeclareLocalVar(name)
-      if (tpe == NoType)
-        reportError(i"Parameter $name has type NoType")
       if (rest)
         reportError(i"Rest parameter $name is illegal in a Scala method")
     }
 
     if (isConstructor && classDef.kind == ClassKind.Interface)
       reportError("Interfaces cannot declare constructors")
-    if (isConstructor != name.isConstructor)
-      reportError("A method must have a constructor name iff it is a constructor")
-
-    val hasStaticConstructorName = name.isStaticInitializer || name.isClassInitializer
-    if ((namespace == MemberNamespace.StaticConstructor) != hasStaticConstructorName)
-      reportError("A method must have a static constructor name iff it is a static constructor")
 
     val advertizedSig = (params.map(_.ptpe), resultType)
     val sigFromName = inferMethodType(name, static)
@@ -412,11 +365,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
     implicit val ctx = ErrorContext(methodDef)
 
     val static = flags.namespace.isStatic
-
-    if (flags.isMutable)
-      reportError("An exported method cannot have the flag Mutable")
-    if (flags.namespace.isPrivate)
-      reportError("An exported method cannot be private")
 
     if (!clazz.kind.isAnyNonNativeClass) {
       reportError(i"Exported method def can only appear in a class")
@@ -494,11 +442,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
     val static = flags.namespace.isStatic
 
-    if (flags.isMutable)
-      reportError("An exported property def cannot have the flag Mutable")
-    if (flags.namespace.isPrivate)
-      reportError("An exported property def cannot be private")
-
     if (!clazz.kind.isAnyNonNativeClass) {
       reportError(i"Exported property def can only appear in a class")
       return
@@ -572,18 +515,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
     val JSMethodDef(flags, pName, params,  body) = topLevelMethodExportDef.methodDef
     implicit val ctx = ErrorContext(topLevelMethodExportDef.methodDef)
-
-    if (flags.isMutable)
-      reportError("Top level export method cannot have the flag Mutable")
-    if (flags.namespace != MemberNamespace.PublicStatic)
-      reportError("Top level export must be public and static")
-
-    pName match {
-      case StringLiteral(name) => // ok
-
-      case _ =>
-        reportError("Top level exports may not have computed names")
-    }
 
     checkJSParamDefs(params)
 
@@ -892,8 +823,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
           reportError(i"Class $className does not have JS native member $member")
 
       case Apply(flags, receiver, MethodIdent(method), args) =>
-        if (flags.isPrivate)
-          reportError("Illegal flag for Apply: Private")
         val receiverType = typecheckExpr(receiver, env)
         val fullCheck = receiverType match {
           case ClassType(className) =>
@@ -934,15 +863,8 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
       case ApplyDynamicImport(_, className, MethodIdent(method), args) =>
         val clazz = lookupClass(className)
-        val methodFullName = i"$className.$method"
-
-        checkApplyGeneric(method, methodFullName, args, AnyType, isStatic = true)
-
-        val resultType = method.resultTypeRef
-        if (resultType != ClassRef(ObjectClass)) {
-          reportError(i"illegal dynamic import call to $methodFullName with " +
-              i"non-object result type: $resultType")
-        }
+        checkApplyGeneric(method, i"$className.$method", args, AnyType,
+            isStatic = true)
 
       case UnaryOp(op, lhs) =>
         import UnaryOp._
@@ -1137,15 +1059,7 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
       // Literals
 
-      case ClassOf(typeRef) =>
-        typeRef match {
-          case NullRef | NothingRef =>
-            reportError(i"Invalid classOf[$typeRef]")
-          case typeRef: ArrayTypeRef =>
-            checkArrayTypeRef(typeRef)
-          case _ =>
-            // ok
-        }
+      case ClassOf(_) =>
 
       case _: Literal =>
 
@@ -1168,9 +1082,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
         /* Check compliance of captureValues wrt. captureParams in the current
          * method state, i.e., outside `withPerMethodState`.
          */
-        if (captureParams.size != captureValues.size)
-          reportError("Mismatched size for captures: "+
-              i"${captureParams.size} params vs ${captureValues.size} values")
 
         for ((ParamDef(_, _, ctpe, _, _), value) <- captureParams zip captureValues) {
           typecheckExpect(value, env, ctpe)
@@ -1184,8 +1095,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
               reportError(i"Capture parameter $name cannot be mutable")
             if (rest)
               reportError(i"Capture parameter $name cannot be a rest parameter")
-            if (ctpe == NoType)
-              reportError(i"Parameter $name has type NoType")
           }
 
           checkJSParamDefs(params)
@@ -1221,9 +1130,7 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
       implicit ctx: ErrorContext): Unit = {
     for (ParamDef(name, _, ptpe, _, _) <- params) {
       checkDeclareLocalVar(name)
-      if (ptpe == NoType)
-        reportError(i"Parameter $name has type NoType")
-      else if (ptpe != AnyType)
+      if (ptpe != AnyType)
         reportError(i"Parameter $name has type $ptpe but must be any")
     }
 
@@ -1261,24 +1168,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
       case NoType | NullType | NothingType | _:RecordType =>
         reportError(i"$tpe is not a valid target type for Is/AsInstanceOf")
 
-      case tpe: ArrayType =>
-        checkArrayType(tpe)
-
-      case _ =>
-        // ok
-    }
-  }
-
-  private def checkArrayType(tpe: ArrayType)(
-      implicit ctx: ErrorContext): Unit = {
-    checkArrayTypeRef(tpe.arrayTypeRef)
-  }
-
-  private def checkArrayTypeRef(typeRef: ArrayTypeRef)(
-      implicit ctx: ErrorContext): Unit = {
-    typeRef.base match {
-      case VoidRef | NullRef | NothingRef =>
-        reportError(i"Invalid array type $typeRef")
       case _ =>
         // ok
     }

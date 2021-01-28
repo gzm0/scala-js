@@ -108,6 +108,8 @@ object Trees {
       ptpe: Type, mutable: Boolean, rest: Boolean)(
       implicit val pos: Position) extends IRNode {
     def ref(implicit pos: Position): VarRef = VarRef(name)(ptpe)
+
+    require(ptpe != NoType, "parameter cannot have type NoType")
   }
 
   // Control flow constructs
@@ -278,6 +280,8 @@ object Trees {
 
     require(!flags.isPrivate, "invalid flag Private for ApplyDynamicImport")
     require(!flags.isConstructor, "invalid flag Constructor for ApplyDynamicImport")
+    require(method.name.resultTypeOf == ClassRef(ObjectClass),
+        s"illegal result type: ${method.name}")
   }
 
   /** Unary operation (always preserves pureness). */
@@ -913,6 +917,9 @@ object Trees {
   sealed case class ClassOf(typeRef: TypeRef)(
       implicit val pos: Position) extends Literal {
     val tpe = ClassType(ClassClass)
+
+    require(typeRef != NullRef && typeRef != NothingRef,
+        s"invalid type: $typeRef")
   }
 
   // Atomic expressions
@@ -934,6 +941,9 @@ object Trees {
       params: List[ParamDef], body: Tree, captureValues: List[Tree])(
       implicit val pos: Position) extends Tree {
     val tpe = AnyType
+
+    require(captureParams.size == captureValues.size, "Mismatched size for captures: " +
+        s"${captureParams.size} params vs ${captureValues.size} values")
   }
 
   /** Creates a JavaScript class value.
@@ -1045,6 +1055,15 @@ object Trees {
   )(
       val optimizerHints: OptimizerHints
   )(implicit val pos: Position) extends IRNode {
+    require(jsNativeLoadSpec.isDefined == kind.isNativeJSClass,
+        "native classes/modules must have a jsNativeLoadSpec")
+
+    require(kind.isJSClass || jsSuperClass.isEmpty,
+        "Only non-native JS types may have a jsSuperClass")
+
+    require(kind == ClassKind.JSClass || jsClassCaptures.isEmpty,
+        "Only non-native JS classes may have jsClassCaptures")
+
     def className: ClassName = name.name
   }
 
@@ -1082,6 +1101,12 @@ object Trees {
   sealed abstract class AnyFieldDef extends MemberDef {
     // val name: Ident | Tree
     val ftpe: Type
+
+    require(ftpe != NoType && ftpe != NothingType,
+        s"FieldDef cannot have type $ftpe")
+
+    require(!flags.namespace.isPrivate,
+        "A field cannot be private")
   }
 
   sealed case class FieldDef(flags: MemberFlags, name: FieldIdent,
@@ -1119,6 +1144,8 @@ object Trees {
       extends JSMethodPropDef {
 
     require(!flags.isMutable, "nonsensical mutable MethodDef")
+
+    require(!flags.namespace.isPrivate, "a JSMethodDef cannot be private")
   }
 
   sealed case class JSPropertyDef(flags: MemberFlags, name: Tree,
@@ -1127,6 +1154,8 @@ object Trees {
       extends JSMethodPropDef {
 
     require(!flags.isMutable, "nonsensical mutable PropertyDef")
+
+    require(!flags.namespace.isPrivate, "a JSPropertyDef cannot be private")
   }
 
   sealed case class JSNativeMemberDef(flags: MemberFlags, name: MethodIdent,
@@ -1179,7 +1208,13 @@ object Trees {
 
   sealed case class TopLevelMethodExportDef(moduleID: String,
       methodDef: JSMethodDef)(
-      implicit val pos: Position) extends TopLevelExportDef
+      implicit val pos: Position) extends TopLevelExportDef {
+    require(methodDef.flags.namespace == MemberNamespace.PublicStatic,
+        "Top level export must be public and static")
+
+    require(methodDef.name.isInstanceOf[StringLiteral],
+        "Top level exports may not have computed names")
+  }
 
   sealed case class TopLevelFieldExportDef(moduleID: String,
       exportName: String, field: FieldIdent)(
