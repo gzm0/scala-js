@@ -96,18 +96,37 @@ object Trees {
 
   // Definitions
 
+  sealed trait AnyLocalDef extends IRNode {
+    def name: LocalIdent
+    def originalName: OriginalName
+    def vtpe: Type
+    def mutable: Boolean
+
+    final def ref(implicit pos: Position): VarRef = VarRef(name)(vtpe)
+  }
+
   sealed case class VarDef(name: LocalIdent, originalName: OriginalName,
       vtpe: Type, mutable: Boolean, rhs: Tree)(
-      implicit val pos: Position) extends Tree {
+      implicit val pos: Position) extends Tree with AnyLocalDef {
     val tpe = NoType // cannot be in expression position
+  }
 
-    def ref(implicit pos: Position): VarRef = VarRef(name)(vtpe)
+  sealed trait AnyParamDef extends AnyLocalDef {
+    def ptpe: Type
+    final def vtpe: Type = ptpe
+    def rest: Boolean
   }
 
   sealed case class ParamDef(name: LocalIdent, originalName: OriginalName,
-      ptpe: Type, mutable: Boolean, rest: Boolean)(
-      implicit val pos: Position) extends IRNode {
-    def ref(implicit pos: Position): VarRef = VarRef(name)(ptpe)
+      ptpe: Type, mutable: Boolean)(
+      implicit val pos: Position) extends IRNode with AnyParamDef {
+    final def rest: Boolean = false
+  }
+
+  sealed case class JSParamDef(name: LocalIdent, originalName: OriginalName,
+      mutable: Boolean, rest: Boolean)(
+      implicit val pos: Position) extends IRNode with AnyParamDef {
+    val ptpe: Type = AnyType
   }
 
   // Control flow constructs
@@ -924,7 +943,7 @@ object Trees {
    *    If `false`, it is a regular Function (`function`).
    */
   sealed case class Closure(arrow: Boolean, captureParams: List[ParamDef],
-      params: List[ParamDef], body: Tree, captureValues: List[Tree])(
+      params: List[JSParamDef], body: Tree, captureValues: List[Tree])(
       implicit val pos: Position) extends Tree {
     val tpe = AnyType
   }
@@ -1106,7 +1125,7 @@ object Trees {
   sealed abstract class JSMethodPropDef extends MemberDef
 
   sealed case class JSMethodDef(flags: MemberFlags, name: Tree,
-      args: List[ParamDef], body: Tree)(
+      args: List[JSParamDef], body: Tree)(
       val optimizerHints: OptimizerHints, val hash: Option[TreeHash])(
       implicit val pos: Position)
       extends JSMethodPropDef {
@@ -1115,7 +1134,7 @@ object Trees {
   }
 
   sealed case class JSPropertyDef(flags: MemberFlags, name: Tree,
-      getterBody: Option[Tree], setterArgAndBody: Option[(ParamDef, Tree)])(
+      getterBody: Option[Tree], setterArgAndBody: Option[(JSParamDef, Tree)])(
       implicit val pos: Position)
       extends JSMethodPropDef {
 

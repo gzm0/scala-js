@@ -255,7 +255,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
   /** Desugars parameters and body to a JS function.
    */
-  def desugarToFunction(enclosingClassName: ClassName, params: List[ParamDef],
+  def desugarToFunction(enclosingClassName: ClassName, params: List[AnyParamDef],
       body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
@@ -268,7 +268,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
    *  an explicit normal parameter.
    */
   def desugarToFunctionWithExplicitThis(enclosingClassName: ClassName,
-      params: List[ParamDef], body: Tree, resultType: Type)(
+      params: List[AnyParamDef], body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
     new JSDesugar().desugarToFunctionWithExplicitThis(params, body,
@@ -278,7 +278,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
   /** Desugars parameters and body to a JS function.
    */
-  def desugarToFunction(params: List[ParamDef], body: Tree, resultType: Type)(
+  def desugarToFunction(params: List[AnyParamDef], body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
     new JSDesugar().desugarToFunction(params, body,
@@ -451,7 +451,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
      *  a normal parameter.
      */
     def desugarToFunctionWithExplicitThis(
-        params: List[ParamDef], body: Tree, isStat: Boolean, env0: Env)(
+        params: List[AnyParamDef], body: Tree, isStat: Boolean, env0: Env)(
         implicit pos: Position): WithGlobals[js.Function] = {
 
       performOptimisticThenPessimisticRuns {
@@ -467,7 +467,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
     /** Desugars parameters and body to a JS function.
      */
     def desugarToFunction(
-        params: List[ParamDef], body: Tree, isStat: Boolean, env0: Env)(
+        params: List[AnyParamDef], body: Tree, isStat: Boolean, env0: Env)(
         implicit pos: Position): WithGlobals[js.Function] = {
       performOptimisticThenPessimisticRuns {
         desugarToFunctionInternal(arrow = false, params, body, isStat, env0)
@@ -477,10 +477,10 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
     /** Desugars parameters and body to a JS function.
      */
     private def desugarToFunctionInternal(arrow: Boolean,
-        params: List[ParamDef], body: Tree, isStat: Boolean, env0: Env)(
+        params: List[AnyParamDef], body: Tree, isStat: Boolean, env0: Env)(
         implicit pos: Position): js.Function = {
 
-      val env = env0.withParams(params)
+      val env = env0.withDefs(params)
 
       val translateRestParam =
         if (esFeatures.useECMAScript2015) false
@@ -515,7 +515,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
           js.Block(extractRestParam, cleanedNewBody))
     }
 
-    private def makeExtractRestParam(params: List[ParamDef])(
+    private def makeExtractRestParam(params: List[AnyParamDef])(
         implicit pos: Position): js.Tree = {
       val offset = params.size - 1
       val restParamDef = params.last
@@ -2858,7 +2858,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
         case Closure(arrow, captureParams, params, body, captureValues) =>
           val innerFunction = {
             desugarToFunctionInternal(arrow, params, body, isStat = false,
-                Env.empty(AnyType).withParams(captureParams ++ params))
+                Env.empty(AnyType).withDefs(captureParams ++ params))
           }
 
           val captures = for {
@@ -2951,7 +2951,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
         subSequenceMethodName
     )
 
-    private def transformParamDef(paramDef: ParamDef): js.ParamDef = {
+    private def transformParamDef(paramDef: AnyParamDef): js.ParamDef = {
       js.ParamDef(transformLocalVarIdent(paramDef.name, paramDef.originalName),
           paramDef.rest)(
           paramDef.pos)
@@ -3138,12 +3138,11 @@ private object FunctionEmitter {
     def withThisIdent(thisIdent: Option[js.Ident]): Env =
       copy(thisIdent = thisIdent)
 
-    def withParams(params: List[ParamDef]): Env = {
-      params.foldLeft(this) {
-        case (env, ParamDef(name, _, _, mutable, _)) =>
-          env.withDef(name, mutable)
-      }
-    }
+    def withDefs(defs: List[AnyLocalDef]): Env =
+      defs.foldLeft(this) { case (env, localDef) => env.withDef(localDef) }
+
+    def withDef(localDef: AnyLocalDef): Env =
+      withDef(localDef.name, localDef.mutable)
 
     def withDef(ident: LocalIdent, mutable: Boolean): Env =
       copy(vars = vars + (ident.name -> mutable))

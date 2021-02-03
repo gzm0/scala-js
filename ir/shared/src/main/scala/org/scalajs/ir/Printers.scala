@@ -89,7 +89,7 @@ object Printers {
       }
     }
 
-    protected def printSig(args: List[ParamDef], resultType: Type): Unit = {
+    protected def printSig(args: List[IRNode], resultType: Type): Unit = {
       printRow(args, "(", ", ", ")")
       if (resultType != NoType) {
         print(": ")
@@ -112,6 +112,7 @@ object Printers {
         case node: MethodIdent       => print(node)
         case node: ClassIdent        => print(node)
         case node: ParamDef          => print(node)
+        case node: JSParamDef        => print(node)
         case node: Tree              => print(node)
         case node: JSSpread          => print(node)
         case node: ClassDef          => print(node)
@@ -121,7 +122,18 @@ object Printers {
     }
 
     def print(paramDef: ParamDef): Unit = {
-      val ParamDef(ident, originalName, ptpe, mutable, rest) = paramDef
+      val ParamDef(ident, originalName, ptpe, mutable) = paramDef
+
+      if (mutable)
+        print("var ")
+      print(ident)
+      print(originalName)
+      print(": ")
+      print(ptpe)
+    }
+
+    def print(jsParamDef: JSParamDef): Unit = {
+      val JSParamDef(ident, originalName, mutable, rest) = jsParamDef
 
       if (mutable)
         print("var ")
@@ -129,8 +141,6 @@ object Printers {
         print("...")
       print(ident)
       print(originalName)
-      print(": ")
-      print(ptpe)
     }
 
     def print(tree: Tree): Unit = {

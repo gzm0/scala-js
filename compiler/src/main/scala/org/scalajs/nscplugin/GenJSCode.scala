@@ -839,7 +839,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
       def selfRef(implicit pos: ir.Position) =
         js.VarRef(selfName)(jstpe.AnyType)
 
-      def memberLambda(params: List[js.ParamDef], body: js.Tree)(
+      def memberLambda(params: List[js.JSParamDef], body: js.Tree)(
           implicit pos: ir.Position) = {
         js.Closure(arrow = false, captureParams = Nil, params, body,
             captureValues = Nil)
@@ -1343,7 +1343,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
                * reflectively, it must be given an `Int` (or `Integer`).
                */
               val paramType = js.ClassOf(toTypeRef(param.tpe))
-              val paramDef = genParamDef(param, jstpe.AnyType)
+              val paramDef = genJSParamDef(param)
               val actualParam = fromAny(paramDef.ref, param.tpe)
               (paramType, paramDef, actualParam)
             }).unzip3
@@ -1403,7 +1403,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
           val captureParamsWithJSSuperClass = captureParams.map { params =>
             val jsSuperClassParam = js.ParamDef(
                 js.LocalIdent(JSSuperClassParamName), NoOriginalName,
-                jstpe.AnyType, mutable = false, rest = false)
+                jstpe.AnyType, mutable = false)
             jsSuperClassParam :: params
           }
 
@@ -1972,10 +1972,9 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
       val js.MethodDef(flags, methodName, originalName, params, resultType, body) =
         methodDef
       val newParams = for {
-        p @ js.ParamDef(name, originalName, ptpe, mutable, rest) <- params
+        p @ js.ParamDef(name, originalName, ptpe, mutable) <- params
       } yield {
-        js.ParamDef(name, originalName, ptpe, newMutable(name.name, mutable),
-            rest)(p.pos)
+        js.ParamDef(name, originalName, ptpe, newMutable(name.name, mutable))(p.pos)
       }
       val transformer = new ir.Transformers.Transformer {
         override def transform(tree: js.Tree, isStat: Boolean): js.Tree = tree match {
@@ -2172,7 +2171,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
           val flags =
             js.MemberFlags.empty.withNamespace(staticNamespace)
           val thisParamDef = js.ParamDef(thisLocalIdent, thisOriginalName,
-              jstpe.AnyType, mutable = false, rest = false)
+              jstpe.AnyType, mutable = false)
 
           js.MethodDef(flags, methodName, originalName,
               thisParamDef :: jsParams, resultIRType, Some(genBody()))(
@@ -5895,8 +5894,8 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
                 actualParams,
                 js.Block(
                     js.VarDef(thisParam.name, thisParam.originalName,
-                        thisParam.ptpe, mutable = false,
-                        js.This()(thisParam.ptpe)(thisParam.pos))(thisParam.pos),
+                        jstpe.AnyType, mutable = false,
+                        js.This()(jstpe.AnyType)(thisParam.pos))(thisParam.pos),
                     patchedBody),
                 capturedArgs)
           } else {
@@ -5975,7 +5974,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
         val thisActualCapture = genExpr(receiver)
         val thisFormalCapture = js.ParamDef(
             freshLocalIdent("this")(receiver.pos), thisOriginalName,
-            thisActualCapture.tpe, mutable = false, rest = false)(receiver.pos)
+            thisActualCapture.tpe, mutable = false)(receiver.pos)
         val thisCaptureArg = thisFormalCapture.ref
 
         val body = if (isJSType(receiver.tpe) && target.owner != ObjectClass) {
@@ -6049,7 +6048,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
       // def this(f: Any) = { this.f = f; super() }
       val ctorDef = {
         val fParamDef = js.ParamDef(js.LocalIdent(LocalName("f")),
-            NoOriginalName, jstpe.AnyType, mutable = false, rest = false)
+            NoOriginalName, jstpe.AnyType, mutable = false)
         js.MethodDef(
             js.MemberFlags.empty.withNamespace(js.MemberNamespace.Constructor),
             js.MethodIdent(ObjectArgConstructorName),
@@ -6145,7 +6144,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
     private def patchFunBodyWithBoxes(methodSym: Symbol,
         params: List[js.ParamDef], body: js.Tree,
         useParamsBeforeLambdaLift: Boolean, hasRepeatedParam: Boolean)(
-        implicit pos: Position): (List[js.ParamDef], js.Tree) = {
+        implicit pos: Position): (List[js.JSParamDef], js.Tree) = {
       val methodType = enteringPhase(currentRun.posterasurePhase)(methodSym.tpe)
 
       // See the comment in genPrimitiveJSArgs for a rationale about this
@@ -6183,7 +6182,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
         val origName = param.originalName
         val newNameIdent = freshLocalIdent(paramNameIdent.name)(paramNameIdent.pos)
         val newOrigName = origName.orElse(paramNameIdent.name)
-        val patchedParam = js.ParamDef(newNameIdent, newOrigName, jstpe.AnyType,
+        val patchedParam = js.JSParamDef(newNameIdent, newOrigName,
             mutable = false, rest = isRepeated)(param.pos)
         val paramLocalRhs =
           if (isRepeated) genJSArrayToVarArgs(patchedParam.ref)
@@ -6273,7 +6272,13 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
     private def genParamDef(sym: Symbol, ptpe: jstpe.Type,
         pos: Position): js.ParamDef = {
       js.ParamDef(encodeLocalSym(sym)(pos), originalNameOfLocal(sym), ptpe,
-          mutable = false, rest = false)(pos)
+          mutable = false)(pos)
+    }
+
+    def genJSParamDef(sym: Symbol): js.JSParamDef = {
+      implicit val pos = sym.pos
+      js.JSParamDef(encodeLocalSym(sym), originalNameOfLocal(sym),
+          mutable = false, rest = false)
     }
 
     /** Generates a call to `runtime.privateFieldsSymbol()` */

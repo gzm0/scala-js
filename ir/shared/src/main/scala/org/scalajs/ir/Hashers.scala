@@ -53,7 +53,7 @@ object Hashers {
       hasher.mixPos(methodDef.pos)
       hasher.mixInt(MemberFlags.toBits(flags))
       hasher.mixTree(name)
-      hasher.mixParamDefs(args)
+      hasher.mixJSParamDefs(args)
       hasher.mixTree(body)
       hasher.mixInt(OptimizerHints.toBits(methodDef.optimizerHints))
 
@@ -121,11 +121,21 @@ object Hashers {
       mixOriginalName(paramDef.originalName)
       mixType(paramDef.ptpe)
       mixBoolean(paramDef.mutable)
-      mixBoolean(paramDef.rest)
     }
 
     def mixParamDefs(paramDefs: List[ParamDef]): Unit =
       paramDefs.foreach(mixParamDef)
+
+    def mixJSParamDef(jsParamDef: JSParamDef): Unit = {
+      mixPos(jsParamDef.pos)
+      mixLocalIdent(jsParamDef.name)
+      mixOriginalName(jsParamDef.originalName)
+      mixBoolean(jsParamDef.mutable)
+      mixBoolean(jsParamDef.rest)
+    }
+
+    def mixJSParamDefs(jsParamDefs: List[JSParamDef]): Unit =
+      jsParamDefs.foreach(mixJSParamDef)
 
     def mixTree(tree: Tree): Unit = {
       mixPos(tree.pos)
@@ -498,7 +508,7 @@ object Hashers {
           mixTag(TagClosure)
           mixBoolean(arrow)
           mixParamDefs(captureParams)
-          mixParamDefs(params)
+          mixJSParamDefs(params)
           mixTree(body)
           mixTrees(captureValues)
 

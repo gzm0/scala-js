@@ -550,7 +550,7 @@ object Serializers {
           writeTagAndPos(TagClosure)
           writeBoolean(arrow)
           writeParamDefs(captureParams)
-          writeParamDefs(params)
+          writeJSParamDefs(params)
           writeTree(body)
           writeTrees(captureValues)
 
@@ -664,7 +664,7 @@ object Serializers {
 
           // Write out method def
           writeInt(MemberFlags.toBits(flags)); writeTree(name)
-          writeParamDefs(args); writeTree(body)
+          writeJSParamDefs(args); writeTree(body)
           writeInt(OptimizerHints.toBits(methodDef.optimizerHints))
 
           // Jump back and write true length
@@ -679,7 +679,7 @@ object Serializers {
           writeOptTree(getter)
           writeBoolean(setterArgAndBody.isDefined)
           setterArgAndBody foreach { case (arg, body) =>
-            writeParamDef(arg); writeTree(body)
+            writeJSParamDef(arg); writeTree(body)
           }
 
         case JSNativeMemberDef(flags, name, jsNativeLoadSpec) =>
@@ -776,13 +776,16 @@ object Serializers {
       writeOriginalName(paramDef.originalName)
       writeType(paramDef.ptpe)
       buffer.writeBoolean(paramDef.mutable)
-      buffer.writeBoolean(paramDef.rest)
     }
 
     def writeParamDefs(paramDefs: List[ParamDef]): Unit = {
       buffer.writeInt(paramDefs.size)
       paramDefs.foreach(writeParamDef)
     }
+
+    def writeJSParamDef(paramDef: JSParamDef): Unit = ???
+
+    def writeJSParamDefs(paramDefs: List[JSParamDef]): Unit = ???
 
     def writeType(tpe: Type): Unit = {
       tpe match {
@@ -1171,7 +1174,7 @@ object Serializers {
         case TagThis =>
           This()(readType())
         case TagClosure =>
-          Closure(readBoolean(), readParamDefs(), readParamDefs(), readTree(),
+          Closure(readBoolean(), readParamDefs(), readJSParamDefs(), readTree(),
               readTrees())
         case TagCreateJSClass =>
           CreateJSClass(readClassName(), readTrees())
@@ -1316,7 +1319,7 @@ object Serializers {
           val len = readInt()
           assert(len >= 0)
           JSMethodDef(MemberFlags.fromBits(readInt()), readTree(),
-              readParamDefs(), readTree())(
+              readJSParamDefs(), readTree())(
               OptimizerHints.fromBits(readInt()), optHash)
 
         case TagJSPropertyDef =>
@@ -1325,7 +1328,7 @@ object Serializers {
           val getterBody = readOptTree()
           val setterArgAndBody = {
             if (readBoolean())
-              Some((readParamDef(), readTree()))
+              Some((readJSParamDef(), readTree()))
             else
               None
           }
@@ -1402,12 +1405,15 @@ object Serializers {
 
     def readParamDef(): ParamDef = {
       implicit val pos = readPosition()
-      ParamDef(readLocalIdent(), readOriginalName(), readType(), readBoolean(),
-          readBoolean())
+      ParamDef(readLocalIdent(), readOriginalName(), readType(), readBoolean())
     }
 
     def readParamDefs(): List[ParamDef] =
       List.fill(readInt())(readParamDef())
+
+    def readJSParamDef(): JSParamDef = ???
+
+    def readJSParamDefs(): List[JSParamDef] = ???
 
     def readType(): Type = {
       val tag = readByte()

@@ -1061,17 +1061,16 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
       if (needsRestParam) freshLocalIdent("rest")(NoPosition).name
       else null
 
-    def genFormalArgs()(implicit pos: Position): List[js.ParamDef] = {
+    def genFormalArgs()(implicit pos: Position): List[js.JSParamDef] = {
       val fixedParamDefs = fixedParamNames.toList.map { paramName =>
-        js.ParamDef(js.LocalIdent(paramName), NoOriginalName, jstpe.AnyType,
-            mutable = false, rest = false)
+        js.JSParamDef(js.LocalIdent(paramName), NoOriginalName, mutable = false,
+            rest = false)
       }
 
       if (needsRestParam) {
         val restParamDef = {
-          js.ParamDef(js.LocalIdent(restParamName),
-              NoOriginalName, jstpe.AnyType,
-              mutable = false, rest = true)
+          js.JSParamDef(js.LocalIdent(restParamName),
+              NoOriginalName, mutable = false, rest = true)
         }
         fixedParamDefs :+ restParamDef
       } else {
