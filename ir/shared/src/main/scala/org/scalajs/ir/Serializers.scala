@@ -1046,7 +1046,7 @@ object Serializers {
         case TagEmptyTree =>
           throw new IOException("Found invalid TagEmptyTree")
 
-        case TagVarDef  => VarDef(readLocalIdent(), readOriginalName(), readType(), readBoolean(), readTree())
+        case TagVarDef  => VarDef(readLocalIdent(), readOriginalName(), readExprType(), readBoolean(), readTree())
         case TagSkip    => Skip()
         case TagBlock   => Block(readTrees())
         case TagLabeled => Labeled(readLabelIdent(), readType(), readTree())
@@ -1096,7 +1096,7 @@ object Serializers {
           val qualifier = readTree()
           val className = readClassName()
           val field = readFieldIdent()
-          val tpe = readType()
+          val tpe = readExprType()
 
           if (hacks.use14 && tpe == NothingType) {
             /* Note [Nothing FieldDef rewrite]
@@ -1107,7 +1107,7 @@ object Serializers {
             Select(qualifier, className, field)(tpe)
           }
 
-        case TagSelectStatic => SelectStatic(readClassName(), readFieldIdent())(readType())
+        case TagSelectStatic => SelectStatic(readClassName(), readFieldIdent())(readExprType())
         case TagSelectJSNativeMember => SelectJSNativeMember(readClassName(), readMethodIdent())
 
         case TagApply =>
@@ -1128,10 +1128,10 @@ object Serializers {
         case TagNewArray         => NewArray(readArrayTypeRef(), readTrees())
         case TagArrayValue       => ArrayValue(readArrayTypeRef(), readTrees())
         case TagArrayLength      => ArrayLength(readTree())
-        case TagArraySelect      => ArraySelect(readTree(), readTree())(readType())
+        case TagArraySelect      => ArraySelect(readTree(), readTree())(readExprType())
         case TagRecordValue      => RecordValue(readType().asInstanceOf[RecordType], readTrees())
-        case TagIsInstanceOf     => IsInstanceOf(readTree(), readType())
-        case TagAsInstanceOf     => AsInstanceOf(readTree(), readType())
+        case TagIsInstanceOf     => IsInstanceOf(readTree(), readExprType())
+        case TagAsInstanceOf     => AsInstanceOf(readTree(), readExprType())
         case TagGetClass         => GetClass(readTree())
         case TagClone            => Clone(readTree())
         case TagIdentityHashCode => IdentityHashCode(readTree())
@@ -1172,9 +1172,9 @@ object Serializers {
         case TagClassOf        => ClassOf(readTypeRef())
 
         case TagVarRef =>
-          VarRef(readLocalIdent())(readType())
+          VarRef(readLocalIdent())(readExprType())
         case TagThis =>
-          This()(readType())
+          This()(readExprType())
         case TagClosure =>
           val arrow = readBoolean()
           val captureParams = readParamDefs()
@@ -1219,7 +1219,7 @@ object Serializers {
           val name = readFieldIdent()
           val originalName = readOriginalName()
 
-          val ftpe0 = readType()
+          val ftpe0 = readExprType()
           val ftpe = if (hacks.use14 && ftpe0 == NothingType) {
             /* Note [Nothing FieldDef rewrite]
              * val field: nothing  -->  val field: null
@@ -1232,7 +1232,7 @@ object Serializers {
           FieldDef(flags, name, originalName, ftpe)
 
         case TagJSFieldDef =>
-          JSFieldDef(MemberFlags.fromBits(readInt()), readTree(), readType())
+          JSFieldDef(MemberFlags.fromBits(readInt()), readTree(), readExprType())
 
         case TagMethodDef =>
           val optHash = readOptHash()
@@ -1414,7 +1414,7 @@ object Serializers {
       implicit val pos = readPosition()
       val name = readLocalIdent()
       val originalName = readOriginalName()
-      val ptpe = readType()
+      val ptpe = readExprType()
       val mutable = readBoolean()
 
       if (hacks.use14) {
@@ -1452,6 +1452,9 @@ object Serializers {
       }
     }
 
+    def readExprType(): ExprType =
+      readType().asInstanceOf[ExprType]
+
     def readType(): Type = {
       val tag = readByte()
       (tag: @switch) match {
@@ -1477,7 +1480,7 @@ object Serializers {
           RecordType(List.fill(readInt()) {
             val name = readFieldName()
             val originalName = readString()
-            val tpe = readType()
+            val tpe = readExprType()
             val mutable = readBoolean()
             RecordType.Field(name, readOriginalName(), tpe, mutable)
           })

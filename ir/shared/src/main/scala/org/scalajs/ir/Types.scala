@@ -38,6 +38,8 @@ object Types {
     }
   }
 
+  sealed abstract trait ExprType extends Type
+
   sealed abstract class PrimType extends Type
 
   sealed abstract class PrimTypeWithRef extends PrimType {
@@ -66,74 +68,74 @@ object Types {
    *  The type java.lang.Object in the back-end maps to [[AnyType]] because it
    *  can hold JS values (not only instances of Scala.js classes).
    */
-  case object AnyType extends Type
+  case object AnyType extends ExprType
 
   // Can't link to Nothing - #1969
   /** Nothing type (the bottom type of this type system).
    *  Expressions from which one can never come back are typed as `Nothing`.
    *  For example, `throw` and `return`.
    */
-  case object NothingType extends PrimTypeWithRef
+  case object NothingType extends PrimTypeWithRef with ExprType
 
   /** The type of `undefined`. */
-  case object UndefType extends PrimType
+  case object UndefType extends PrimType with ExprType
 
   /** Boolean type.
    *  It does not accept `null` nor `undefined`.
    */
-  case object BooleanType extends PrimTypeWithRef
+  case object BooleanType extends PrimTypeWithRef with ExprType
 
   /** `Char` type, a 16-bit UTF-16 code unit.
    *  It does not accept `null` nor `undefined`.
    */
-  case object CharType extends PrimTypeWithRef
+  case object CharType extends PrimTypeWithRef with ExprType
 
   /** 8-bit signed integer type.
    *  It does not accept `null` nor `undefined`.
    */
-  case object ByteType extends PrimTypeWithRef
+  case object ByteType extends PrimTypeWithRef with ExprType
 
   /** 16-bit signed integer type.
    *  It does not accept `null` nor `undefined`.
    */
-  case object ShortType extends PrimTypeWithRef
+  case object ShortType extends PrimTypeWithRef with ExprType
 
   /** 32-bit signed integer type.
    *  It does not accept `null` nor `undefined`.
    */
-  case object IntType extends PrimTypeWithRef
+  case object IntType extends PrimTypeWithRef with ExprType
 
   /** 64-bit signed integer type.
    *  It does not accept `null` nor `undefined`.
    */
-  case object LongType extends PrimTypeWithRef
+  case object LongType extends PrimTypeWithRef with ExprType
 
   /** Float type (32-bit).
    *  It does not accept `null` nor `undefined`.
    */
-  case object FloatType extends PrimTypeWithRef
+  case object FloatType extends PrimTypeWithRef with ExprType
 
   /** Double type (64-bit).
    *  It does not accept `null` nor `undefined`.
    */
-  case object DoubleType extends PrimTypeWithRef
+  case object DoubleType extends PrimTypeWithRef with ExprType
 
   /** String type.
    *  It does not accept `null` nor `undefined`.
    */
-  case object StringType extends PrimType
+  case object StringType extends PrimType with ExprType
 
   /** The type of `null`.
    *  It does not accept `undefined`.
    *  The null type is a subtype of all class types and array types.
    */
-  case object NullType extends PrimTypeWithRef
+  case object NullType extends PrimTypeWithRef with ExprType
 
   /** Class (or interface) type. */
-  final case class ClassType(className: ClassName) extends Type
+  final case class ClassType(className: ClassName) extends ExprType
 
   /** Array type. */
-  final case class ArrayType(arrayTypeRef: ArrayTypeRef) extends Type
+  final case class ArrayType(arrayTypeRef: ArrayTypeRef) extends ExprType
 
   /** Record type.
    *  Used by the optimizer to inline classes as records with multiple fields.
@@ -142,14 +144,14 @@ object Types {
    *  the type of fields or parameters, nor as result types of methods.
    *  The compiler itself never generates record types.
    */
-  final case class RecordType(fields: List[RecordType.Field]) extends Type {
+  final case class RecordType(fields: List[RecordType.Field]) extends ExprType {
     def findField(name: FieldName): RecordType.Field =
       fields.find(_.name == name).get
   }
 
   object RecordType {
     final case class Field(name: FieldName, originalName: OriginalName,
-        tpe: Type, mutable: Boolean)
+        tpe: ExprType, mutable: Boolean)
   }
 
   /** No type. */
@@ -267,7 +269,7 @@ object Types {
   }
 
   /** Generates a literal zero of the given type. */
-  def zeroOf(tpe: Type)(implicit pos: Position): Tree = tpe match {
+  def zeroOf(tpe: ExprType)(implicit pos: Position): Tree = tpe match {
     case BooleanType => BooleanLiteral(false)
     case CharType    => CharLiteral('\u0000')
     case ByteType    => ByteLiteral(0)
@@ -284,7 +286,7 @@ object Types {
     case tpe: RecordType =>
       RecordValue(tpe, tpe.fields.map(f => zeroOf(f.tpe)))
 
-    case NothingType | NoType =>
+    case NothingType =>
       throw new IllegalArgumentException(s"cannot generate a zero for $tpe")
   }
 

@@ -97,7 +97,7 @@ object Trees {
   // Definitions
 
   sealed case class VarDef(name: LocalIdent, originalName: OriginalName,
-      vtpe: Type, mutable: Boolean, rhs: Tree)(
+      vtpe: ExprType, mutable: Boolean, rhs: Tree)(
       implicit val pos: Position) extends Tree {
     val tpe = NoType // cannot be in expression position
 
@@ -105,7 +105,7 @@ object Trees {
   }
 
   sealed case class ParamDef(name: LocalIdent, originalName: OriginalName,
-      ptpe: Type, mutable: Boolean)(
+      ptpe: ExprType, mutable: Boolean)(
       implicit val pos: Position) extends IRNode {
     def ref(implicit pos: Position): VarRef = VarRef(name)(ptpe)
   }
@@ -232,11 +232,11 @@ object Trees {
 
   sealed case class Select(qualifier: Tree, className: ClassName,
       field: FieldIdent)(
-      val tpe: Type)(
+      val tpe: ExprType)(
       implicit val pos: Position) extends AssignLhs
 
   sealed case class SelectStatic(className: ClassName, field: FieldIdent)(
-      val tpe: Type)(
+      val tpe: ExprType)(
       implicit val pos: Position) extends AssignLhs
 
   sealed case class SelectJSNativeMember(className: ClassName, member: MethodIdent)(
@@ -306,7 +306,7 @@ object Trees {
     final val LongToDouble = 14
     final val DoubleToLong = 15
 
-    def resultTypeOf(op: Code): Type = (op: @switch) match {
+    def resultTypeOf(op: Code): ExprType = (op: @switch) match {
       case Boolean_! =>
         BooleanType
       case IntToChar =>
@@ -406,7 +406,7 @@ object Trees {
     final val Double_>  = 56
     final val Double_>= = 57
 
-    def resultTypeOf(op: Code): Type = (op: @switch) match {
+    def resultTypeOf(op: Code): ExprType = (op: @switch) match {
       case === | !== |
           Boolean_== | Boolean_!= | Boolean_| | Boolean_& |
           Int_== | Int_!= | Int_< | Int_<= | Int_> | Int_>= |
@@ -445,24 +445,24 @@ object Trees {
     val tpe = IntType
   }
 
-  sealed case class ArraySelect(array: Tree, index: Tree)(val tpe: Type)(
+  sealed case class ArraySelect(array: Tree, index: Tree)(val tpe: ExprType)(
       implicit val pos: Position) extends AssignLhs
 
   sealed case class RecordValue(tpe: RecordType, elems: List[Tree])(
       implicit val pos: Position) extends Tree
 
   sealed case class RecordSelect(record: Tree, field: FieldIdent)(
-      val tpe: Type)(
+      val tpe: ExprType)(
       implicit val pos: Position)
       extends AssignLhs
 
-  sealed case class IsInstanceOf(expr: Tree, testType: Type)(
+  sealed case class IsInstanceOf(expr: Tree, testType: ExprType)(
       implicit val pos: Position)
       extends Tree {
     val tpe = BooleanType
   }
 
-  sealed case class AsInstanceOf(expr: Tree, tpe: Type)(
+  sealed case class AsInstanceOf(expr: Tree, tpe: ExprType)(
       implicit val pos: Position)
       extends Tree
 
@@ -725,7 +725,7 @@ object Trees {
 
     final val typeof = 5
 
-    def resultTypeOf(op: Code): Type =
+    def resultTypeOf(op: Code): ExprType =
       AnyType
   }
 
@@ -770,7 +770,7 @@ object Trees {
     final val in         = 20
     final val instanceof = 21
 
-    def resultTypeOf(op: Code): Type = op match {
+    def resultTypeOf(op: Code): ExprType = op match {
       case === | !== =>
         /* We assume that ECMAScript will never pervert `===` and `!==` to the
          * point of them not returning a primitive boolean. This is important
@@ -910,10 +910,10 @@ object Trees {
 
   // Atomic expressions
 
-  sealed case class VarRef(ident: LocalIdent)(val tpe: Type)(
+  sealed case class VarRef(ident: LocalIdent)(val tpe: ExprType)(
       implicit val pos: Position) extends AssignLhs
 
-  sealed case class This()(val tpe: Type)(implicit val pos: Position)
+  sealed case class This()(val tpe: ExprType)(implicit val pos: Position)
       extends Tree
 
   /** Closure with explicit captures.
@@ -1079,10 +1079,10 @@ object Trees {
   }
 
   sealed case class FieldDef(flags: MemberFlags, name: FieldIdent,
-      originalName: OriginalName, ftpe: Type)(
+      originalName: OriginalName, ftpe: ExprType)(
       implicit val pos: Position) extends AnyFieldDef
 
-  sealed case class JSFieldDef(flags: MemberFlags, name: Tree, ftpe: Type)(
+  sealed case class JSFieldDef(flags: MemberFlags, name: Tree, ftpe: ExprType)(
       implicit val pos: Position) extends AnyFieldDef
 
   sealed case class MethodDef(flags: MemberFlags, name: MethodIdent,

@@ -93,7 +93,7 @@ object Transformers {
         case StoreModule(className, value) =>
           StoreModule(className, transformExpr(value))
 
-        case Select(qualifier, className, field) =>
+        case tree @ Select(qualifier, className, field) =>
           Select(transformExpr(qualifier), className, field)(tree.tpe)
 
         case Apply(flags, receiver, method, args) =>
@@ -125,13 +125,13 @@ object Transformers {
         case ArrayLength(array) =>
           ArrayLength(transformExpr(array))
 
-        case ArraySelect(array, index) =>
+        case tree @ ArraySelect(array, index) =>
           ArraySelect(transformExpr(array), transformExpr(index))(tree.tpe)
 
         case RecordValue(tpe, elems) =>
           RecordValue(tpe, elems map transformExpr)
 
-        case RecordSelect(record, field) =>
+        case tree @ RecordSelect(record, field) =>
           RecordSelect(transformExpr(record), field)(tree.tpe)
 
         case IsInstanceOf(expr, testType) =>

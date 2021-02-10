@@ -523,7 +523,7 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
       case ArrayLength(array) =>
         ArrayLength(transformExpr(array))
 
-      case ArraySelect(array, index) =>
+      case tree @ ArraySelect(array, index) =>
         ArraySelect(transformExpr(array), transformExpr(index))(tree.tpe)
 
       case RecordValue(tpe, elems) =>
@@ -1046,7 +1046,7 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
     }
   }
 
-  private def pretransformSelectCommon(expectedType: Type,
+  private def pretransformSelectCommon(expectedType: ExprType,
       preTransQual: PreTransform, className: ClassName, field: FieldIdent,
       isLhsOfAssign: Boolean)(
       cont: PreTransCont)(
@@ -2137,9 +2137,9 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
              * builing an `Array[Char]`.
              */
             tpe match {
-              case CharType => IntLiteral(0)
-              case NoType   => Undefined()
-              case _        => zeroOf(tpe)
+              case CharType      => IntLiteral(0)
+              case NoType        => Undefined()
+              case tpe: ExprType => zeroOf(tpe)
             }
           case ClassOf(_) =>
             Null()
@@ -3922,7 +3922,7 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
     }
   }
 
-  private def foldAsInstanceOf(arg: PreTransform, tpe: Type)(
+  private def foldAsInstanceOf(arg: PreTransform, tpe: ExprType)(
       cont: PreTransCont): TailRec[Tree] = {
     if (isSubtype(arg.tpe.base, tpe))
       cont(arg)
@@ -4276,7 +4276,7 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
            *    that ends up having only one target in a subclass).
            * We can refine the type here based on that knowledge.
            */
-          val improvedBaseType =
+          val improvedBaseType: ExprType =
             if (isSubtype(value.tpe.base, declaredType)) value.tpe.base
             else declaredType
           val isExact = false // We catch the case value.tpe.isExact earlier
@@ -4381,9 +4381,8 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
    *  Requires that lhs and rhs be subtypes of upperBound, obviously.
    */
   private def constrainedLub(lhs: RefinedType, rhs: RefinedType,
-      upperBound: Type): RefinedType = {
-    if (upperBound == NoType) RefinedType(upperBound)
-    else if (lhs == rhs) lhs
+      upperBound: ExprType): RefinedType = {
+    if (lhs == rhs) lhs
     else if (lhs.isNothingType) rhs
     else if (rhs.isNothingType) lhs
     else {
@@ -4396,7 +4395,7 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
    *  but still a subtype of upperBound.
    *  Requires that lhs and rhs be subtypes of upperBound, obviously.
    */
-  private def constrainedLub(lhs: Type, rhs: Type, upperBound: Type): Type = {
+  private def constrainedLub(lhs: ExprType, rhs: ExprType, upperBound: ExprType): ExprType = {
     // TODO Improve this
     if (upperBound == NoType) upperBound
     else if (lhs == rhs) lhs
@@ -4525,27 +4524,27 @@ private[optimizer] object OptimizerCore {
   private type CancelFun = () => Nothing
   private type PreTransCont = PreTransform => TailRec[Tree]
 
-  private final case class RefinedType private (base: Type, isExact: Boolean,
+  private final case class RefinedType private (base: ExprType, isExact: Boolean,
       isNullable: Boolean)(val allocationSite: AllocationSite, dummy: Int = 0) {
 
     def isNothingType: Boolean = base == NothingType
   }
 
   private object RefinedType {
-    def apply(base: Type, isExact: Boolean, isNullable: Boolean,
+    def apply(base: ExprType, isExact: Boolean, isNullable: Boolean,
         allocationSite: AllocationSite): RefinedType =
       new RefinedType(base, isExact, isNullable)(allocationSite)
 
-    def apply(base: Type, isExact: Boolean, isNullable: Boolean): RefinedType =
+    def apply(base: ExprType, isExact: Boolean, isNullable: Boolean): RefinedType =
       RefinedType(base, isExact, isNullable, AllocationSite.Anonymous)
 
-    def apply(tpe: Type): RefinedType = tpe match {
+    def apply(tpe: ExrpType): RefinedType = tpe match {
       case AnyType | ClassType(_) | ArrayType(_) =>
         RefinedType(tpe, isExact = false, isNullable = true)
       case NullType =>
         RefinedType(tpe, isExact = true, isNullable = true)
       case NothingType | UndefType | BooleanType | CharType | LongType |
-          StringType | NoType =>
+          StringType =>
         RefinedType(tpe, isExact = true, isNullable = false)
       case ByteType | ShortType | IntType | FloatType | DoubleType |
           RecordType(_) =>
@@ -5058,7 +5057,7 @@ private[optimizer] object OptimizerCore {
     }
   }
 
-  private final case class Binding(name: Binding.Name, declaredType: Type,
+  private final case class Binding(name: Binding.Name, declaredType: ExprType,
       mutable: Boolean, value: PreTransform)
 
   private object Binding {
@@ -5070,12 +5069,12 @@ private[optimizer] object OptimizerCore {
         extends Name
 
     def apply(localIdent: LocalIdent, originalName: OriginalName,
-        declaredType: Type, mutable: Boolean, value: PreTransform): Binding = {
+        declaredType: ExprType, mutable: Boolean, value: PreTransform): Binding = {
       apply(Local(localIdent.name, originalName), declaredType,
           mutable, value)
     }
 
-    def temp(baseName: LocalName, declaredType: Type, mutable: Boolean,
+    def temp(baseName: LocalName, declaredType: ExprType, mutable: Boolean,
         value: PreTransform): Binding = {
       apply(Local(baseName, NoOriginalName), declaredType, mutable, value)
     }

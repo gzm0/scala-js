@@ -268,7 +268,7 @@ trait JSEncoding[G <: Global with Singleton] extends SubComponent {
     js.LocalIdent(localSymbolName(sym))
   }
 
-  def encodeClassType(sym: Symbol): jstpe.Type = {
+  def encodeClassType(sym: Symbol): jstpe.ExprType = {
     if (sym == definitions.ObjectClass) jstpe.AnyType
     else if (isJSType(sym)) jstpe.AnyType
     else {
