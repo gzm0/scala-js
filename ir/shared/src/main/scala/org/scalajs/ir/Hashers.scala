@@ -116,15 +116,10 @@ object Hashers {
     def finalizeHash(): TreeHash =
       new TreeHash(digestBuilder.finalizeDigest())
 
-    def mixParamDef(paramDef: ParamDef): Unit = {
-      mixPos(paramDef.pos)
-      mixLocalIdent(paramDef.name)
-      mixOriginalName(paramDef.originalName)
-      mixType(paramDef.ptpe)
-      mixBoolean(paramDef.mutable)
+    def mixParamDef(paramDef: Any): Unit = {
     }
 
-    def mixParamDefs(paramDefs: List[ParamDef]): Unit =
+    def mixParamDefs(paramDefs: List[Any]): Unit =
       paramDefs.foreach(mixParamDef)
 
     def mixTree(tree: Tree): Unit = {

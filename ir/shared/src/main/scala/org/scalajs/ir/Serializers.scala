@@ -771,20 +771,16 @@ object Serializers {
         buffer.writeInt(encodedNameToIndex(originalName.get))
     }
 
-    def writeParamDef(paramDef: ParamDef): Unit = {
-      writePosition(paramDef.pos)
-      writeLocalIdent(paramDef.name)
-      writeOriginalName(paramDef.originalName)
-      writeType(paramDef.ptpe)
-      buffer.writeBoolean(paramDef.mutable)
+    def writeParamDef(paramDef: Any): Unit = {
+      ???
     }
 
-    def writeParamDefs(paramDefs: List[ParamDef]): Unit = {
+    def writeParamDefs(paramDefs: List[Any]): Unit = {
       buffer.writeInt(paramDefs.size)
       paramDefs.foreach(writeParamDef(_))
     }
 
-    def writeOptParamDef(paramDef: Option[ParamDef]): Unit = {
+    def writeOptParamDef(paramDef: Option[Any]): Unit = {
       buffer.writeBoolean(paramDef.isDefined)
       paramDef.foreach(writeParamDef(_))
     }
@@ -1276,7 +1272,7 @@ object Serializers {
              */
             assert(args.size == 1)
 
-            val patchedBody = Some(IdentityHashCode(args(0).ref))
+            val patchedBody = Some(IdentityHashCode(???))
             val patchedOptimizerHints = OptimizerHints.empty.withInline(true)
 
             MethodDef(flags, name, originalName, args, resultType, patchedBody)(
@@ -1410,46 +1406,13 @@ object Serializers {
       else None
     }
 
-    def readParamDef(): ParamDef = {
-      implicit val pos = readPosition()
-      val name = readLocalIdent()
-      val originalName = readOriginalName()
-      val ptpe = readType()
-      val mutable = readBoolean()
+    def readParamDef(): Nothing = ???
 
-      if (hacks.use14) {
-        val rest = readBoolean()
-        assert(!rest, "Illegal rest parameter")
-      }
-
-      ParamDef(name, originalName, ptpe, mutable)
-    }
-
-    def readParamDefs(): List[ParamDef] =
+    def readParamDefs(): List[Nothing] =
       List.fill(readInt())(readParamDef())
 
-    def readParamDefsWithRest(): (List[ParamDef], Option[ParamDef]) = {
-      if (hacks.use14) {
-        val (params, isRest) = List.fill(readInt()) {
-          implicit val pos = readPosition()
-          (ParamDef(readLocalIdent(), readOriginalName(), readType(), readBoolean()), readBoolean())
-        }.unzip
-
-        if (isRest.forall(!_)) {
-          (params, None)
-        } else {
-          assert(isRest.init.forall(!_), "illegal non-last rest parameter")
-          (params.init, Some(params.last))
-        }
-      } else {
-        val params = readParamDefs()
-
-        val restParam =
-          if (readBoolean()) Some(readParamDef())
-          else None
-
-        (params, restParam)
-      }
+    def readParamDefsWithRest(): (List[Nothing], Option[Nothing]) = {
+      ???
     }
 
     def readType(): Type = {

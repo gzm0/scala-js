@@ -518,10 +518,6 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
 
     setterArgAndBody.foreach { case (setterArg, setterBody) =>
       checkDeclareLocalVar(setterArg.name)
-      if (setterArg.ptpe != AnyType)
-        reportError("Setter argument of exported property def has type "+
-            i"${setterArg.ptpe}, but must be Any")
-
       val setterBodyEnv = Env.fromSignature(thisType, clazz.jsClassCaptures,
           List(setterArg))
       typecheckStat(setterBody, setterBodyEnv)
@@ -1221,14 +1217,10 @@ private final class IRChecker(unit: LinkingUnit, logger: Logger) {
   }
 
   /** Check the parameters for a method with JS calling conventions. */
-  private def checkJSParamDefs(params: List[ParamDef], restParam: Option[ParamDef])(
+  private def checkJSParamDefs(params: List[JSParamDef], restParam: Option[JSParamDef])(
       implicit ctx: ErrorContext): Unit = {
     for (ParamDef(name, _, ptpe, _) <- params ++ restParam) {
       checkDeclareLocalVar(name)
-      if (ptpe == NoType)
-        reportError(i"Parameter $name has type NoType")
-      else if (ptpe != AnyType)
-        reportError(i"Parameter $name has type $ptpe but must be any")
     }
   }
 

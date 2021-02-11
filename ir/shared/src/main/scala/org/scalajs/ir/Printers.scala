@@ -89,31 +89,8 @@ object Printers {
       }
     }
 
-    protected def printSig(args: List[ParamDef], restParam: Option[ParamDef],
+    protected def printSig(args: List[Any], restParam: Option[Any],
         resultType: Type): Unit = {
-      print("(")
-      var rem = args
-      while (rem.nonEmpty) {
-        printAnyNode(rem.head)
-        rem = rem.tail
-        if (rem.nonEmpty || restParam.nonEmpty)
-          print(", ")
-      }
-
-      restParam.foreach { p =>
-        print("...")
-        printAnyNode(p)
-      }
-
-      print(")")
-
-      if (resultType != NoType) {
-        print(": ")
-        print(resultType)
-        print(" = ")
-      } else {
-        print(' ')
-      }
     }
 
     def printArgs(args: List[TreeOrJSSpread]): Unit = {
@@ -133,6 +110,7 @@ object Printers {
         case node: ClassDef          => print(node)
         case node: MemberDef         => print(node)
         case node: TopLevelExportDef => print(node)
+        case _ => ??? // yolo
       }
     }
 
@@ -852,7 +830,7 @@ object Printers {
               first = false
             else
               print(", ")
-            print(param)
+//            print(param)
             print(" = ")
             print(value)
           }

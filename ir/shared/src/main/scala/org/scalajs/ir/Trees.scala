@@ -104,9 +104,29 @@ object Trees {
     def ref(implicit pos: Position): VarRef = VarRef(name)(vtpe)
   }
 
+  sealed abstract class AnyParamDef extends IRNode {
+    def name: LocalIdent
+    def originalName: OriginalName
+    def mutable: Boolean
+  }
+
   sealed case class ParamDef(name: LocalIdent, originalName: OriginalName,
       ptpe: Type, mutable: Boolean)(
-      implicit val pos: Position) extends IRNode {
+      implicit val pos: Position) extends AnyParamDef {
+    def ref(implicit pos: Position): VarRef = VarRef(name)(ptpe)
+  }
+
+  sealed case class JSParamDef(name: LocalIdent, originalName: OriginalName,
+      mutable: Boolean)(
+      implicit val pos: Position) extends AnyParamDef {
+    def ref(implicit pos: Position): VarRef = VarRef(name)(AnyType)
+  }
+
+  sealed case class CaptureDef(name: LocalIdent, originalName: OriginalName,
+      ptpe: Type)(
+      implicit val pos: Position) extends AnyParamDef {
+    val mutable = false
+
     def ref(implicit pos: Position): VarRef = VarRef(name)(ptpe)
   }
 
@@ -923,8 +943,8 @@ object Trees {
    *    an `this` parameter, and cannot be constructed (called with `new`).
    *    If `false`, it is a regular Function (`function`).
    */
-  sealed case class Closure(arrow: Boolean, captureParams: List[ParamDef],
-      params: List[ParamDef], restParam: Option[ParamDef], body: Tree,
+  sealed case class Closure(arrow: Boolean, captureParams: List[CaptureDef],
+      params: List[JSParamDef], restParam: Option[JSParamDef], body: Tree,
       captureValues: List[Tree])(
       implicit val pos: Position) extends Tree {
     val tpe = AnyType
@@ -1017,7 +1037,7 @@ object Trees {
        *  to have no captures. It will still have zero to many JS class values
        *  created with `CreateJSClass`.
        */
-      val jsClassCaptures: Option[List[ParamDef]],
+      val jsClassCaptures: Option[List[CaptureDef]],
       val superClass: Option[ClassIdent],
       val interfaces: List[ClassIdent],
       /** If defined, an expression returning the JS class value of the super
@@ -1047,7 +1067,7 @@ object Trees {
         name: ClassIdent,
         originalName: OriginalName,
         kind: ClassKind,
-        jsClassCaptures: Option[List[ParamDef]],
+        jsClassCaptures: Option[List[CaptureDef]],
         superClass: Option[ClassIdent],
         interfaces: List[ClassIdent],
         jsSuperClass: Option[Tree],
@@ -1107,7 +1127,7 @@ object Trees {
   sealed abstract class JSMethodPropDef extends MemberDef
 
   sealed case class JSMethodDef(flags: MemberFlags, name: Tree,
-      args: List[ParamDef], restParam: Option[ParamDef], body: Tree)(
+      args: List[JSParamDef], restParam: Option[JSParamDef], body: Tree)(
       val optimizerHints: OptimizerHints, val hash: Option[TreeHash])(
       implicit val pos: Position)
       extends JSMethodPropDef {
@@ -1116,7 +1136,7 @@ object Trees {
   }
 
   sealed case class JSPropertyDef(flags: MemberFlags, name: Tree,
-      getterBody: Option[Tree], setterArgAndBody: Option[(ParamDef, Tree)])(
+      getterBody: Option[Tree], setterArgAndBody: Option[(JSParamDef, Tree)])(
       implicit val pos: Position)
       extends JSMethodPropDef {
 

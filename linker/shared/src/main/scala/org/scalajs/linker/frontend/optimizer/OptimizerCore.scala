@@ -667,8 +667,8 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
   }
 
   private def transformClosureCommon(arrow: Boolean,
-      captureParams: List[ParamDef], params: List[ParamDef],
-      restParam: Option[ParamDef], body: Tree,
+      captureParams: List[CaptureDef], params: List[JSParamDef],
+      restParam: Option[JSParamDef], body: Tree,
       newCaptureValues: List[Tree])(
       implicit scope: Scope, pos: Position): Closure = {
 
@@ -1982,7 +1982,7 @@ private[optimizer] abstract class OptimizerCore(config: CommonPhaseConfig) {
   }
 
   private def inlineBody(optReceiver: Option[(Type, PreTransform)],
-      formals: List[ParamDef], resultType: Type, body: Tree,
+      formals: List[AnyParamDef], resultType: Type, body: Tree,
       args: List[PreTransform], isStat: Boolean,
       usePreTransform: Boolean)(
       cont: PreTransCont)(
@@ -4707,7 +4707,7 @@ private[optimizer] object OptimizerCore {
       value: Tree) extends LocalDefReplacement
 
   private final case class TentativeClosureReplacement(
-      captureParams: List[ParamDef], params: List[ParamDef], body: Tree,
+      captureParams: List[CaptureDef], params: List[JSParamDef], body: Tree,
       captureValues: List[LocalDef],
       alreadyUsed: SimpleState[Boolean],
       cancelFun: CancelFun) extends LocalDefReplacement

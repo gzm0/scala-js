@@ -283,7 +283,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
     }
 
     def genJSConstructorExport(
-        alts: List[Symbol]): (Option[List[js.ParamDef]], js.JSMethodDef) = {
+        alts: List[Symbol]): (Option[List[js.CaptureDef]], js.JSMethodDef) = {
       val exporteds = alts.map(ExportedSymbol)
 
       val isLiftedJSCtor = exporteds.head.isLiftedJSConstructor
@@ -297,7 +297,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
           exported <- exporteds
           param <- exported.captureParamsFront ::: exported.captureParamsBack
         } yield {
-          genParamDef(param.sym)
+          genCaptureDef(param.sym)(param.sym.pos)
         })
       }
 
@@ -1056,16 +1056,15 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
       if (needsRestParam) freshLocalIdent("rest")(NoPosition).name
       else null
 
-    def genFormalArgs()(implicit pos: Position): (List[js.ParamDef], Option[js.ParamDef]) = {
+    def genFormalArgs()(implicit pos: Position): (List[js.JSParamDef], Option[js.JSParamDef]) = {
       val fixedParamDefs = fixedParamNames.toList.map { paramName =>
-        js.ParamDef(js.LocalIdent(paramName), NoOriginalName, jstpe.AnyType,
-            mutable = false)
+        js.JSParamDef(js.LocalIdent(paramName), NoOriginalName, mutable = false)
       }
 
       val restParam = {
         if (needsRestParam) {
-          Some(js.ParamDef(js.LocalIdent(restParamName),
-              NoOriginalName, jstpe.AnyType, mutable = false))
+          Some(js.JSParamDef(js.LocalIdent(restParamName),
+              NoOriginalName, mutable = false))
         } else {
           None
         }

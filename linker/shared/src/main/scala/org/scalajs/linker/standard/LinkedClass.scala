@@ -34,7 +34,7 @@ final class LinkedClass(
     // Stuff from Tree
     val name: ClassIdent,
     val kind: ClassKind,
-    val jsClassCaptures: Option[List[ParamDef]],
+    val jsClassCaptures: Option[List[CaptureDef]],
     val superClass: Option[ClassIdent],
     val interfaces: List[ClassIdent],
     val jsSuperClass: Option[Tree],
@@ -113,7 +113,7 @@ final class LinkedClass(
   private def copy(
       name: ClassIdent = this.name,
       kind: ClassKind = this.kind,
-      jsClassCaptures: Option[List[ParamDef]] = this.jsClassCaptures,
+      jsClassCaptures: Option[List[CaptureDef]] = this.jsClassCaptures,
       superClass: Option[ClassIdent] = this.superClass,
       interfaces: List[ClassIdent] = this.interfaces,
       jsSuperClass: Option[Tree] = this.jsSuperClass,

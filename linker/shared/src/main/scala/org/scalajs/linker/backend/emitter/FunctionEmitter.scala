@@ -255,7 +255,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
   /** Desugars parameters and body to a JS function.
    */
-  def desugarToFunction(enclosingClassName: ClassName, params: List[ParamDef],
+  def desugarToFunction(enclosingClassName: ClassName, params: List[AnyParamDef],
       body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
@@ -265,8 +265,8 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
   /** Desugars parameters and body to a JS function.
    */
-  def desugarToFunction(enclosingClassName: ClassName, params: List[ParamDef],
-      restParam: Option[ParamDef], body: Tree, resultType: Type)(
+  def desugarToFunction(enclosingClassName: ClassName, params: List[AnyParamDef],
+      restParam: Option[JSParamDef], body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
     new JSDesugar().desugarToFunction(params, restParam, body,
@@ -278,7 +278,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
    *  an explicit normal parameter.
    */
   def desugarToFunctionWithExplicitThis(enclosingClassName: ClassName,
-      params: List[ParamDef], body: Tree, resultType: Type)(
+      params: List[AnyParamDef], body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
     new JSDesugar().desugarToFunctionWithExplicitThis(params, body,
@@ -288,7 +288,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
   /** Desugars parameters and body to a JS function.
    */
-  def desugarToFunction(params: List[ParamDef], restParam: Option[ParamDef],
+  def desugarToFunction(params: List[AnyParamDef], restParam: Option[JSParamDef],
       body: Tree, resultType: Type)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): WithGlobals[js.Function] = {
@@ -462,7 +462,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
      *  a normal parameter.
      */
     def desugarToFunctionWithExplicitThis(
-        params: List[ParamDef], body: Tree, isStat: Boolean, env0: Env)(
+        params: List[AnyParamDef], body: Tree, isStat: Boolean, env0: Env)(
         implicit pos: Position): WithGlobals[js.Function] = {
 
       performOptimisticThenPessimisticRuns {
@@ -476,7 +476,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
     /** Desugars parameters and body to a JS function.
      */
-    def desugarToFunction(params: List[ParamDef], restParam: Option[ParamDef],
+    def desugarToFunction(params: List[AnyParamDef], restParam: Option[JSParamDef],
         body: Tree, isStat: Boolean, env0: Env)(
         implicit pos: Position): WithGlobals[js.Function] = {
       performOptimisticThenPessimisticRuns {
@@ -487,7 +487,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
     /** Desugars parameters and body to a JS function.
      */
     private def desugarToFunctionInternal(arrow: Boolean,
-        params: List[ParamDef], restParam: Option[ParamDef], body: Tree,
+        params: List[AnyParamDef], restParam: Option[JSParamDef], body: Tree,
         isStat: Boolean, env0: Env)(
         implicit pos: Position): js.Function = {
 
@@ -2926,7 +2926,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
         MethodName("notifyAll", Nil, VoidRef)
     )
 
-    private def transformParamDef(paramDef: ParamDef): js.ParamDef =
+    private def transformParamDef(paramDef: AnyParamDef): js.ParamDef =
       js.ParamDef(transformLocalVarIdent(paramDef.name, paramDef.originalName))(paramDef.pos)
 
     private def transformLabelIdent(ident: LabelIdent): js.Ident =
@@ -3110,7 +3110,7 @@ private object FunctionEmitter {
     def withThisIdent(thisIdent: Option[js.Ident]): Env =
       copy(thisIdent = thisIdent)
 
-    def withParams(params: List[ParamDef]): Env = {
+    def withParams(params: List[AnyParamDef]): Env = {
       params.foldLeft(this) {
         case (env, ParamDef(name, _, _, mutable)) =>
           env.withDef(name, mutable)

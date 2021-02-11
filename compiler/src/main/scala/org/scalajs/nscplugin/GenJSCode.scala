@@ -166,7 +166,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
     // For anonymous methods
     // These have a default, since we always read them.
     private val tryingToGenMethodAsJSFunction = new ScopedVar[Boolean](false)
-    private val paramAccessorLocals = new ScopedVar(Map.empty[Symbol, js.ParamDef])
+    private val paramAccessorLocals = new ScopedVar(Map.empty[Symbol, js.CaptureDef])
 
     /* Contextual JS class value for some operations of nested JS classes that
      * need one.
@@ -839,7 +839,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
       def selfRef(implicit pos: ir.Position) =
         js.VarRef(selfName)(jstpe.AnyType)
 
-      def memberLambda(params: List[js.ParamDef], restParam: Option[js.ParamDef],
+      def memberLambda(params: List[js.JSParamDef], restParam: Option[js.JSParamDef],
           body: js.Tree)(implicit pos: ir.Position) = {
         js.Closure(arrow = false, captureParams = Nil, params, restParam, body,
             captureValues = Nil)
@@ -1343,7 +1343,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
                * reflectively, it must be given an `Int` (or `Integer`).
                */
               val paramType = js.ClassOf(toTypeRef(param.tpe))
-              val paramDef = genParamDef(param, jstpe.AnyType)
+              val paramDef = js.JSParamDef(encodeLocalSym(sym), originalNameOfLocal(sym), mutable = false)
               val actualParam = fromAny(paramDef.ref, param.tpe)
               (paramType, paramDef, actualParam)
             }).unzip3
@@ -1374,7 +1374,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
     // Constructor of a non-native JS class ------------------------------
 
     def genJSClassCapturesAndConstructor(classSym: Symbol,
-        constructorTrees: List[DefDef]): (Option[List[js.ParamDef]], js.JSMethodDef) = {
+        constructorTrees: List[DefDef]): (Option[List[js.CaptureDef]], js.JSMethodDef) = {
       implicit val pos = classSym.pos
 
       if (hasDefaultCtorArgsAndJSModule(classSym)) {
@@ -1401,9 +1401,9 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
            * super class value. genNonNativeJSClass relies on this.
            */
           val captureParamsWithJSSuperClass = captureParams.map { params =>
-            val jsSuperClassParam = js.ParamDef(
+            val jsSuperClassParam = js.CaptureDef(
                 js.LocalIdent(JSSuperClassParamName), NoOriginalName,
-                jstpe.AnyType, mutable = false)
+                jstpe.AnyType)
             jsSuperClassParam :: params
           }
 
@@ -5845,7 +5845,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
         val usedCtorParams =
           if (hasUnusedOuterCtorParam) ctorParams.tail
           else ctorParams
-        val ctorParamDefs = usedCtorParams.map(genParamDef(_))
+        val ctorParamDefs = usedCtorParams.map(genCaptureDef(_))
 
         // Third step: emit the body of the apply method def
 
@@ -5923,8 +5923,8 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
                 patchedRepeatedParam,
                 js.Block(
                     js.VarDef(thisParam.name, thisParam.originalName,
-                        thisParam.ptpe, mutable = false,
-                        js.This()(thisParam.ptpe)(thisParam.pos))(thisParam.pos),
+                        jstpe.AnyType, mutable = false,
+                        js.This()(jstpe.AnyType)(thisParam.pos))(thisParam.pos),
                     patchedBody),
                 capturedArgs)
           } else {
@@ -5994,16 +5994,16 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
 
       val allArgs = allArgs0 map genExpr
 
-      val formalCaptures = captureSyms.toList.map(genParamDef(_, pos))
+      val formalCaptures = captureSyms.toList.map(genCaptureDef(_))
       val actualCaptures = formalCaptures.map(_.ref)
 
       val formalArgs = params.map(genParamDef(_))
 
       val (allFormalCaptures, body, allActualCaptures) = if (!target.isStaticMember) {
         val thisActualCapture = genExpr(receiver)
-        val thisFormalCapture = js.ParamDef(
+        val thisFormalCapture = js.CaptureDef(
             freshLocalIdent("this")(receiver.pos), thisOriginalName,
-            thisActualCapture.tpe, mutable = false)(receiver.pos)
+            thisActualCapture.tpe)(receiver.pos)
         val thisCaptureArg = thisFormalCapture.ref
 
         val body = if (isJSType(receiver.tpe) && target.owner != ObjectClass) {
@@ -6174,7 +6174,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
 
     private def patchFunParamsWithBoxes(methodSym: Symbol,
         params: List[js.ParamDef], useParamsBeforeLambdaLift: Boolean)(
-        implicit pos: Position): (List[js.ParamDef], List[js.VarDef]) = {
+        implicit pos: Position): (List[js.JSParamDef], List[js.VarDef]) = {
       // See the comment in genPrimitiveJSArgs for a rationale about this
       val paramTpes = enteringPhase(currentRun.posterasurePhase) {
         for (param <- methodSym.tpe.params)
@@ -6206,13 +6206,12 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
     }
 
     private def genPatchedParam(param: js.ParamDef, rhs: js.VarRef => js.Tree)(
-        implicit pos: Position): (js.ParamDef, js.VarDef) = {
+        implicit pos: Position): (js.JSParamDef, js.VarDef) = {
       val paramNameIdent = param.name
       val origName = param.originalName
       val newNameIdent = freshLocalIdent(paramNameIdent.name)(paramNameIdent.pos)
       val newOrigName = origName.orElse(paramNameIdent.name)
-      val patchedParam = js.ParamDef(newNameIdent, newOrigName, jstpe.AnyType,
-          mutable = false)(param.pos)
+      val patchedParam = js.JSParamDef(newNameIdent, newOrigName, mutable = false)(param.pos)
       val paramLocal = js.VarDef(paramNameIdent, origName, param.ptpe,
           mutable = false, rhs(patchedParam.ref))
       (patchedParam, paramLocal)
@@ -6290,6 +6289,10 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
         pos: Position): js.ParamDef = {
       js.ParamDef(encodeLocalSym(sym)(pos), originalNameOfLocal(sym), ptpe,
           mutable = false)(pos)
+    }
+
+    def genCaptureDef(sym: Symbol)(implicit pos: Position): js.CaptureDef = {
+      js.CaptureDef(encodeLocalSym(sym), originalNameOfLocal(sym), toIRType(sym.tpe))
     }
 
     /** Generates a call to `runtime.privateFieldsSymbol()` */
