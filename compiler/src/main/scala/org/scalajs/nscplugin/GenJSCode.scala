@@ -2786,9 +2786,12 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
       val Apply(fun, args) = tree
       val sym = fun.symbol
 
-      def isJSDefaultParam: Boolean = {
+      def needsJSUndefinedParam: Boolean = {
         if (isCtorDefaultParam(sym)) {
-          isJSCtorDefaultParam(sym)
+          val ctorOwner = patchedLinkedClassOfClass(sym.owner)
+          // We'd want to recognize delegated constructors here, but it doesn't
+          // seem feasible without looking at larger trees.
+          isJSType(ctorOwner) && ctorOwner != currentClassSym.get
         } else {
           /* If this is a default parameter accessor on a
            * non-native JS class, we need to know if the method for which we
@@ -2816,7 +2819,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
         case TypeApply(_, _) =>
           genApplyTypeApply(tree, isStat)
 
-        case _ if isJSDefaultParam =>
+        case _ if needsJSUndefinedParam =>
           js.Transient(UndefinedParam)
 
         case Select(Super(_, _), _) =>
@@ -6582,7 +6585,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
 
   private def isJSCtorDefaultParam(sym: Symbol) = {
     isCtorDefaultParam(sym) &&
-    isJSType(patchedLinkedClassOfClass(sym.owner))
+
   }
 
   private def isJSNativeCtorDefaultParam(sym: Symbol) = {
