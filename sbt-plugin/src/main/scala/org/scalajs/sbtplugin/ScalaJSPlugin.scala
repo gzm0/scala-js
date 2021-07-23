@@ -24,6 +24,8 @@ import org.scalajs.linker.interface._
 import org.scalajs.jsenv.{Input, JSEnv}
 import org.scalajs.jsenv.nodejs.NodeJSEnv
 
+import org.scalajs.testing.adapter.TestAdapter
+
 object ScalaJSPlugin extends AutoPlugin {
   override def requires: Plugins = plugins.JvmPlugin
 
@@ -261,6 +263,16 @@ object ScalaJSPlugin extends AutoPlugin {
     val scalaJSTestHTMLArtifactDirectory = SettingKey[File]("scalaJSTestHTMLArtifactDirectory",
         "Directory for artifacts produced by testHtml.",
         BSetting)
+
+    /* TestAdapter for executing tests in this project.
+     *
+     *  @note
+     *    **Unstable API**: this API is subject to backward incompatible
+     *    changes in future minor versions of Scala.js.
+     */
+    val scalaJSTestAdapter = TaskKey[TestAdapter]("scalaJSTestAdapter",
+        "TestAdapter for executing tests in this project.",
+        KeyRanks.Invisible)
 
     val scalaJSLinkerOutputDirectory = SettingKey[File]("scalaJSLinkerOutputDirectory",
         "Directory for linker output.",

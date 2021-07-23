@@ -64,11 +64,6 @@ private[sbtplugin] object ScalaJSPluginInternal {
   private val createdTestAdapters =
     new AtomicReference[List[TestAdapter]](Nil)
 
-  private def newTestAdapter(jsEnv: JSEnv, input: Seq[Input],
-      config: TestAdapter.Config): TestAdapter = {
-    registerResource(createdTestAdapters, new TestAdapter(jsEnv, input, config))
-  }
-
   private[sbtplugin] def closeAllTestAdapters(): Unit =
     createdTestAdapters.getAndSet(Nil).foreach(_.close())
 
@@ -570,7 +565,7 @@ private[sbtplugin] object ScalaJSPluginInternal {
         }
       },
 
-      loadedTestFrameworks := {
+      scalaJSTestAdapter := {
         val configName = configuration.value.name
         val input = jsEnvInput.value
 
@@ -594,20 +589,32 @@ private[sbtplugin] object ScalaJSPluginInternal {
               s"set `$configName / test` := {}`.")
         }
 
-        val frameworks = testFrameworks.value
         val env = jsEnv.value
-        val frameworkNames = frameworks.map(_.implClassNames.toList).toList
 
         val logger = sbtLogger2ToolsLogger(streams.value.log)
         val config = TestAdapter.Config()
           .withLogger(logger)
 
-        val adapter = newTestAdapter(env, input, config)
-        val frameworkAdapters = adapter.loadFrameworks(frameworkNames)
+        registerResource(createdTestAdapters,
+            new TestAdapter(env, input, config))
+      },
+
+      loadedTestFrameworks := {
+        val frameworks = testFrameworks.value
+        val frameworkNames = frameworks.map(_.implClassNames.toList).toList
+
+        val frameworkAdapters =
+          scalaJSTestAdapter.value.loadFrameworks(frameworkNames)
 
         frameworks.zip(frameworkAdapters).collect {
           case (tf, Some(adapter)) => (tf, adapter)
         }.toMap
+      },
+
+      testOptions += {
+        val adapter = scalaJSTestAdapter.value
+        // TODO: This runs too early (before `done` is called on the `Run`).
+        Tests.Cleanup(() => adapter.close())
       },
 
       // Override default to avoid triggering a test:fastLinkJS in a test:compile
