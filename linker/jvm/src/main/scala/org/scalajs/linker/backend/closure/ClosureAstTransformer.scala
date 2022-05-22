@@ -189,6 +189,13 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
       case classDef: ClassDef =>
         transformClassDef(classDef)
 
+      case ImportNamespace(binding, from) =>
+        new Node(Token.IMPORT,
+          new Node(Token.EMPTY),
+          setNodePosition(Node.newString(Token.IMPORT_STAR, binding.name), binding.pos.orElse(pos)),
+          transformExpr(from),
+        )
+
       case _ =>
         // We just assume it is an expression
         new Node(Token.EXPR_RESULT, transformExpr(tree))

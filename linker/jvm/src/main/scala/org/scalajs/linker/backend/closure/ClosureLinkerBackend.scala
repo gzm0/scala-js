@@ -48,9 +48,6 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
       s"Cannot use features $esFeatures with the Closure Compiler " +
       "because they allow to use BigInts")
 
-  require(moduleKind != ModuleKind.ESModule,
-      s"Cannot use module kind $moduleKind with the Closure Compiler")
-
   private[this] val emitter = {
     val emitterConfig = Emitter.Config(config.commonConfig.coreSpec)
       .withJSHeader(config.jsHeader)
@@ -238,6 +235,7 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
     options.setWarningLevel(DiagnosticGroups.CHECK_REGEXP, CheckLevel.OFF)
     options.setWarningLevel(DiagnosticGroups.CHECK_TYPES, CheckLevel.OFF)
     options.setWarningLevel(DiagnosticGroups.CHECK_USELESS_CODE, CheckLevel.OFF)
+    options.setEnableModuleRewriting(false)
 
     if (config.sourceMap) {
       val sourceMapFileName =
