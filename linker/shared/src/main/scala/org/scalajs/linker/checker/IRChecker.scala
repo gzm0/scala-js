@@ -28,7 +28,8 @@ import org.scalajs.linker.standard.LinkedClass
 import org.scalajs.linker.checker.ErrorReporter._
 
 /** Checker for the validity of the IR. */
-private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter) {
+private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter,
+    allowTransients: Boolean) {
 
   import IRChecker._
   import reporter.reportError
@@ -711,6 +712,17 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter) {
             typecheckExpect(value, env, ctpe)
         }
 
+      case Transient(transient) if allowTransients =>
+        transient.traverse(new Traversers.Traverser {
+          override def traverse(tree: Tree): Unit = typecheck(tree, env)
+        })
+
+      case _: RecordSelect if allowTransients =>
+        // TODO
+
+      case _: RecordValue if allowTransients =>
+        // TODO
+
       case _:RecordSelect | _:RecordValue | _:Transient | _:JSSuperConstructorCall =>
         reportError("invalid tree")
     }
@@ -879,9 +891,9 @@ object IRChecker {
    *
    *  @return Count of IR checking errors (0 in case of success)
    */
-  def check(unit: LinkingUnit, logger: Logger): Int = {
+  def check(unit: LinkingUnit, logger: Logger, allowTransients: Boolean): Int = {
     val reporter = new LoggerErrorReporter(logger)
-    new IRChecker(unit, reporter).check()
+    new IRChecker(unit, reporter, allowTransients).check()
     reporter.errorCount
   }
 }

@@ -20,6 +20,7 @@ import org.scalajs.ir.Trees.ClassDef
 
 import org.scalajs.logging._
 
+import org.scalajs.linker.checker.IRChecker
 import org.scalajs.linker.interface.ModuleInitializer
 import org.scalajs.linker.standard._
 import org.scalajs.linker.standard.ModuleSet.ModuleID
@@ -67,6 +68,16 @@ final class Refiner(config: CommonPhaseConfig, checkIR: Boolean) {
       }
 
       irLoader.cleanAfterRun()
+
+      if (checkIR) {
+        logger.time("Refiner: Check IR") {
+          val errorCount = IRChecker.check(result, logger, allowTransients = true)
+          if (errorCount != 0) {
+            throw new AssertionError(
+                s"There were $errorCount IR checking errors (this is a bug)")
+          }
+        }
+      }
 
       result
     }
