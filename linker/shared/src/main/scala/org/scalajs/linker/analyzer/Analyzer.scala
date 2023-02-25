@@ -59,7 +59,9 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
   private val isNoModule = config.coreSpec.moduleKind == ModuleKind.NoModule
 
   private var objectClassInfo: ClassInfo = _
-  private[this] val _classInfos = mutable.Map.empty[ClassName, ClassLoadingState]
+
+  private[this] var _classInfos = mutable.Map.empty[ClassName, ClassLoadingState]
+  private[this] var _previousClassInfos = mutable.Map.empty[ClassName, ClassInfo]
 
   private[this] val _errors = mutable.Buffer.empty[Error]
 
@@ -72,13 +74,25 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
   def computeReachability(moduleInitializers: Seq[ModuleInitializer], logger: Logger)(
       implicit ec: ExecutionContext): Future[Analysis] = {
 
-    resetState()
+    if (_errors.nonEmpty || _previousClassInfos.nonEmpty)
+      resetState()
 
     infoLoader.update(logger)
 
     workQueue = new WorkQueue(ec)
 
-    loadObjectClass(() => loadEverything(moduleInitializers, symbolRequirements))
+    // Cast is checked by postLoad of previous run.
+    _previousClassInfos = _classInfos.asInstanceOf[mutable.Map[ClassName, ClassInfo]]
+    _classInfos = mutable.Map.empty()
+
+    val firstRun = objectClassInfo == null
+
+    loadObjectClass { () =>
+      if (firstRun)
+        loadFixedEntrypoints()
+
+      loadDynamicEntrypoints(moduleInitializers)
+    }
 
     workQueue.join()
       .map(_ => postLoad(moduleInitializers, logger))(ec)
@@ -90,6 +104,7 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
     workQueue = null
     _errors.clear()
     _classInfos.clear()
+    _previousClassInfos.clear()
     _topLevelExportInfos.clear()
   }
 
@@ -105,20 +120,22 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
 
       case Some(future) =>
         workQueue.enqueue(future) { data =>
-          objectClassInfo = new ClassInfo(data,
-              unvalidatedSuperClass = None,
-              unvalidatedInterfaces = Nil, nonExistent = false)
+          if (objectClassInfo == null) {
+            objectClassInfo = new ClassInfo(data,
+                unvalidatedSuperClass = None,
+                unvalidatedInterfaces = Nil, nonExistent = false)
+          } else {
+            objectClassInfo.update(data)
+          }
 
           objectClassInfo.link()
+
           onSuccess()
         }
     }
   }
 
-  private def loadEverything(moduleInitializers: Seq[ModuleInitializer],
-      symbolRequirements: SymbolRequirement): Unit = {
-    assert(objectClassInfo != null)
-
+  private def loadFixedEntrypoints(): Unit = {
     implicit val from = fromAnalyzer
 
     /* java.lang.Object is always instantiated, because it is the
@@ -141,6 +158,10 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
 
     // External symbol requirements.
     reachSymbolRequirement(symbolRequirements)
+  }
+
+  private def loadEverything(moduleInitializers: Seq[ModuleInitializer]): Unit = {
+    implicit val from = fromAnalyzer
 
     // Reach entry points
     for (className <- infoLoader.classesWithEntryPoints())
@@ -152,6 +173,10 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
 
   private def postLoad(moduleInitializers: Seq[ModuleInitializer],
       logger: Logger): Analysis = {
+
+    _previousClassInfos.values.foreach(_.discard())
+    _previousClassInfos.clear()
+
     if (isNoModule) {
       // Check there is only a single module.
       val publicModuleIDs = (
@@ -370,10 +395,11 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
   private def lookupClassForLinking(className: ClassName,
       knownDescendants: Set[LoadingClass] = Set.empty)(
       onSuccess: LoadingResult => Unit): Unit = {
-
     _classInfos.get(className) match {
       case None =>
-        val loading = new LoadingClass(className)
+        val previous = _previousClassInfos.remove(className)
+        val loading = new LoadingClass(className, previous)
+        _classInfos(className) = loading
         loading.requestLink(knownDescendants)(onSuccess)
 
       case Some(loading: LoadingClass) =>
@@ -393,7 +419,7 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
       root: LoadingClass)
       extends LoadingResult
 
-  private final class LoadingClass(className: ClassName)
+  private final class LoadingClass(className: ClassName, previousInfo: Option[ClassInfo])
       extends ClassLoadingState {
 
     private val promise = Promise[LoadingResult]()
@@ -425,7 +451,19 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
           if (data.superClass.isEmpty) (None, classes)
           else (Some(classes.head), classes.tail)
 
-        val info = new ClassInfo(data, superClass, interfaces, nonExistent)
+        val info = previousInfo match {
+          case Some(previous) =>
+            if (nonExistent || previous.superClass != superClass || previous.interfaces != interfaces) {
+              previous.discard()
+              new ClassInfo(data, superClass, interfaces, nonExistent)
+            } else {
+              previous.update(data)
+              previous
+            }
+
+          case None =>
+            new ClassInfo(data, superClass, interfaces, nonExistent)
+        }
 
         implicit val from = FromClass(info)
         classes.foreach(_.link())
@@ -463,7 +501,9 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
   }
 
   private class ClassInfo(
-      val data: Infos.ClassInfo,
+    //      val data: Infos.ClassInfo,
+      val className: ClassName,
+      val kind: ClassKind,
       unvalidatedSuperClass: Option[ClassInfo],
       unvalidatedInterfaces: List[ClassInfo],
       val nonExistent: Boolean)
@@ -471,17 +511,13 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
 
     var linkedFrom: List[From] = Nil
 
-    val className = data.className
-    val kind = data.kind
-    val isAnyModuleClass =
-      data.kind.hasModuleAccessor || data.kind == ClassKind.NativeJSModuleClass
-    val isInterface = data.kind == ClassKind.Interface
-    val isScalaClass = data.kind.isClass || data.kind == ClassKind.HijackedClass
-    val isJSClass = data.kind.isJSClass
-    val isJSType = data.kind.isJSType
+    val isAnyModuleClass = kind.hasModuleAccessor || kind == ClassKind.NativeJSModuleClass
+    val isInterface = kind == ClassKind.Interface
+    val isScalaClass = kind.isClass || kind == ClassKind.HijackedClass
+    val isJSClass = kind.isJSClass
+    val isJSType = kind.isJSType
     val isAnyClass = isScalaClass || isJSClass
-    val isNativeJSClass =
-      kind == ClassKind.NativeJSClass || kind == ClassKind.NativeJSModuleClass
+    val isNativeJSClass = kind.isNativeJSClass
 
     // Note: j.l.Object is special and is validated upfront
 
@@ -507,6 +543,18 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
     }
 
     _classInfos(className) = this
+
+    def update(data: Infos.ClassInfo): Unit = {
+      linkedFrom = Nil  // we re-link on every run
+
+      // TODO: Update entryPoints
+
+      ???
+    }
+
+    def discard(): Unit = {
+      ???
+    }
 
     def link()(implicit from: From): Unit = {
       if (nonExistent)
