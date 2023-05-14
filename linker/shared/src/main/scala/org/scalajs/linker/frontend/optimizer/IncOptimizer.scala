@@ -112,7 +112,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   }
 
   /** Update the incremental analyzer with a new run. */
-  def update(unit: LinkingUnit, logger: Logger): List[(ClassDef, Version)] = {
+  def update(unit: LinkingUnit, logger: Logger): List[ClassDef] = {
     batchMode = objectClass == null
     logger.debug(s"Optimizer: Batch mode: $batchMode")
 
@@ -142,7 +142,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   }
 
   private def optimizedClass(linkedClass: LinkedClass,
-      tles: List[LinkedTopLevelExport]): (ClassDef, Version) = {
+      tles: List[LinkedTopLevelExport]): ClassDef = {
     val className = linkedClass.className
     val interface = getInterface(className)
 
@@ -193,7 +193,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       newTopLevelExports
     )(linkedClass.optimizerHints)(linkedClass.pos)
 
-    (classDef, linkedClass.version)
+    classDef
   }
 
   /** Incremental part: update state and detect what needs to be re-optimized.

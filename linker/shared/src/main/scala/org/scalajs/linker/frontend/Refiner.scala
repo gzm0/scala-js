@@ -48,7 +48,7 @@ final class Refiner(config: CommonPhaseConfig, checkIR: Boolean) {
     checkIR && !optimizerUsesRuntimeLong
   }
 
-  def refine(classDefs: Seq[(ClassDef, Version)],
+  def refine(classDefs: Seq[ClassDef],
       moduleInitializers: List[ModuleInitializer],
       symbolRequirements: SymbolRequirement, logger: Logger)(
       implicit ec: ExecutionContext): Future[LinkingUnit] = {
@@ -64,11 +64,10 @@ final class Refiner(config: CommonPhaseConfig, checkIR: Boolean) {
     } yield {
       val result = logger.time("Refiner: Assemble LinkedClasses") {
         val assembled = for {
-          (classDef, version) <- classDefs
+          classDef <- classDefs
           if analysis.classInfos.contains(classDef.className)
         } yield {
-          BaseLinker.linkClassDef(classDef, version,
-              syntheticMethodDefs = Nil, analysis)
+          BaseLinker.linkClassDef(classDef, syntheticMethodDefs = Nil, analysis)
         }
 
         val (linkedClassDefs, linkedTopLevelExports) = assembled.unzip
@@ -105,8 +104,8 @@ private object Refiner {
   private final class ClassDefIRLoader extends IRLoader {
     private var classesByName: Map[ClassName, ClassDef] = _
 
-    def update(classDefs: Seq[(ClassDef, Version)]): Unit = {
-      this.classesByName = classDefs.map(c => c._1.className -> c._1).toMap
+    def update(classDefs: Seq[ClassDef]): Unit = {
+      this.classesByName = classDefs.map(c => c.className -> c).toMap
     }
 
     def classesWithEntryPoints(): Iterable[ClassName] = {

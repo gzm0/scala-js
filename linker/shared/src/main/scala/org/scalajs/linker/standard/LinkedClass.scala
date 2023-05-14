@@ -66,9 +66,7 @@ final class LinkedClass(
     val dynamicDependencies: Set[ClassName],
 
     // Desugaring requirements
-    val desugaringRequirements: LinkedClass.DesugaringRequirements,
-
-    val version: Version) {
+    val desugaringRequirements: LinkedClass.DesugaringRequirements) {
 
   require(ancestors.headOption.contains(name.name),
       s"ancestors for ${name.name.nameString} must start with itself: $ancestors")

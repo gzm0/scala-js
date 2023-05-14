@@ -94,7 +94,7 @@ final class BaseLinker(config: CommonPhaseConfig, checkIR: Boolean) {
         classDef <- classDefFuture
         syntheticMethods <- syntheticMethodsFuture
       } yield {
-        BaseLinker.linkClassDef(classDef, version, syntheticMethods, analysis)
+        BaseLinker.linkClassDef(classDef, syntheticMethods, analysis)
       }
     }
 
@@ -119,8 +119,7 @@ private[frontend] object BaseLinker {
 
   /** Takes a ClassDef and DCE infos to construct a stripped down LinkedClass.
    */
-  private[frontend] def linkClassDef(classDef: ClassDef, version: Version,
-      syntheticMethodDefs: List[MethodDef],
+  private[frontend] def linkClassDef(classDef: ClassDef, syntheticMethodDefs: List[MethodDef],
       analysis: Analysis): (LinkedClass, List[LinkedTopLevelExport]) = {
     import ir.Trees._
 
@@ -197,8 +196,7 @@ private[frontend] object BaseLinker {
         staticDependencies = classInfo.staticDependencies.toSet,
         externalDependencies = classInfo.externalDependencies.toSet,
         dynamicDependencies = classInfo.dynamicDependencies.toSet,
-        desugaringRequirements,
-        version)
+        desugaringRequirements)
 
     val linkedTopLevelExports = for {
       topLevelExport <- classDef.topLevelExportDefs
