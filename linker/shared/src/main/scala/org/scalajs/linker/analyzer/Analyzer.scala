@@ -63,6 +63,8 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
   private[this] var _classInfos = mutable.Map.empty[ClassName, ClassLoadingState]
   private[this] var _previousClassInfos = mutable.Map.empty[ClassName, ClassInfo]
 
+  private[this] var _previousModuleInitializers = Set.empty[(ClassName, MethodName)]
+
   private[this] val _errors = mutable.Buffer.empty[Error]
 
   private var workQueue: WorkQueue = _
@@ -83,15 +85,16 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
 
     // Cast is checked by postLoad of previous run.
     _previousClassInfos = _classInfos.asInstanceOf[mutable.Map[ClassName, ClassInfo]]
-    _classInfos = mutable.Map.empty()
+    _classInfos = mutable.Map.empty
 
     val firstRun = objectClassInfo == null
 
     loadObjectClass { () =>
       if (firstRun)
-        loadFixedEntrypoints()
+        reachCoreEntrypoints()
 
-      loadDynamicEntrypoints(moduleInitializers)
+      reachClassEntryPoints()
+      reachInitializers(moduleInitializers)
     }
 
     workQueue.join()
@@ -105,6 +108,7 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
     _errors.clear()
     _classInfos.clear()
     _previousClassInfos.clear()
+    _previousModuleInitializers = Set.empty
     _topLevelExportInfos.clear()
   }
 
@@ -135,7 +139,7 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
     }
   }
 
-  private def loadFixedEntrypoints(): Unit = {
+  private def reachCoreEntrypoints(): Unit = {
     implicit val from = fromAnalyzer
 
     /* java.lang.Object is always instantiated, because it is the
@@ -160,20 +164,17 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
     reachSymbolRequirement(symbolRequirements)
   }
 
-  private def loadEverything(moduleInitializers: Seq[ModuleInitializer]): Unit = {
+  private def reachClassEntryPoints(): Unit = {
     implicit val from = fromAnalyzer
-
-    // Reach entry points
     for (className <- infoLoader.classesWithEntryPoints())
       lookupClass(className)(_.reachEntryPoints())
-
-    // Reach module initializers.
-    reachInitializers(moduleInitializers)
   }
 
   private def postLoad(moduleInitializers: Seq[ModuleInitializer],
       logger: Logger): Analysis = {
 
+    // TODO: This is more than just discarding:
+    // We need to process removals in a way that can deal with cycles.
     _previousClassInfos.values.foreach(_.discard())
     _previousClassInfos.clear()
 
@@ -321,26 +322,47 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
 
   private def reachInitializers(
       moduleInitializers: Seq[ModuleInitializer]): Unit = {
+
+    // Assemble methods in a set first to ensure unique From.
+    val newModuleInitializers: Set[(ClassName, MethodName)] = {
+      for (moduleInitializer <- moduleInitializers) yield {
+        import ModuleInitializerImpl._
+
+        fromInitializer(moduleInitializer.initializer) match {
+          case VoidMainMethod(className, mainMethodName) =>
+            className -> mainMethodName
+
+          case MainMethodWithArgs(className, mainMethodName, _) =>
+            className -> mainMethodName
+            /* Technically, we'd have to call
+             * `lookupClass(BoxedStringClass)(_.accessData())`
+             * for new Array[String], but this makes diffing harder and it is
+             * called anyways because String is a BoxedStringClass is a hijacked
+             * class.
+             */
+        }
+      }
+    }.toSet
+
     implicit val from = FromCore("module initializers")
 
-    for (moduleInitializer <- moduleInitializers) {
-      import ModuleInitializerImpl._
-
-      fromInitializer(moduleInitializer.initializer) match {
-        case VoidMainMethod(className, mainMethodName) =>
-          lookupClass(className) { classInfo =>
-            classInfo.callMethodStatically(MemberNamespace.PublicStatic, mainMethodName)
-          }
-
-        case MainMethodWithArgs(className, mainMethodName, _) =>
-          lookupClass(className) { classInfo =>
-            classInfo.callMethodStatically(MemberNamespace.PublicStatic, mainMethodName)
-          }
-
-          // For new Array[String]
-          lookupClass(BoxedStringClass)(_.accessData())
+    for {
+      (className, methodName) <- newModuleInitializers.diff(_previousModuleInitializers)
+    } {
+      lookupClass(className) { classInfo =>
+        classInfo.callMethodStatically(MemberNamespace.PublicStatic, methodName)
       }
     }
+
+    for {
+      (className, methodName) <- _previousModuleInitializers.diff(newModuleInitializers)
+    } {
+      lookupOldClass(className) { classInfo =>
+        classInfo.unCallMethodStatically(MemberNamespace.PublicStatic, methodName)
+      }
+    }
+
+    _previousModuleInitializers = newModuleInitializers
   }
 
   /** Reach additional class data based on reflection methods being used. */
