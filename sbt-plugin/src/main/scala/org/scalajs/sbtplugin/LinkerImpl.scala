@@ -122,7 +122,15 @@ object LinkerImpl {
        * different name.
        */
       "sun.reflect.",
-      "jdk.internal.reflect."
+      "jdk.internal.reflect.",
+      /* The yourkit runtime library for profiling.
+       * A bit of a hack to put it here, but:
+       * - Very useful
+       * - If the linker (or GCC) ever starts depending on the YourKit runtime
+       *   library, there are bigger problems.
+       */
+      "com.yourkit.runtime.",
+      "com.yourkit.probes."
     )
 
     override def loadClass(name: String, resolve: Boolean): Class[_] = {

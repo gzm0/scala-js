@@ -215,6 +215,8 @@ object MyScalaJSPlugin extends AutoPlugin {
         libDeps.filterNot(dep => blacklist.contains(dep.name))
       },
 
+      //scalaJSLinkerConfig ~= (_.withCheckIR(true)),
+
       wantSourceMaps := true,
 
       // If `enableMinifyEverywhere` is used, make sure to deactive GCC in fullLinkJS
