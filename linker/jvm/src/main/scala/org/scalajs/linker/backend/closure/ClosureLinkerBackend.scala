@@ -53,20 +53,6 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
   require(moduleKind != ModuleKind.ESModule,
       s"Cannot use module kind $moduleKind with the Closure Compiler")
 
-  private[this] val emitter = {
-    val emitterConfig = Emitter.Config(config.commonConfig.coreSpec)
-      .withJSHeader(config.jsHeader)
-      .withOptimizeBracketSelects(false)
-      .withTrackAllGlobalRefs(true)
-      .withInternalModulePattern(m => OutputPatternsImpl.moduleName(config.outputPatterns, m.id))
-
-    new Emitter(emitterConfig)
-  }
-
-  val symbolRequirements: SymbolRequirement = emitter.symbolRequirements
-
-  override def injectedIRFiles: Seq[IRFile] = emitter.injectedIRFiles
-
   private val languageMode: ClosureOptions.LanguageMode = {
     import ClosureOptions.LanguageMode._
 
@@ -84,6 +70,23 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
         throw new AssertionError(s"Unknown ES version ${esFeatures.esVersion}")
     }
   }
+
+  private[this] val transformer = new ClosureAstTransformer(
+      languageMode.toFeatureSet(), config.relativizeSourceMapBase)
+
+  private[this] val emitter: Emitter[ClosureAstTransformer.Chunk] = {
+    val emitterConfig = Emitter.Config(config.commonConfig.coreSpec)
+      .withJSHeader(config.jsHeader)
+      .withOptimizeBracketSelects(false)
+      .withTrackAllGlobalRefs(true)
+      .withInternalModulePattern(m => OutputPatternsImpl.moduleName(config.outputPatterns, m.id))
+
+    new Emitter(emitterConfig, transformer)
+  }
+
+  val symbolRequirements: SymbolRequirement = emitter.symbolRequirements
+
+  override def injectedIRFiles: Seq[IRFile] = emitter.injectedIRFiles
 
   /** Emit the given [[standard.ModuleSet ModuleSet]] to the target output.
    *
@@ -129,9 +132,8 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config)
     }
   }
 
-  private def buildChunk(topLevelTrees: List[js.Tree]): JSChunk = {
-    val root = ClosureAstTransformer.transformScript(topLevelTrees,
-        languageMode.toFeatureSet(), config.relativizeSourceMapBase)
+  private def buildChunk(topLevelTrees: List[ClosureAstTransformer.Chunk]): JSChunk = {
+    val root = transformer.transformScript(topLevelTrees)
 
     val chunk = new JSChunk("Scala.js")
     chunk.add(new CompilerInput(new SyntheticAst(root)))

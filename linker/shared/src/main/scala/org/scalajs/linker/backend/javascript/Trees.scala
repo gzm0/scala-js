@@ -499,4 +499,18 @@ object Trees {
       from: StringLiteral)(
       implicit val pos: Position)
       extends Tree
+
+  /** A transient node to store a partially transformed trees.
+   *
+   *  This is very similar to ir.Tree.Transient but does not allow for
+   *  transformation / traversal.
+   */
+  sealed case class Transformed(value: Transformed.Value) extends Tree {
+    val pos: Position = Position.NoPosition
+  }
+
+  object Transformed {
+    /** Marker trait for transformed JS Values. */
+    trait Value
+  }
 }
