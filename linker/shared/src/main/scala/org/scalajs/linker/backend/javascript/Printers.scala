@@ -66,7 +66,7 @@ object Printers {
       println()
     }
 
-    protected def printRow(ts: List[Tree], start: Char, end: Char): Unit = {
+    private def printRow(ts: List[Tree], start: Char, end: Char): Unit = {
       print(start)
       var rest = ts
       while (rest.nonEmpty) {
@@ -78,8 +78,8 @@ object Printers {
       print(end)
     }
 
-    protected def printBlock(tree: Tree): Unit = {
-      print('{'); indent();
+    private def printBlock(tree: Tree): Unit = {
+      print('{'); indent(); println()
       tree match {
         case Skip() =>
           // do not print anything
@@ -99,7 +99,7 @@ object Printers {
       undent(); println(); print('}')
     }
 
-    protected def printSig(args: List[ParamDef], restParam: Option[ParamDef]): Unit = {
+    private def printSig(args: List[ParamDef], restParam: Option[ParamDef]): Unit = {
       print("(")
       var rem = args
       while (rem.nonEmpty) {
@@ -117,13 +117,13 @@ object Printers {
       print(") ")
     }
 
-    protected def printArgs(args: List[Tree]): Unit =
+    private def printArgs(args: List[Tree]): Unit =
       printRow(args, '(', ')')
 
     protected def printStat(tree: Tree): Unit =
       printTree(tree, isStat = true)
 
-    protected def print(tree: Tree): Unit =
+    private def print(tree: Tree): Unit =
       printTree(tree, isStat = false)
 
     def printTree(tree: Tree, isStat: Boolean): Unit = {
