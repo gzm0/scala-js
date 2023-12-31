@@ -48,11 +48,32 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
     script
   }
 
-  def transformStat(tree: Tree)(implicit parentPos: Position): Node =
+  private def transformStat(tree: Tree)(implicit parentPos: Position): Node =
     innerTransformStat(tree, tree.pos orElse parentPos)
 
   private def innerTransformStat(tree: Tree, pos_in: Position): Node = {
     implicit val pos = pos_in
+
+    def newFixedPropNode(token: Token, static: Boolean, name: Ident,
+        function: Node): Node = {
+      val node = Node.newString(token, name.name)
+      node.addChildToBack(function)
+      node.setStaticMember(static)
+      node
+    }
+
+    /* This method should take a `prop: Node.Prop` parameter to factor out
+     * the `node.putBooleanProp()` that we find the three cases below. However,
+     * that is not possible because `Node.Prop` is private in `Node`. Go figure
+     * why Java allows to export as `public` the aliases
+     * `Node.COMPUTED_PROP_METHOD` et al. with a type that is not public ...
+     */
+    def newComputedPropNode(static: Boolean, nameExpr: Tree,
+        function: Node): Node = {
+      val node = new Node(Token.COMPUTED_PROP, transformExpr(nameExpr), function)
+      node.setStaticMember(static)
+      node
+    }
 
     wrapTransform(tree) {
       case VarDef(ident, optRhs) =>
@@ -172,51 +193,6 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
       case classDef: ClassDef =>
         transformClassDef(classDef)
 
-      case _ =>
-        // We just assume it is an expression
-        new Node(Token.EXPR_RESULT, transformExpr(tree))
-    }
-  }
-
-  private def transformClassDef(classDef: ClassDef)(
-      implicit pos: Position): Node = {
-    val ClassDef(className, parentClass, members) = classDef
-
-    val membersBlock = new Node(Token.CLASS_MEMBERS)
-    for (member <- members)
-      membersBlock.addChildToBack(transformClassMember(member))
-    new Node(
-        Token.CLASS,
-        className.fold(new Node(Token.EMPTY))(transformName(_)),
-        parentClass.fold(new Node(Token.EMPTY))(transformExpr(_)),
-        membersBlock)
-  }
-
-  private def transformClassMember(member: Tree): Node = {
-    implicit val pos = member.pos
-
-    def newFixedPropNode(token: Token, static: Boolean, name: Ident,
-        function: Node): Node = {
-      val node = Node.newString(token, name.name)
-      node.addChildToBack(function)
-      node.setStaticMember(static)
-      node
-    }
-
-    /* This method should take a `prop: Node.Prop` parameter to factor out
-     * the `node.putBooleanProp()` that we find the three cases below. However,
-     * that is not possible because `Node.Prop` is private in `Node`. Go figure
-     * why Java allows to export as `public` the aliases
-     * `Node.COMPUTED_PROP_METHOD` et al. with a type that is not public ...
-     */
-    def newComputedPropNode(static: Boolean, nameExpr: Tree,
-        function: Node): Node = {
-      val node = new Node(Token.COMPUTED_PROP, transformExpr(nameExpr), function)
-      node.setStaticMember(static)
-      node
-    }
-
-    wrapTransform(member) {
       case MethodDef(static, name, args, restParam, body) =>
         val function = genFunction("", args, restParam, body)
         name match {
@@ -280,12 +256,27 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
         }
 
       case _ =>
-        throw new AssertionError(
-            s"Unexpected class member tree of class ${member.getClass.getName}")
+        // We just assume it is an expression
+        new Node(Token.EXPR_RESULT, transformExpr(tree))
     }
   }
 
-  def transformExpr(tree: Tree)(implicit parentPos: Position): Node =
+  private def transformClassDef(classDef: ClassDef)(
+      implicit pos: Position): Node = {
+    val ClassDef(className, parentClass, members) = classDef
+
+    val membersBlock = new Node(Token.CLASS_MEMBERS)
+    for (node <- transformBlockStats(members))
+      membersBlock.addChildToBack(node)
+
+    new Node(
+        Token.CLASS,
+        className.fold(new Node(Token.EMPTY))(transformName(_)),
+        parentClass.fold(new Node(Token.EMPTY))(transformExpr(_)),
+        membersBlock)
+  }
+
+  private def transformExpr(tree: Tree)(implicit parentPos: Position): Node =
     innerTransformExpr(tree, tree.pos orElse parentPos)
 
   private def innerTransformExpr(tree: Tree, pos_in: Position): Node = {
@@ -406,15 +397,15 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
     new Node(Token.FUNCTION, nameNode, paramList, transformBlock(body))
   }
 
-  def transformName(ident: Ident)(implicit parentPos: Position): Node =
+  private def transformName(ident: Ident)(implicit parentPos: Position): Node =
     setNodePosition(Node.newString(Token.NAME, ident.name),
         ident.pos orElse parentPos)
 
-  def transformLabel(ident: Ident)(implicit parentPos: Position): Node =
+  private def transformLabel(ident: Ident)(implicit parentPos: Position): Node =
     setNodePosition(Node.newString(Token.LABEL_NAME, ident.name),
         ident.pos orElse parentPos)
 
-  def transformObjectLitField(name: PropertyName, value: Tree)(
+  private def transformObjectLitField(name: PropertyName, value: Tree)(
       implicit parentPos: Position): Node = {
 
     val transformedValue = transformExpr(value)
@@ -436,7 +427,7 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
     setNodePosition(node, name.pos.orElse(parentPos))
   }
 
-  def transformBlock(tree: Tree)(implicit parentPos: Position): Node = {
+  private def transformBlock(tree: Tree)(implicit parentPos: Position): Node = {
     val pos = if (tree.pos.isDefined) tree.pos else parentPos
     wrapTransform(tree) {
       case Block(stats) =>
@@ -446,14 +437,14 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
     } (pos)
   }
 
-  def transformBlock(stats: List[Tree], blockPos: Position): Node = {
+  private def transformBlock(stats: List[Tree], blockPos: Position): Node = {
     val block = new Node(Token.BLOCK)
     for (node <- transformBlockStats(stats)(blockPos))
       block.addChildToBack(node)
     block
   }
 
-  def transformBlockStats(stats: List[Tree])(
+  private def transformBlockStats(stats: List[Tree])(
       implicit parentPos: Position): List[Node] = {
 
     @inline def ctorDoc(): JSDocInfo = {
