@@ -31,9 +31,9 @@ object Trees {
   abstract sealed class Tree {
     val pos: Position
 
-    def show: String = {
+    final def show: String = {
       val writer = new ByteArrayWriter()
-      val printer = new Printers.JSTreePrinter(writer)
+      val printer = new Printers.JSTreePrinter(writer, showTransformedTreeValue = true)
       printer.printTree(this, isStat = true)
       new String(writer.toByteArray(), StandardCharsets.US_ASCII)
     }
@@ -510,7 +510,8 @@ object Trees {
   }
 
   object Transformed {
-    /** Marker trait for transformed JS Values. */
-    trait Value
+    trait Value {
+      def show: String
+    }
   }
 }

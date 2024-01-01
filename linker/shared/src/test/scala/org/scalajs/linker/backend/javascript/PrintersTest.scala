@@ -24,18 +24,23 @@ import org.scalajs.ir
 import Trees._
 
 class PrintersTest {
+  import PrintersTest.FakeTransformed
 
   private implicit val pos: ir.Position = ir.Position.NoPosition
 
   private implicit def str2ident(name: String): Ident =
     Ident(name, ir.OriginalName.NoOriginalName)
 
-  private def assertPrintEquals(expected: String, tree: Tree): Unit = {
+  private def doPrint(tree: Tree): String = {
     val out = new ByteArrayWriter
     val printer = new Printers.JSTreePrinter(out)
     printer.printStat(tree)
-    assertEquals(expected.stripMargin.trim + "\n",
-        new String(out.toByteArray(), StandardCharsets.UTF_8))
+    new String(out.toByteArray(), StandardCharsets.UTF_8)
+  }
+
+  private def assertPrintEquals(expected: String, tree: Tree): Unit = {
+    val result = doPrint(tree)
+    assertEquals(expected.stripMargin.trim + "\n", result)
   }
 
   @Test def printFunctionDef(): Unit = {
@@ -155,5 +160,30 @@ class PrintersTest {
         If(BooleanLiteral(false), IntLiteral(1),
             If(BooleanLiteral(true), IntLiteral(2), IntLiteral(3)))
     )
+  }
+
+  @Test def disallowTransformed(): Unit = {
+    assertThrows(classOf[IllegalArgumentException],
+        () => doPrint(Transformed(FakeTransformed)))
+  }
+
+  @Test def showTransformed(): Unit = {
+    val str = While(BooleanLiteral(false), Transformed(FakeTransformed)).show
+    assertEquals(
+      """
+        |while (false) {
+        |  transformed (org.scalajs.linker.backend.javascript.PrintersTest$FakeTransformed$) {
+        |show
+        |  }
+        |}
+      """.stripMargin.trim,
+      str
+    )
+  }
+}
+
+object PrintersTest {
+  object FakeTransformed extends Transformed.Value {
+    def show: String = "show"
   }
 }

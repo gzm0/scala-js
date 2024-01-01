@@ -33,7 +33,9 @@ import java.net.URI
 private[closure] object ClosureAstTransformer {
   final class Chunk private[ClosureAstTransformer] (
     private[ClosureAstTransformer] val nodes: List[Node]
-  ) extends Transformed.Value
+  ) extends Transformed.Value {
+    def show: String = nodes.toString()
+  }
 }
 
 private[closure] class ClosureAstTransformer(featureSet: FeatureSet,
