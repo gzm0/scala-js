@@ -31,9 +31,9 @@ object Trees {
   abstract sealed class Tree {
     val pos: Position
 
-    final def show: String = {
+    def show: String = {
       val writer = new ByteArrayWriter()
-      val printer = new Printers.JSTreePrinter(writer, showTransformedTreeValue = true)
+      val printer = new Printers.JSTreePrinter(writer)
       printer.printTree(this, isStat = true)
       new String(writer.toByteArray(), StandardCharsets.US_ASCII)
     }
@@ -500,18 +500,21 @@ object Trees {
       implicit val pos: Position)
       extends Tree
 
-  /** A transient node to store a partially transformed trees.
+  /** An already printed tree.
    *
-   *  This is very similar to ir.Tree.Transient but does not allow for
-   *  transformation / traversal.
+   *  This is a special purpose node to store partially transformed trees.
+   *
+   *  A cleaner abstraction would be to have something like ir.Tree.Transient
+   *  (for different output formats), but for now, we do not need this.
    */
-  sealed case class Transformed(value: Transformed.Value) extends Tree {
+  sealed case class PrintedTree(jsCode: Array[Byte],
+      sourceMapFragment: SourceMapWriter.Fragment) extends Tree {
     val pos: Position = Position.NoPosition
+
+    override def show: String = new String(jsCode, StandardCharsets.UTF_8)
   }
 
-  object Transformed {
-    trait Value {
-      def show: String
-    }
+  object PrintedTree {
+    def empty: PrintedTree = PrintedTree(Array(), SourceMapWriter.Fragment.Empty)
   }
 }

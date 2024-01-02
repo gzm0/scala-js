@@ -18,7 +18,6 @@ import org.scalajs.ir
 import ir.Position
 import ir.Position.NoPosition
 
-import org.scalajs.linker.backend.emitter.Emitter
 import org.scalajs.linker.backend.javascript.Trees._
 import org.scalajs.linker.backend.javascript.SourceFileUtil
 
@@ -31,35 +30,23 @@ import java.lang.{Double => JDouble}
 import java.net.URI
 
 private[closure] object ClosureAstTransformer {
-  final class Chunk private[ClosureAstTransformer] (
-    private[ClosureAstTransformer] val nodes: List[Node]
-  ) extends Transformed.Value {
-    def show: String = nodes.toString()
+  def transformScript(topLevelTrees: List[Tree], featureSet: FeatureSet,
+      relativizeBaseURI: Option[URI]): Node = {
+    val transformer = new ClosureAstTransformer(featureSet, relativizeBaseURI)
+    transformer.transformScript(topLevelTrees)
   }
 }
 
-private[closure] class ClosureAstTransformer(featureSet: FeatureSet,
-    relativizeBaseURI: Option[URI]) extends Emitter.PostTransformer[ClosureAstTransformer.Chunk] {
-  import ClosureAstTransformer.Chunk
-
+private class ClosureAstTransformer(featureSet: FeatureSet,
+    relativizeBaseURI: Option[URI]) {
   private val dummySourceName = new java.net.URI("virtualfile:scala.js-ir")
 
-  def transformScript(chunks: List[Chunk]): Node = {
+  def transformScript(topLevelTrees: List[Tree]): Node = {
     val script = setNodePosition(new Node(Token.SCRIPT), NoPosition)
-
-    for {
-      chunk <- chunks
-      node <- chunk.nodes
-    } {
-      script.addChildToBack(node)
-    }
-
+    transformBlockStats(topLevelTrees)(NoPosition).foreach(script.addChildToBack(_))
     script.putProp(Node.FEATURE_SET, featureSet)
     script
   }
-
-  def transformStats(trees: List[Tree], indent: Int): Chunk =
-    new Chunk(transformBlockStats(trees)(NoPosition))
 
   private def transformStat(tree: Tree)(implicit parentPos: Position): Node =
     innerTransformStat(tree, tree.pos orElse parentPos)
@@ -472,10 +459,6 @@ private[closure] class ClosureAstTransformer(featureSet: FeatureSet,
     def loop(ts: List[Tree], nextIsCtor: Boolean, acc: List[Node]): List[Node] = ts match {
       case DocComment(text) :: tss =>
         loop(tss, nextIsCtor = text.startsWith("@constructor"), acc)
-
-      case Transformed(chunk: Chunk) :: tss =>
-        assert(!nextIsCtor)
-        loop(tss, nextIsCtor = false, chunk.nodes reverse_::: acc)
 
       case t :: tss =>
         val node = transformStat(t)

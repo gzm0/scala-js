@@ -29,8 +29,6 @@ import org.scalajs.linker.standard.ModuleSet.ModuleID
 import org.scalajs.linker.backend.emitter.Emitter
 import org.scalajs.linker.backend.javascript.{ByteArrayWriter, Printers, SourceMapWriter, Trees => js}
 
-import org.scalajs.linker.backend.javascript.Printers.PrintedTree
-
 /** The basic backend for the Scala.js linker.
  *
  *  Simply emits the JavaScript without applying any further optimizations.
@@ -223,7 +221,7 @@ private object BasicLinkerBackend {
   private sealed class PrintedModuleCache {
     private var cacheUsed = false
     private var changed = false
-    private var lastPrintedTrees: List[PrintedTree] = Nil
+    private var lastPrintedTrees: List[js.PrintedTree] = Nil
 
     private var previousFinalJSFileSize: Int = 0
     private var previousFinalSourceMapSize: Int = 0
@@ -241,7 +239,7 @@ private object BasicLinkerBackend {
       previousFinalSourceMapSize = finalSourceMapSize
     }
 
-    def update(newPrintedTrees: List[PrintedTree]): Boolean = {
+    def update(newPrintedTrees: List[js.PrintedTree]): Boolean = {
       val changed = !newPrintedTrees.corresponds(lastPrintedTrees)(_ eq _)
       this.changed = changed
       if (changed) {
@@ -257,27 +255,25 @@ private object BasicLinkerBackend {
     }
   }
 
-  private object PostTransformerWithoutSourceMap extends Emitter.PostTransformer[PrintedTree] {
-    def transformStats(trees: List[js.Tree], indent: Int): PrintedTree = {
+  private object PostTransformerWithoutSourceMap extends Emitter.PostTransformer[js.PrintedTree] {
+    def transformStats(trees: List[js.Tree], indent: Int): List[js.PrintedTree] = {
       if (trees.isEmpty) {
-        // Fast path
-        Printers.emptyPrintedTree
+        Nil // Fast path
       } else {
         val jsCodeWriter = new ByteArrayWriter()
         val printer = new Printers.JSTreePrinter(jsCodeWriter, indent)
 
         trees.map(printer.printStat(_))
 
-        new PrintedTree(jsCodeWriter.toByteArray(), SourceMapWriter.Fragment.Empty)
+        js.PrintedTree(jsCodeWriter.toByteArray(), SourceMapWriter.Fragment.Empty) :: Nil
       }
     }
   }
 
-  private object PostTransformerWithSourceMap extends Emitter.PostTransformer[PrintedTree] {
-    def transformStats(trees: List[js.Tree], indent: Int): PrintedTree = {
+  private object PostTransformerWithSourceMap extends Emitter.PostTransformer[js.PrintedTree] {
+    def transformStats(trees: List[js.Tree], indent: Int): List[js.PrintedTree] = {
       if (trees.isEmpty) {
-        // Fast path
-        Printers.emptyPrintedTree
+        Nil // Fast path
       } else {
         val jsCodeWriter = new ByteArrayWriter()
         val smFragmentBuilder = new SourceMapWriter.FragmentBuilder()
@@ -286,7 +282,7 @@ private object BasicLinkerBackend {
         trees.map(printer.printStat(_))
         smFragmentBuilder.complete()
 
-        new PrintedTree(jsCodeWriter.toByteArray(), smFragmentBuilder.result())
+        js.PrintedTree(jsCodeWriter.toByteArray(), smFragmentBuilder.result()) :: Nil
       }
     }
   }

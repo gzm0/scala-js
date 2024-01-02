@@ -33,8 +33,7 @@ import Trees._
 object Printers {
   private val ReusableIndentArray = Array.fill(128)(' '.toByte)
 
-  class JSTreePrinter(protected val out: ByteArrayWriter,
-      initIndent: Int = 0, showTransformedTreeValue: Boolean = false) {
+  class JSTreePrinter(protected val out: ByteArrayWriter, initIndent: Int = 0) {
     private final val IndentStep = 2
 
     private var indentMargin = initIndent * IndentStep
@@ -121,9 +120,9 @@ object Printers {
 
     /** Prints a stat including leading indent and trailing newline. */
     final def printStat(tree: Tree): Unit = tree match {
-      case Transformed(printedTree: PrintedTree) =>
-        // printedTree already contains indent and trailing newline.
-        print(printedTree)
+      case tree: PrintedTree =>
+        // PrintedTree already contains indent and trailing newline.
+        print(tree)
 
       case _ =>
         printIndent()
@@ -752,11 +751,6 @@ object Printers {
           print(from: Tree)
           print(';')
 
-        case Transformed(value) if showTransformedTreeValue =>
-          print(s"transformed (${value.getClass.getName}) {"); println()
-          print(value.show); println();
-          printIndent(); print("}")
-
         case _ =>
           throw new IllegalArgumentException(
               s"Unexpected tree of class ${tree.getClass.getName} at ${tree.pos}")
@@ -852,12 +846,4 @@ object Printers {
     }
   }
 
-  final class PrintedTree(
-    val jsCode: Array[Byte],
-    val sourceMapFragment: SourceMapWriter.Fragment
-  ) extends Transformed.Value {
-    def show: String = new String(jsCode, StandardCharsets.UTF_8)
-  }
-
-  val emptyPrintedTree = new PrintedTree(Array(), SourceMapWriter.Fragment.Empty)
 }

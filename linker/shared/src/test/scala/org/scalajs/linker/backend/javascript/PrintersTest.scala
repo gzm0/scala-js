@@ -14,7 +14,7 @@ package org.scalajs.linker.backend.javascript
 
 import scala.language.implicitConversions
 
-import java.nio.charset.StandardCharsets
+import java.nio.charset.StandardCharsets.UTF_8
 
 import org.junit.Test
 import org.junit.Assert._
@@ -24,23 +24,17 @@ import org.scalajs.ir
 import Trees._
 
 class PrintersTest {
-  import PrintersTest.FakeTransformed
-
   private implicit val pos: ir.Position = ir.Position.NoPosition
 
   private implicit def str2ident(name: String): Ident =
     Ident(name, ir.OriginalName.NoOriginalName)
 
-  private def doPrint(tree: Tree): String = {
+  private def assertPrintEquals(expected: String, tree: Tree): Unit = {
     val out = new ByteArrayWriter
     val printer = new Printers.JSTreePrinter(out)
     printer.printStat(tree)
-    new String(out.toByteArray(), StandardCharsets.UTF_8)
-  }
-
-  private def assertPrintEquals(expected: String, tree: Tree): Unit = {
-    val result = doPrint(tree)
-    assertEquals(expected.stripMargin.trim + "\n", result)
+    assertEquals(expected.stripMargin.trim + "\n",
+        new String(out.toByteArray(), UTF_8))
   }
 
   @Test def printFunctionDef(): Unit = {
@@ -162,28 +156,23 @@ class PrintersTest {
     )
   }
 
-  @Test def disallowTransformed(): Unit = {
-    assertThrows(classOf[IllegalArgumentException],
-        () => doPrint(Transformed(FakeTransformed)))
+  @Test def showPrintedTree(): Unit = {
+    val tree = PrintedTree("test".getBytes(UTF_8), SourceMapWriter.Fragment.Empty)
+
+    assertEquals("test", tree.show)
   }
 
-  @Test def showTransformed(): Unit = {
-    val str = While(BooleanLiteral(false), Transformed(FakeTransformed)).show
+  @Test def showNestedPrintedTree(): Unit = {
+    val tree = PrintedTree("  test\n".getBytes(UTF_8), SourceMapWriter.Fragment.Empty)
+
+    val str = While(BooleanLiteral(false), tree).show
     assertEquals(
       """
         |while (false) {
-        |  transformed (org.scalajs.linker.backend.javascript.PrintersTest$FakeTransformed$) {
-        |show
-        |  }
+        |  test
         |}
       """.stripMargin.trim,
       str
     )
-  }
-}
-
-object PrintersTest {
-  object FakeTransformed extends Transformed.Value {
-    def show: String = "show"
   }
 }
