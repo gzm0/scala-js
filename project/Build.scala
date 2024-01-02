@@ -2690,4 +2690,13 @@ object Build {
       jUnitRuntime, testBridge % "test"
   )
 
+  lazy val memProfile = project
+    .dependsOn(linker.v2_12, testAdapter.v2_12)
+    .enablePlugins(BuildInfoPlugin)
+    .settings(
+      fork := true,
+      javaOptions += "-agentpath:/home/tos/opt/yourkit/bin/linux-x86-64/libyjpagent.so=disablestacktelemetry,exceptions=disable,alloceach=20,allocsizelimit=4096",
+      buildInfoPackage := "buildinfo",
+      buildInfoKeys := Seq[BuildInfoKey]((fullClasspath in testSuite.v2_12 in Test)),
+  )
 }
