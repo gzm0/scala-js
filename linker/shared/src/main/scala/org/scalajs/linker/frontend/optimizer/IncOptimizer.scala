@@ -16,6 +16,7 @@ import scala.annotation.{switch, tailrec}
 
 import scala.collection.mutable
 
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 import org.scalajs.ir._
@@ -65,7 +66,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   private var batchMode: Boolean = false
 
   private var objectClass: Class = _
-  private val classes = collOps.emptyMap[ClassName, Class]
+  private val classes = new ConcurrentHashMap[ClassName, Class]
   private val interfaces = collOps.emptyParMap[ClassName, InterfaceType]
   private val topLevelExports = new JSTopLevelMethodContainer
 
@@ -110,16 +111,21 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     val className = linkedClass.className
     val interface = getInterface(className)
 
-    val publicContainer = classes.get(className).getOrElse {
-      /* For interfaces, we need to look at default methods.
-       * For other kinds of classes, the public namespace is necessarily
-       * empty.
-       */
-      val container = interface.staticLike(MemberNamespace.Public)
-      assert(
-          linkedClass.kind == ClassKind.Interface || container.methods.isEmpty,
-          linkedClass.className -> linkedClass.kind)
-      container
+    val publicContainer = {
+      val clazz = classes.get(className)
+      if (clazz != null) {
+        clazz
+      } else {
+        /* For interfaces, we need to look at default methods.
+         * For other kinds of classes, the public namespace is necessarily
+         * empty.
+         */
+        val container = interface.staticLike(MemberNamespace.Public)
+        assert(
+            linkedClass.kind == ClassKind.Interface || container.methods.isEmpty,
+            linkedClass.className -> linkedClass.kind)
+        container
+      }
     }
 
     val newMethods = for (m <- linkedClass.methods) yield {
@@ -244,7 +250,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       linkedClass.superClass.fold[Unit] {
         assert(batchMode, "Trying to add java.lang.Object in incremental mode")
         objectClass = new Class(None, linkedClass)
-        classes += linkedClass.className -> objectClass
+        classes.put(linkedClass.className, objectClass)
       } { superClassName =>
         collOps.acc(newChildrenByParent, superClassName.name, linkedClass)
       }
@@ -258,7 +264,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       objectClass.walkForAdditions(getNewChildren)
     } else {
       val existingParents =
-        collOps.parFlatMapKeys(newChildrenByParent)(classes.get)
+        collOps.parFlatMapKeys(newChildrenByParent)(n => Option(classes.get(n)))
       collOps.foreach(existingParents) { parent =>
         parent.walkForAdditions(getNewChildren)
       }
@@ -293,7 +299,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     def isGetter(classAndMethodName: (ClassName, MethodName)): Boolean = {
       val (className, methodName) = classAndMethodName
-      classes(className).lookupMethod(methodName).exists { m =>
+      classes.get(className).lookupMethod(methodName).exists { m =>
         m.originalDef.body match {
           case Some(Select(This(), _)) => true
           case _                          => false
@@ -307,7 +313,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      * - Initialize `elidableConstructorsRemainingDependenciesCount` for `DependentOn` classes
      * - Initialize the stack with dependency-free classes
      */
-    for (cls <- classes.valuesIterator) {
+    classes.forEachValue(Long.MaxValue, { cls =>
       cls.elidableConstructorsInfo match {
         case DependentOn(deps, getterDeps) =>
           if (!getterDeps.forall(isGetter(_))) {
@@ -318,7 +324,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
               toProcessStack += cls
             } else {
               cls.elidableConstructorsRemainingDependenciesCount = deps.size
-              deps.foreach(dep => classes(dep).elidableConstructorsDependents += cls)
+              deps.foreach(dep => classes.get(dep).elidableConstructorsDependents += cls)
             }
           }
         case AcyclicElidable =>
@@ -326,7 +332,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
         case NotElidable =>
           ()
       }
-    }
+    })
 
     /* Propagate AcyclicElidable
      * When a class `cls` is on the stack, it is known to be AcyclicElidable.
@@ -358,9 +364,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     }
 
     // Set the final value of hasElidableConstructors
-    for (cls <- classes.valuesIterator) {
-      cls.setHasElidableConstructors()
-    }
+    classes.forEachValue(1, _.setHasElidableConstructors())
   }
 
   /** Optimizer part: process all methods that need reoptimizing.
@@ -493,7 +497,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     /** True if *all* constructors of this class are recursively elidable. */
     private var hasElidableConstructors: Boolean =
       elidableConstructorsInfo != ElidableConstructorsInfo.NotElidable // initial educated guess
-    private val hasElidableConstructorsAskers = collOps.emptyMap[Processable, Unit]
+    private val hasElidableConstructorsAskers = new ConcurrentHashMap[Processable, Unit]
 
     var fields: List[AnyFieldDef] = linkedClass.fields
     var fieldsRead: Set[FieldName] = linkedClass.fieldsRead
@@ -504,7 +508,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      */
     private var inlineableFieldBodies: OptimizerCore.InlineableFieldBodies =
       computeInlineableFieldBodies(linkedClass)
-    private val inlineableFieldBodiesAskers = collOps.emptyMap[Processable, Unit]
+    private val inlineableFieldBodiesAskers = new ConcurrentHashMap[Processable, Unit]
 
     setupAfterCreation(linkedClass)
 
@@ -548,7 +552,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
         notInstantiatedAnymore()
       for (method <- methods.values)
         method.delete()
-      classes -= className
+      classes.remove(className)
       /* Note: no need to tag methods that call *statically* one of the methods
        * of the deleted classes, since they've got to be invalidated by
        * themselves.
@@ -633,7 +637,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       val newInlineableFieldBodies = computeInlineableFieldBodies(linkedClass)
       if (inlineableFieldBodies != newInlineableFieldBodies) {
         inlineableFieldBodies = newInlineableFieldBodies
-        inlineableFieldBodiesAskers.keysIterator.foreach(_.tag())
+        inlineableFieldBodiesAskers.forEachKey(1, _.tag())
         inlineableFieldBodiesAskers.clear()
       }
 
@@ -657,7 +661,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
       if (hasElidableConstructors != newHasElidableConstructors) {
         hasElidableConstructors = newHasElidableConstructors
-        hasElidableConstructorsAskers.keysIterator.foreach(_.tag())
+        hasElidableConstructorsAskers.forEachKey(1, _.tag())
         hasElidableConstructorsAskers.clear()
       }
 
@@ -676,7 +680,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       collOps.foreach(getNewChildren(className)) { linkedClass =>
         val cls = new Class(Some(this), linkedClass)
         collOps.add(subclassAcc, cls)
-        classes += linkedClass.className -> cls
+        classes.put(linkedClass.className, cls)
         cls.walkForAdditions(getNewChildren)
       }
 
@@ -888,7 +892,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
         // Mixin constructor -- test whether its body is entirely empty
         case ApplyStatically(flags, This(), className, methodName, Nil)
-            if !flags.isPrivate && !classes.contains(className) =>
+            if !flags.isPrivate && !classes.containsKey(className) =>
           // Since className is not in classes, it must be a default method call.
           val container =
             getInterface(className).staticLike(MemberNamespace.Public)
@@ -1025,7 +1029,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
           // Mixin constructor -- assume it is empty
           case ApplyStatically(flags, This(), className, methodName, Nil)
-              if !flags.isPrivate && !classes.contains(className) =>
+              if !flags.isPrivate && !classes.containsKey(className) =>
             fieldBodies
 
           // Delegation to another constructor
@@ -1221,21 +1225,21 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     val className: ClassName = linkedClass.className
 
-    private type MethodCallers = collOps.Map[MethodName, collOps.Map[Processable, Unit]]
+    private type MethodCallers = ConcurrentHashMap[MethodName, ConcurrentHashMap[Processable, Unit]]
 
-    private val ancestorsAskers = collOps.emptyMap[Processable, Unit]
-    private val dynamicCallers: MethodCallers = collOps.emptyMap
+    private val ancestorsAskers = new ConcurrentHashMap[Processable, Unit]
+    private val dynamicCallers: MethodCallers = new ConcurrentHashMap
 
     // ArrayBuffer to avoid need for ClassTag[collOps.Map[_, _]]
     private val staticCallers =
-      mutable.ArrayBuffer.fill[MethodCallers](MemberNamespace.Count)(collOps.emptyMap)
+      mutable.ArrayBuffer.fill[MethodCallers](MemberNamespace.Count)(new ConcurrentHashMap)
 
-    private val jsNativeImportsAskers = collOps.emptyMap[Processable, Unit]
-    private val fieldsReadAskers = collOps.emptyMap[Processable, Unit]
+    private val jsNativeImportsAskers = new ConcurrentHashMap[Processable, Unit]
+    private val fieldsReadAskers = new ConcurrentHashMap[Processable, Unit]
 
     private var _ancestors: List[ClassName] = linkedClass.ancestors
 
-    private val _instantiatedSubclasses = collOps.emptyMap[Class, Unit]
+    private val _instantiatedSubclasses = new ConcurrentHashMap[Class, Unit]
 
     private val staticLikes: Array[StaticLikeNamespace] = {
       Array.tabulate(MemberNamespace.Count) { ord =>
@@ -1285,25 +1289,37 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     def askDynamicCallTargets(methodName: MethodName,
         asker: Processable): List[MethodImpl] = {
       dynamicCallers
-        .getOrElseUpdate(methodName, collOps.emptyMap)
+        .computeIfAbsent(methodName, _ => new ConcurrentHashMap)
         .put(asker, ())
       asker.registerTo(this)
-      _instantiatedSubclasses.keys.flatMap(_.lookupMethod(methodName)).toList
+      val res = mutable.Set.empty[MethodImpl]
+      //val res = mutable.Buffer.empty[MethodImpl]
+
+      _instantiatedSubclasses.forEachKey(Long.MaxValue,
+          _.lookupMethod(methodName).foreach(res += _))
+
+      res.toList
     }
 
     /** PROCESS PASS ONLY. */
     def askStaticCallTarget(namespace: MemberNamespace, methodName: MethodName,
         asker: Processable): MethodImpl = {
       staticCallers(namespace.ordinal)
-        .getOrElseUpdate(methodName, collOps.emptyMap)
+        .computeIfAbsent(methodName, _ => new ConcurrentHashMap)
         .put(asker, ())
       asker.registerTo(this)
 
       def inStaticsLike = staticLike(namespace)
 
-      val container =
-        if (namespace != MemberNamespace.Public) inStaticsLike
-        else classes.getOrElse(className, inStaticsLike)
+      val container = {
+        if (namespace != MemberNamespace.Public) {
+          inStaticsLike
+        } else {
+          val clazz = classes.get(className)
+          if (clazz == null) inStaticsLike
+          else clazz
+        }
+      }
 
       // Method must exist, otherwise it's a bug / invalid IR.
       container.lookupMethod(methodName).getOrElse {
@@ -1317,7 +1333,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     /** UPDATE PASS ONLY. */
     def removeInstantiatedSubclass(x: Class): Unit =
-      _instantiatedSubclasses -= x
+      _instantiatedSubclasses.remove(x)
 
     /** PROCESS PASS ONLY. */
     def askAncestors(asker: Processable): List[ClassName] = {
@@ -1368,7 +1384,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       // Update ancestors
       if (linkedClass.ancestors != _ancestors) {
         _ancestors = linkedClass.ancestors
-        ancestorsAskers.keysIterator.foreach(_.tag())
+        ancestorsAskers.forEachKey(1, _.tag())
         ancestorsAskers.clear()
       }
 
@@ -1376,7 +1392,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       val newJSNativeImports = computeJSNativeImports(linkedClass)
       if (jsNativeImports != newJSNativeImports) {
         jsNativeImports = newJSNativeImports
-        jsNativeImportsAskers.keysIterator.foreach(_.tag())
+        jsNativeImportsAskers.forEachKey(1, _.tag())
         jsNativeImportsAskers.clear()
       }
 
@@ -1385,7 +1401,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
           staticFieldsRead != linkedClass.staticFieldsRead) {
         fieldsRead = linkedClass.fieldsRead
         staticFieldsRead = linkedClass.staticFieldsRead
-        fieldsReadAskers.keysIterator.foreach(_.tag())
+        fieldsReadAskers.forEachKey(1, _.tag())
         fieldsReadAskers.clear()
       }
 
@@ -1412,8 +1428,9 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      *  UPDATE PASS ONLY.
      */
     def tagDynamicCallersOf(methodName: MethodName): Unit = {
-      dynamicCallers.remove(methodName)
-        .foreach(_.keysIterator.foreach(_.tag()))
+      val callers = dynamicCallers.remove(methodName)
+      if (callers != null)
+        callers.forEachKey(1, _.tag())
     }
 
     /** Tag the static-callers of an instance method.
@@ -1421,15 +1438,16 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      */
     def tagStaticCallersOf(namespace: MemberNamespace,
         methodName: MethodName): Unit = {
-      staticCallers(namespace.ordinal).remove(methodName)
-        .foreach(_.keysIterator.foreach(_.tag()))
+      val callers = staticCallers(namespace.ordinal).remove(methodName)
+      if (callers != null)
+        callers.forEachKey(1, _.tag())
     }
 
     /** UPDATE PASS ONLY. */
     def unregisterDependee(dependee: Processable): Unit = {
       ancestorsAskers.remove(dependee)
-      dynamicCallers.valuesIterator.foreach(_.remove(dependee))
-      staticCallers.foreach(_.valuesIterator.foreach(_.remove(dependee)))
+      dynamicCallers.forEachValue(1, _.remove(dependee))
+      staticCallers.foreach(_.forEachValue(1, _.remove(dependee)))
       jsNativeImportsAskers.remove(dependee)
     }
 
@@ -1468,7 +1486,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   private abstract class Processable {
     type Def >: scala.Null <: VersionedMemberDef
 
-    private[this] val registeredTo = collOps.emptyMap[Unregisterable, Unit]
+    private[this] val registeredTo = new ConcurrentHashMap[Unregisterable, Unit]
     private[this] val tagged = new AtomicBoolean(false)
     private[this] var _deleted: Boolean = false
 
@@ -1510,7 +1528,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     }
 
     private def unregisterFromEverywhere(): Unit = {
-      registeredTo.keysIterator.foreach(_.unregisterDependee(this))
+      registeredTo.forEachKey(1, _.unregisterDependee(this))
       registeredTo.clear()
     }
 
@@ -1560,7 +1578,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     type Def = MethodDef
 
-    private val bodyAskers = collOps.emptyMap[Processable, Unit]
+    private val bodyAskers = new ConcurrentHashMap[Processable, Unit]
 
     var attributes: OptimizerCore.MethodAttributes = _
 
@@ -1578,7 +1596,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     /** UPDATE PASS ONLY. */
     def tagBodyAskers(): Unit = {
-      bodyAskers.keysIterator.foreach(_.tag())
+      bodyAskers.forEachKey(1, _.tag())
       bodyAskers.clear()
     }
 
@@ -1741,14 +1759,17 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       getInterface(intfName).askAncestors(asker)
 
     protected def hasElidableConstructors(className: ClassName): Boolean =
-      classes(className).askHasElidableConstructors(asker)
+      classes.get(className).askHasElidableConstructors(asker)
 
-    protected def inlineableFieldBodies(className: ClassName): OptimizerCore.InlineableFieldBodies =
-      classes.get(className).fold(OptimizerCore.InlineableFieldBodies.Empty)(_.askInlineableFieldBodies(asker))
+    protected def inlineableFieldBodies(className: ClassName): OptimizerCore.InlineableFieldBodies = {
+      val clazz = classes.get(className)
+      if (clazz == null) OptimizerCore.InlineableFieldBodies.Empty
+      else clazz.askInlineableFieldBodies(asker)
+    }
 
     protected def tryNewInlineableClass(
         className: ClassName): Option[OptimizerCore.InlineableClassStructure] = {
-      classes(className).tryNewInlineable
+      classes.get(className).tryNewInlineable
     }
 
     protected def getJSNativeImportOf(

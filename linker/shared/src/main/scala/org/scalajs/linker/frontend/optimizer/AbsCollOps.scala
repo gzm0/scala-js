@@ -17,14 +17,12 @@ import language.higherKinds
 import scala.collection.mutable
 
 private[optimizer] trait AbsCollOps {
-  type Map[K, V] <: mutable.Map[K, V]
   type ParMap[K, V] <: AnyRef
   type AccMap[K, V] <: AnyRef
   type ParIterable[V] <: AnyRef
   type Addable[V] <: AnyRef
 
   def emptyAccMap[K, V]: AccMap[K, V]
-  def emptyMap[K, V]: Map[K, V]
   def emptyParMap[K, V]: ParMap[K, V]
   def emptyParIterable[V]: ParIterable[V]
   def emptyAddable[V]: Addable[V]

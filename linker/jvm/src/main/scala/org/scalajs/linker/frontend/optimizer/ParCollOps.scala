@@ -19,16 +19,15 @@ import scala.collection.parallel.mutable.{ParTrieMap, ParArray}
 import scala.collection.parallel._
 
 import java.util.concurrent.atomic._
+import java.util.concurrent.ConcurrentHashMap
 
 private[optimizer] object ParCollOps extends AbsCollOps {
-  type Map[K, V] = TrieMap[K, V]
   type ParMap[K, V] = ParTrieMap[K, V]
-  type AccMap[K, V] = TrieMap[K, Addable[V]]
+  type AccMap[K, V] = ConcurrentHashMap[K, Addable[V]]
   type ParIterable[V] = ParArray[V]
   type Addable[V] = AtomicReference[List[V]]
 
-  def emptyAccMap[K, V]: AccMap[K, V] = TrieMap.empty
-  def emptyMap[K, V]: Map[K, V] = TrieMap.empty
+  def emptyAccMap[K, V]: AccMap[K, V] = new ConcurrentHashMap
   def emptyParMap[K, V]: ParMap[K, V] =  ParTrieMap.empty
   def emptyParIterable[V]: ParIterable[V] = ParArray.empty
   def emptyAddable[V]: Addable[V] = new AtomicReference[List[V]](Nil)
@@ -52,13 +51,20 @@ private[optimizer] object ParCollOps extends AbsCollOps {
 
   // Operations on AccMap
   def acc[K, V](map: AccMap[K, V], k: K, v: V): Unit =
-    add(map.getOrElseUpdate(k, emptyAddable), v)
+    add(map.computeIfAbsent(k, _ => emptyAddable[V]), v)
 
-  def getAcc[K, V](map: AccMap[K, V], k: K): ParIterable[V] =
-    map.get(k).fold(emptyParIterable[V])(finishAdd(_))
+  def getAcc[K, V](map: AccMap[K, V], k: K): ParIterable[V] = {
+    val v = map.get(k)
+    if (v == null) emptyParIterable
+    else finishAdd(v)
+  }
 
-  def parFlatMapKeys[A, B](map: AccMap[A, _])(f: A => Option[B]): ParIterable[B] =
-    map.keys.flatMap(f(_)).toParArray
+  def parFlatMapKeys[A, B](map: AccMap[A, _])(f: A => Option[B]): ParIterable[B] = {
+    val b = scala.collection.mutable.Set.empty[B]
+    //val b = ParArray.newBuilder[B]
+    map.forEachKey(Long.MaxValue, k => f(k).foreach(b += _))
+    b.toParArray //result()
+  }
 
   // Operations on ParIterable
   def prepAdd[V](it: ParIterable[V]): Addable[V] =
