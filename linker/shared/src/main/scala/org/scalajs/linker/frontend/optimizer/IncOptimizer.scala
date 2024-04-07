@@ -16,7 +16,8 @@ import scala.annotation.{switch, tailrec}
 
 import scala.collection.mutable
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.Vector
+import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicBoolean
 
 import org.scalajs.ir._
@@ -80,7 +81,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   private val interfaces = new ConcurrentHashMap[ClassName, InterfaceType]
   private val topLevelExports = new JSTopLevelMethodContainer
 
-  private var methodsToProcess = collOps.emptyAddable[Processable]
+  private val methodsToProcess = new Vector[Processable]
 
   @inline
   private def getInterface(className: ClassName): InterfaceType =
@@ -235,8 +236,8 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
        *
        * Non-batch mode only.
        */
-      val objectClassStillExists =
-        objectClass.walkClassesForDeletions(className => Option(neededClasses.get(className)))
+      val objectClassStillExists = ForkJoinPool.commonPool()
+        .invoke(new WalkClassForDeletions(objectClass, neededClasses))
       assert(objectClassStillExists, "Uh oh, java.lang.Object was deleted!")
 
       /* Class changes:
@@ -246,7 +247,8 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
        *
        * Non-batch mode only.
        */
-      objectClass.walkForChanges(neededClasses.remove(_), Set.empty)
+      ForkJoinPool.commonPool()
+        .invoke(new WalkClassForChanges(objectClass, neededClasses, Set.empty))
     }
 
     /* Class additions:
@@ -255,7 +257,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      */
 
     // Group children by (immediate) parent
-    val newChildrenByParent = new ConcurrentHashMap[ClassName, collOps.Addable[LinkedClass]]
+    val newChildrenByParent = new ConcurrentHashMap[ClassName, List[LinkedClass]]
 
     neededClasses.forEachValue(collOps.parThreshold, { linkedClass =>
       linkedClass.superClass.fold[Unit] {
@@ -263,27 +265,19 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
         objectClass = new Class(None, linkedClass)
         classes.put(linkedClass.className, objectClass)
       } { superClassName =>
-        val addable = newChildrenByParent
-          .computeIfAbsent(superClassName.name, _ => collOps.emptyAddable)
-
-        collOps.add(addable, linkedClass)
+        newChildrenByParent.compute(superClassName.name,
+          (_, v) => linkedClass :: (if (v != null) v else Nil))
       }
     })
 
-    val getNewChildren = { (name: ClassName) =>
-      val acc = newChildrenByParent.get(name)
-      if (acc == null) collOps.emptyParIterable[LinkedClass]
-      else collOps.finishAdd(acc)
-    }
-
     // Walk the tree to add children
     if (batchMode) {
-      objectClass.walkForAdditions(getNewChildren)
+      objectClass.walkForAdditions(newChildrenByParent)
     } else {
       newChildrenByParent.forEachKey(1, { parentName =>
         val parent = classes.get(parentName)
         if (parent != null)
-          parent.walkForAdditions(getNewChildren)
+          parent.walkForAdditions(newChildrenByParent)
       })
     }
 
@@ -388,12 +382,11 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
    *  PROCESS PASS ONLY. (This IS the process pass).
    */
   private def processAllTaggedMethods(logger: Logger): Unit = {
-    val methods = collOps.finishAdd(methodsToProcess)
-    methodsToProcess = collOps.emptyAddable
-
-    val count = collOps.count(methods)(!_.deleted)
+    val count = methodsToProcess.stream().filter(!_.deleted).count()
     logger.debug(s"Optimizer: Optimizing $count methods.")
-    collOps.foreach(methods)(_.process())
+
+    methodsToProcess.parallelStream().forEach(_.process())
+    methodsToProcess.clear()
   }
 
   /** Base class for [[IncOptimizer.Class]] and
@@ -502,7 +495,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       parentChain.reverse
 
     var interfaces: Set[InterfaceType] = linkedClass.ancestors.map(getInterface).toSet
-    var subclasses: collOps.ParIterable[Class] = collOps.emptyParIterable
+    var subclasses: List[Class] = Nil
     var isInstantiated: Boolean = linkedClass.hasInstances
 
     // Temporary information used to eventually derive `hasElidableConstructors`
@@ -532,35 +525,10 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     override def toString(): String =
       className.nameString
 
-    /** Walk the class hierarchy tree for deletions.
-     *  This includes "deleting" classes that were previously instantiated but
-     *  are no more.
-     *  UPDATE PASS ONLY. Not concurrency safe on same instance.
-     */
-    def walkClassesForDeletions(
-        getLinkedClassIfNeeded: ClassName => Option[LinkedClass]): Boolean = {
-      def sameSuperClass(linkedClass: LinkedClass): Boolean =
-        superClass.map(_.className) == linkedClass.superClass.map(_.name)
-
-      getLinkedClassIfNeeded(className) match {
-        case Some(linkedClass) if sameSuperClass(linkedClass) =>
-          // Class still exists. Recurse.
-          subclasses = collOps.filter(subclasses)(
-              _.walkClassesForDeletions(getLinkedClassIfNeeded))
-          if (isInstantiated && !linkedClass.hasInstances)
-            notInstantiatedAnymore()
-          true
-        case _ =>
-          // Class does not exist or has been moved. Delete the entire subtree.
-          deleteSubtree()
-          false
-      }
-    }
-
     /** Delete this class and all its subclasses. UPDATE PASS ONLY. */
     def deleteSubtree(): Unit = {
       delete()
-      collOps.foreach(subclasses)(_.deleteSubtree())
+      subclasses.foreach(_.deleteSubtree())
     }
 
     /** UPDATE PASS ONLY. */
@@ -587,11 +555,8 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       }
     }
 
-    /** UPDATE PASS ONLY. */
-    def walkForChanges(getLinkedClass: ClassName => LinkedClass,
-        parentMethodAttributeChanges: Set[MethodName]): Unit = {
-
-      val linkedClass = getLinkedClass(className)
+    def updateWith(linkedClass: LinkedClass,
+        parentMethodAttributeChanges: Set[MethodName]): Set[MethodName] = {
 
       val (addedMethods, changedMethods, deletedMethods) =
         updateWith(linkedClass)
@@ -664,10 +629,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
           myInterface.tagStaticCallersOf(namespace, method.methodName)
       }
 
-      // Recurse in subclasses
-      collOps.foreach(subclasses) { cls =>
-        cls.walkForChanges(getLinkedClass, methodAttributeChanges)
-      }
+      methodAttributeChanges
     }
 
     /** ELIDABLE CTORS PASS ONLY. */
@@ -689,19 +651,14 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     }
 
     /** UPDATE PASS ONLY. */
-    def walkForAdditions(
-        getNewChildren: ClassName => collOps.ParIterable[LinkedClass]): Unit = {
+    def walkForAdditions(newChildrenByParent: ConcurrentHashMap[ClassName, List[LinkedClass]]): Unit = {
+      val children = newChildrenByParent.get(className)
 
-      val subclassAcc = collOps.prepAdd(subclasses)
-
-      collOps.foreach(getNewChildren(className)) { linkedClass =>
-        val cls = new Class(Some(this), linkedClass)
-        collOps.add(subclassAcc, cls)
-        classes.put(linkedClass.className, cls)
-        cls.walkForAdditions(getNewChildren)
+      if (children != null) {
+        val tasks = children.map(new AddClassAndWalk(this, _, newChildrenByParent))
+        ForkJoinTask.invokeAll(tasks:_*)
+        subclasses :::= tasks.map(_.join())
       }
-
-      subclasses = collOps.finishAdd(subclassAcc)
     }
 
     def askHasElidableConstructors(asker: Processable): Boolean = {
@@ -1104,6 +1061,67 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     def unregisterDependee(dependee: Processable): Unit = {
       hasElidableConstructorsAskers.remove(dependee)
       inlineableFieldBodiesAskers.remove(dependee)
+    }
+  }
+
+  /** Walk the class hierarchy tree for deletions.
+   *  This includes "deleting" classes that were previously instantiated but
+   *  are no more.
+   *  UPDATE PASS ONLY. Not concurrency safe on same instance.
+   */
+  private final class WalkClassForDeletions(
+      private val clazz: Class, neededClasses: ConcurrentHashMap[ClassName, LinkedClass])
+      extends RecursiveTask[Boolean] {
+
+    protected def compute(): Boolean = {
+      val linkedClass = neededClasses.get(clazz.className)
+
+      val stillExists = {
+        linkedClass != null &&
+        // check super class is the same.
+        clazz.superClass.map(_.className) == linkedClass.superClass.map(_.name)
+      }
+
+      if (stillExists) {
+        // Recurse.
+        val tasks = clazz.subclasses.map(new WalkClassForDeletions(_, neededClasses))
+        ForkJoinTask.invokeAll(tasks :_*)
+        clazz.subclasses = tasks.withFilter(_.join()).map(_.clazz)
+
+        if (clazz.isInstantiated && !linkedClass.hasInstances)
+          clazz.notInstantiatedAnymore()
+      } else {
+        // Class does not exist or has been moved. Delete the entire subtree.
+        clazz.deleteSubtree()
+      }
+
+      stillExists
+    }
+  }
+
+  private final class WalkClassForChanges(
+      clazz: Class, neededClasses: ConcurrentHashMap[ClassName, LinkedClass],
+      parentMethodAttributeChanges: Set[MethodName]) extends RecursiveAction {
+
+    protected def compute(): Unit = {
+      val linkedClass = neededClasses.remove(clazz.className)
+
+      val methodAttributeChanges = clazz.updateWith(linkedClass, parentMethodAttributeChanges)
+
+      val subtasks = clazz.subclasses.map(new WalkClassForChanges(_, neededClasses, methodAttributeChanges))
+      ForkJoinTask.invokeAll(subtasks:_*)
+    }
+  }
+
+  private final class AddClassAndWalk(
+      parent: Class, linkedClass: LinkedClass,
+      newChildrenByParent: ConcurrentHashMap[ClassName, List[LinkedClass]]
+  ) extends RecursiveTask[Class] {
+    protected def compute(): Class = {
+      val cls = new Class(Some(parent), linkedClass)
+      classes.put(linkedClass.className, cls)
+      cls.walkForAdditions(newChildrenByParent)
+      cls
     }
   }
 
@@ -1558,7 +1576,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      */
     final def tag(): Unit = {
       if (protectTag()) {
-        collOps.add(methodsToProcess, this)
+        methodsToProcess.add(this)
         unregisterFromEverywhere()
       }
     }
