@@ -3251,11 +3251,6 @@ private class FunctionEmitter private (
 
   private def genTransient(tree: Transient): Type = {
     tree.value match {
-      case Transients.CheckNotNull(expr) =>
-        genTreeAuto(expr)
-        genAsNonNullOrNPEFor(expr)
-        tree.tpe
-
       case Transients.Cast(expr, tpe) =>
         genCast(expr, tpe, tree.pos)
 

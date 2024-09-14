@@ -1044,7 +1044,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
                 IsInstanceOf(rec(expr), testType)
 
               case AsInstanceOf(expr, tpe)
-                  if noExtractYet || semantics.asInstanceOfs == Unchecked =>
+                  if noExtractYet || (semantics.asInstanceOfs == Unchecked && semantics.nullPointers == CheckedBehavior.Unchecked) =>
                 AsInstanceOf(rec(expr), tpe)
 
               case NewArray(tpe, lengths) =>
@@ -1097,8 +1097,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
               case Transient(ObjectClassName(obj)) =>
                 Transient(ObjectClassName(rec(obj)))
 
-              case Transient(CheckNotNull(obj)) if noExtractYet =>
-                Transient(CheckNotNull(rec(obj)))
               case Transient(NativeArrayWrapper(elemClass, nativeArray)) if noExtractYet =>
                 val newNativeArray = rec(nativeArray)
                 val newElemClass = rec(elemClass)
@@ -1336,8 +1334,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
           allowSideEffects && args.forall(test)
 
         // Transients with side effects.
-        case Transient(CheckNotNull(obj)) =>
-          allowSideEffects && test(obj)
         case Transient(TypedArrayToArray(expr, primRef)) =>
           allowSideEffects && test(expr) // may TypeError
 
@@ -1349,7 +1345,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
 
         // Casts
         case AsInstanceOf(expr, _) =>
-          allowBehavior(semantics.asInstanceOfs) && test(expr)
+          allowBehavior(semantics.asInstanceOfs) && allowBehavior(semantics.nullPointers) && test(expr)
 
         // JavaScript expressions that can always have side-effects
         case SelectJSNativeMember(_, _) =>
@@ -1821,11 +1817,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
             }
           }
 
-        case Transient(CheckNotNull(obj)) =>
-          unnest(obj) { (newObj, env) =>
-            redo(Transient(CheckNotNull(newObj)))(env)
-          }
-
         case Transient(Cast(expr, tpe)) =>
           unnest(expr) { (newExpr, env) =>
             redo(Transient(Cast(newExpr, tpe)))(env)
@@ -2237,6 +2228,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
               if (receiver.tpe == CharType)
                 transformExpr(receiver, preserveChar = true)
               else
+                // TODO: Remove checkNotNull
                 transformExpr(AsInstanceOf(checkNotNull(receiver), CharType), preserveChar = true)
             } else {
               /* For other primitive types, unboxes/casts are not necessary,
@@ -2702,7 +2694,15 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
           genIsInstanceOf(transformExprNoChar(expr), testType)
 
         case AsInstanceOf(expr, tpe) =>
-          extractWithGlobals(genAsInstanceOf(transformExprNoChar(expr), tpe))
+          val texpr = transformExprNoChar(expr)
+
+          if (expr.tpe == tpe || expr.tpe == tpe.toNonNullable) {
+            texpr
+          } else if (expr.tpe.toNonNullable == tpe) {
+            genCheckNotNull(texpr)
+          } else {
+            extractWithGlobals(genAsInstanceOf(texpr, tpe))
+          }
 
         case GetClass(expr) =>
           genCallHelper(VarField.objectGetClass, transformExprNoChar(expr))
@@ -2761,9 +2761,6 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
               genCheckNotNull(newExpr))
 
         // Transients
-
-        case Transient(CheckNotNull(obj)) =>
-          genCallHelper(VarField.n, transformExpr(obj, preserveChar = true))
 
         case Transient(Cast(expr, tpe)) =>
           val newExpr = transformExpr(expr, preserveChar = true)
@@ -3208,7 +3205,7 @@ private[emitter] class FunctionEmitter(sjsGen: SJSGen) {
       if (semantics.nullPointers == CheckedBehavior.Unchecked || !tree.tpe.isNullable)
         tree
       else
-        Transient(CheckNotNull(tree))
+        AsInstanceOf(tree, tree.tpe.toNonNullable)
     }
 
     private def transformParamDef(paramDef: ParamDef): js.ParamDef =

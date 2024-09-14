@@ -708,8 +708,7 @@ private final class ClassDefChecker(classDef: ClassDef,
       case AsInstanceOf(expr, tpe) =>
         checkTree(expr, env)
         tpe match {
-          case NoType | NullType | NothingType | AnyNotNullType |
-              ClassType(_, false) | ArrayType(_, false) | _:RecordType =>
+          case NoType | NullType | NothingType | _:RecordType =>
             reportError(i"$tpe is not a valid target type for AsInstanceOf")
           case tpe: ArrayType =>
             checkArrayType(tpe)

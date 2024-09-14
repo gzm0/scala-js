@@ -514,6 +514,9 @@ private[emitter] final class SJSGen(
         case ClassType(_, true) | ArrayType(_, true) | AnyType =>
           wg(expr)
 
+        case ClassType(_, false) | ArrayType(_, false) | AnyNotNullType =>
+          wg(genCheckNotNull(expr))
+
         case UndefType                     => wg(Block(expr, Undefined()))
         case BooleanType                   => wg(!(!expr))
         case CharType                      => wg(genCallHelper(VarField.uC, expr))
@@ -526,19 +529,31 @@ private[emitter] final class SJSGen(
           if (semantics.strictFloats) genCallPolyfillableBuiltin(FroundBuiltin, expr)
           else wg(UnaryOp(irt.JSUnaryOp.+, expr))
 
-        case NoType | NullType | NothingType | AnyNotNullType |
-            ClassType(_, false) | ArrayType(_, false) | _:RecordType =>
+        case NoType | NullType | NothingType | _:RecordType =>
           throw new AssertionError(s"Unexpected type $tpe in genAsInstanceOf")
       }
     } else {
       val resultTree = tpe match {
         case ClassType(ObjectClass, true) =>
           expr
-        case ClassType(className, true) =>
-          Apply(globalVar(VarField.as, className), List(expr))
 
-        case ArrayType(ArrayTypeRef(base, depth), true) =>
-          Apply(typeRefVar(VarField.asArrayOf, base), List(expr, IntLiteral(depth)))
+        case ClassType(ObjectClass, false) | AnyNotNullType =>
+          genCheckNotNull(expr)
+
+        case ClassType(className, nullable) =>
+          val checkedExpr =
+            if (nullable) expr
+            else genCheckNotNull(expr)
+
+          Apply(globalVar(VarField.as, className), List(checkedExpr))
+
+        case ArrayType(ArrayTypeRef(base, depth), nullable) =>
+          val checkedExpr =
+            if (nullable) expr
+            else genCheckNotNull(expr)
+
+          Apply(typeRefVar(VarField.asArrayOf, base),
+              List(checkedExpr, IntLiteral(depth)))
 
         case UndefType   => genCallHelper(VarField.uV, expr)
         case BooleanType => genCallHelper(VarField.uZ, expr)
@@ -552,8 +567,7 @@ private[emitter] final class SJSGen(
         case StringType  => genCallHelper(VarField.uT, expr)
         case AnyType     => expr
 
-        case NoType | NullType | NothingType | AnyNotNullType |
-            ClassType(_, false) | ArrayType(_, false) | _:RecordType =>
+        case NoType | NullType | NothingType | _:RecordType =>
           throw new AssertionError(s"Unexpected type $tpe in genAsInstanceOf")
       }
 

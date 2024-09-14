@@ -5266,8 +5266,7 @@ private[optimizer] abstract class OptimizerCore(
     } else if (semantics.nullPointers == CheckedBehavior.Unchecked) {
       foldCast(texpr, texpr.tpe.base.toNonNullable)
     } else {
-      PreTransTree(Transient(CheckNotNull(finishTransformExpr(texpr))),
-          texpr.tpe.toNonNullable)
+      PreTransTree(asNonNull(finishTransformExpr(texpr)))
     }
   }
 
@@ -5277,21 +5276,26 @@ private[optimizer] abstract class OptimizerCore(
     else if (semantics.nullPointers == CheckedBehavior.Unchecked)
       makeCast(expr, expr.tpe.toNonNullable)
     else
-      Transient(CheckNotNull(expr))
+      asNonNull(expr)
   }
 
   private def checkNotNullStatement(texpr: PreTransform)(implicit pos: Position): Tree = {
     if (!texpr.tpe.isNullable || semantics.nullPointers == CheckedBehavior.Unchecked)
       finishTransformStat(texpr)
     else
-      Transient(CheckNotNull(finishTransformExpr(texpr)))
+      asNonNull(finishTransformExpr(texpr))
   }
 
   private def checkNotNullStatement(expr: Tree)(implicit pos: Position): Tree = {
     if (!expr.tpe.isNullable || semantics.nullPointers == CheckedBehavior.Unchecked)
       keepOnlySideEffects(expr)
     else
-      Transient(CheckNotNull(expr))
+      asNonNull(expr)
+  }
+
+  private def asNonNull(expr: Tree)(implicit pos: Position): Tree = {
+    assert(semantics.nullPointers != CheckedBehavior.Unchecked)
+    AsInstanceOf(expr, expr.tpe.toNonNullable)
   }
 
   private def newParamReplacement(paramDef: ParamDef): ((LocalName, LocalDef), ParamDef) = {
