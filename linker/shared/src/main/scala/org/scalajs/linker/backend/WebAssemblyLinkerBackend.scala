@@ -23,6 +23,7 @@ import org.scalajs.linker._
 import org.scalajs.linker.interface._
 import org.scalajs.linker.interface.unstable._
 import org.scalajs.linker.standard._
+import org.scalajs.linker.standard.ModuleSet.ModuleID
 
 import org.scalajs.linker.backend.javascript.{ByteArrayWriter, SourceMapWriter}
 import org.scalajs.linker.backend.webassembly._
@@ -59,36 +60,41 @@ final class WebAssemblyLinkerBackend(config: LinkerBackendImpl.Config)
 
   def emit(moduleSet: ModuleSet, output: OutputDirectory, logger: Logger)(
       implicit ec: ExecutionContext): Future[Report] = {
-    moduleSet.modules match {
-      case Nil =>
-        val outputImpl = OutputDirectoryImpl.fromOutputDirectory(output)
-        for {
-          currentFilesList <- outputImpl.listFiles()
-          _ <- Future.traverse(currentFilesList) { f =>
-            outputImpl.delete(f)
-          }
-        } yield new ReportImpl(Nil)
-      case onlyModule :: Nil =>
-        emit(onlyModule, moduleSet.globalInfo, output, logger)
-      case modules =>
-        throw new UnsupportedOperationException(
-            "The WebAssembly backend does not support multiple modules. Found: " +
-            modules.map(_.id.id).mkString(", "))
+    val emitterResult = emitter.emit(moduleSet, logger)
+
+    val writerInputs = if (emitterResult.body.isEmpty) {
+      Iterator.empty
+    } else {
+      val loaderInput = OutputWriter.OneFile(
+          loaderJSFileName, true, () => ByteBuffer.wrap(emitterResult.loaderContent))
+
+      Iterator.single(loaderInput) ++ emitterResult.body.iterator.flatMap {
+        case (moduleID, emitterModule) => moduleOutput(moduleID, emitterModule)
+      }
+    }
+
+    for {
+      _ <- OutputWriter.write(writerInputs, output, config.maxConcurrentWrites,
+          skipContentCheck = false)
+    } yield {
+      LinkerBackendImpl.report(
+        moduleSet,
+        ModuleKind.ESModule,
+        config.outputPatterns,
+        madeSourceMap = false // JS file never has a sourcemap, only WASM
+      )
     }
   }
 
-  private def emit(onlyModule: ModuleSet.Module, globalInfo: LinkedGlobalInfo,
-      output: OutputDirectory, logger: Logger)(
-      implicit ec: ExecutionContext): Future[Report] = {
-    val moduleID = onlyModule.id.id
+  private def moduleOutput(moduleID: ModuleID,
+      emitterModule: Emitter.Result.Module): Iterator[OutputWriter.Input] = {
 
-    val emitterResult = emitter.emit(onlyModule, globalInfo, logger)
-    val wasmModule = emitterResult.wasmModule
+    val wasmModule = emitterModule.wasmModule
 
-    val watFileName = s"$moduleID.wat"
-    val wasmFileName = s"$moduleID.wasm"
+    val watFileName = s"${moduleID.id}.wat"
+    val wasmFileName = s"${moduleID.id}.wasm"
     val sourceMapFileName = s"$wasmFileName.map"
-    val jsFileName = OutputPatternsImpl.jsFile(config.outputPatterns, moduleID)
+    val jsFileName = OutputPatternsImpl.jsFile(config.outputPatterns, moduleID.id)
 
     import OutputWriter.{OneFile, TwoFiles}
 
@@ -126,23 +132,8 @@ final class WebAssemblyLinkerBackend(config: LinkerBackendImpl.Config)
           () => BinaryWriter.write(wasmModule, emitDebugInfo))
     }
 
-    val loaderInput =
-      OneFile(loaderJSFileName, true, () => ByteBuffer.wrap(emitterResult.loaderContent))
+    val jsFileInput = OneFile(jsFileName, true, () => ByteBuffer.wrap(emitterModule.jsFileContent))
 
-    val jsFileInput = OneFile(jsFileName, true, () => ByteBuffer.wrap(emitterResult.jsFileContent))
-
-    val writerInputs = maybeWat ++ Iterator(mainInput, loaderInput, jsFileInput)
-
-    val reportModule = new ReportImpl.ModuleImpl(
-      moduleID,
-      jsFileName,
-      None,
-      coreSpec.moduleKind
-    )
-
-    val report = new ReportImpl(List(reportModule))
-
-    OutputWriter.write(writerInputs, output, config.maxConcurrentWrites,
-        skipContentCheck = false).map(_ => report)
+    maybeWat ++ Iterator(mainInput, jsFileInput)
   }
 }
