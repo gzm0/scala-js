@@ -105,6 +105,9 @@ private[optimizer] abstract class OptimizerCore(
   /** Returns true if the given static field is ever read. */
   protected def isStaticFieldRead(fieldName: FieldName): Boolean
 
+  /** Whether the given class is a JS type */
+  protected def isJSType(className: ClassName): Boolean
+
   private val localNameAllocator = new FreshNameAllocator.Local
 
   /** An allocated local variable name is mutable iff it belongs to this set. */
@@ -2778,12 +2781,21 @@ private[optimizer] abstract class OptimizerCore(
 
     @inline def StringClassType = ClassType(BoxedStringClass, nullable = true)
 
-    def cursoryArrayElemType(tpe: ArrayType): Type = {
-      if (tpe.arrayTypeRef.dimensions != 1) AnyType
-      else (tpe.arrayTypeRef.base match {
-        case PrimRef(elemType) => elemType
-        case ClassRef(_)       => AnyType
-      })
+    def arrayElemType(tpe: ArrayType): Type = {
+      val ArrayTypeRef(base, dimensions) = tpe.arrayTypeRef
+
+      if (dimensions == 1) {
+        base match {
+          case PrimRef(elemType)     => elemType
+          case ClassRef(ObjectClass) => AnyType
+
+          case ClassRef(className) =>
+            if (isJSType(className)) AnyType
+            else ClassType(className, nullable = true)
+        }
+      } else {
+        ArrayType(ArrayTypeRef(base, dimensions - 1), nullable = true)
+      }
     }
 
     def longToInt(longExpr: Tree): Tree =
@@ -2855,7 +2867,7 @@ private[optimizer] abstract class OptimizerCore(
              * code path, the semantics of `ArraySelect` are equivalent to the
              * intrinsic.
              */
-            val elemType = cursoryArrayElemType(arrayTpe)
+            val elemType = arrayElemType(arrayTpe)
             if (!tarray.tpe.isNullable) {
               val array = finishTransformExpr(tarray)
               val index = finishTransformExpr(tindex)
@@ -2879,7 +2891,7 @@ private[optimizer] abstract class OptimizerCore(
             /* Rewrite to `tarray[index] = tvalue` as an `Assign(ArraySelect, _)`.
              * See `ArrayApply` above for the handling of a nullable `tarray`.
              */
-            val elemType = cursoryArrayElemType(arrayTpe)
+            val elemType = arrayElemType(arrayTpe)
             if (!tarray.tpe.isNullable) {
               val array = finishTransformExpr(tarray)
               val index = finishTransformExpr(tindex)
