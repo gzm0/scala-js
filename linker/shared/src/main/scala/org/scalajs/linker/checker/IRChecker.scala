@@ -253,7 +253,37 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter) {
               _:JSSuperSelect | _:JSGlobalRef =>
         }
         typecheckExpr(lhs, env)
-        typecheckExpect(rhs, env, lhs.tpe)
+
+        val expectedRhsTpe = lhs match {
+          case ArraySelect(array, _) =>
+            /* Array assignments are unsound due to covariance of arrays
+             * To maintain the subtyping relationship in the IR, we have to
+             * allow assignments of any type to
+             * - Array[Object] (that's expected)
+             * - and its subtypes (that's not expected)
+             */
+
+            array.tpe match {
+              case ArrayType(ArrayTypeRef(PrimRef(tpe), 1), _) => tpe
+
+              case _: ArrayType =>
+                /* Subtype of Array[Object]
+                 * Recall: `Array[Array[A]] <: Array[Object]` even for primitive `A`
+                 * Allow any rhs.
+                 */
+                AnyType
+
+              case _ =>
+                /* I'll typed IR, typecheck of lhs above will emit an error.
+                 * Allow any rhs to avoid further unnecessary errors.
+                 */
+                AnyType
+            }
+
+          case _ => lhs.tpe
+        }
+
+        typecheckExpect(rhs, env, expectedRhsTpe)
 
       case Return(expr, label) =>
         val returnType = env.returnTypes(label.name)
@@ -508,7 +538,7 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter) {
         array.tpe match {
           case NullType => // will NPE, but allowed.
           case arrayType: ArrayType =>
-            if (tree.tpe != arrayElemType(arrayType))
+            if (!isSubtype(arrayElemType(arrayType), tree.tpe))
               reportError(i"Array select of array type $arrayType typed as ${tree.tpe}")
           case arrayType =>
             reportError(i"Array type expected but $arrayType found")

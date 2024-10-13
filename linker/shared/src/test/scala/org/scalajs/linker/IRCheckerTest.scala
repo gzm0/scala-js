@@ -267,6 +267,24 @@ class IRCheckerTest {
     testLinkNoIRError(classDefs, MainTestModuleInitializers)
   }
 
+  @Test
+  def arrayAssignCovariant(): AsyncResult = await {
+    val classDefs = Seq(
+      classDef("Foo", superClass = Some(ObjectClass)),
+      mainTestClassDef(
+        Assign(
+          ArraySelect(
+            ArrayValue(ArrayTypeRef.of(ClassRef("Foo")), Nil),
+            int(1)
+          )(ClassType("Foo", true)),
+          int(1) // not a Foo, but OK.
+        )
+      )
+    )
+
+    testLinkNoIRError(classDefs, MainTestModuleInitializers)
+  }
+
 }
 
 object IRCheckerTest {
