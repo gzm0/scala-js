@@ -478,9 +478,10 @@ private[optimizer] abstract class OptimizerCore(
             }.getOrElse(default)
             transform(body, isStat)
           case _ =>
+            val newTpe = if (isStat) NoType else tree.tpe
             Match(newSelector,
-                cases map (c => (c._1, transform(c._2, isStat))),
-                transform(default, isStat))(tree.tpe)
+                cases.map(c => (c._1, transform(c._2, isStat))),
+                transform(default, isStat))(newTpe)
         }
 
       // Scala expressions
