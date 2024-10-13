@@ -539,7 +539,7 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter,
         array.tpe match {
           case NullType => // will NPE, but allowed.
           case arrayType: ArrayType =>
-            if (!isSubtype(arrayElemType(arrayType), tree.tpe))
+            if (tree.tpe != arrayElemType(arrayType))
               reportError(i"Array select of array type $arrayType typed as ${tree.tpe}")
           case arrayType =>
             reportError(i"Array type expected but $arrayType found")
