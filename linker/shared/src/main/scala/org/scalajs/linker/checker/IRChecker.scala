@@ -255,9 +255,17 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter,
             } {
               reportError(i"Assignment to immutable static field $name.")
             }
+          case RecordSelect(record, SimpleFieldIdent(fieldName)) =>
+            record.tpe match {
+              case RecordType(fields) =>
+                if (fields.find(_.name == fieldName).exists(!_.mutable))
+                  reportError(i"assignment to immutable record field $fieldName")
 
-          case _:VarRef | _:ArraySelect | _:RecordSelect | _:JSSelect |
-              _:JSSuperSelect | _:JSGlobalRef =>
+              case _ =>
+                // ok (NothingType) or check of lhs will complain.
+            }
+
+          case _:VarRef | _:ArraySelect | _:JSSelect | _:JSSuperSelect | _:JSGlobalRef =>
         }
         typecheckExpr(lhs, env)
 
@@ -726,11 +734,32 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter,
           override def traverse(tree: Tree): Unit = typecheck(tree, env)
         })
 
-      case _: RecordSelect if postOptimizer =>
-        // TODO
+      case RecordSelect(record, SimpleFieldIdent(fieldName)) if postOptimizer =>
+        record.tpe match {
+          case NothingType => // ok
 
-      case _: RecordValue if postOptimizer =>
-        // TODO
+          case RecordType(fields) =>
+            fields.find(_.name == fieldName) match {
+              case Some(field) =>
+                if (tree.tpe != field.tpe)
+                  reportError(i"Record select of field type ${field.tpe} typed as ${tree.tpe}")
+
+              case None =>
+                reportError(i"Record select of non-existent field: $fieldName")
+            }
+
+          case tpe =>
+            reportError(i"Record type expected but $tpe found")
+        }
+
+      case RecordValue(RecordType(fields), elems) if postOptimizer =>
+        if (fields.size == elems.size) {
+          for ((field, tree) <- fields.zip(elems))
+            typecheckExpect(tree, env, field.tpe)
+        } else {
+          reportError("Mismatched size for record fields / elements: " +
+            i"${fields.size} fields vs ${elems.size} elements")
+        }
 
       case _:RecordSelect | _:RecordValue | _:Transient | _:JSSuperConstructorCall =>
         reportError("invalid tree")

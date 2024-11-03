@@ -350,6 +350,83 @@ class IRCheckerTest {
     testLinkNoIRError(classDefs, MainTestModuleInitializers, postOptimizer = true)
   }
 
+  @Test
+  def badRecordSelect(): AsyncResult = await {
+    val recordValue = RecordValue(
+      RecordType(List(
+        RecordType.Field("i", NON, IntType, false),
+        RecordType.Field("s", NON, StringType, false),
+      )),
+      List(int(1), str("foo")),
+    )
+
+    val classDefs = Seq(
+      mainTestClassDef(Block(
+        RecordSelect(recordValue, "i")(StringType),
+        RecordSelect(recordValue, "x")(StringType),
+      ))
+    )
+
+    for {
+      log <- testLinkIRErrors(classDefs, MainTestModuleInitializers, postOptimizer = true)
+    } yield {
+      log.assertContainsError("Record select of field type int typed as string")
+      log.assertContainsError("Record select of non-existent field: x")
+    }
+  }
+
+  @Test
+  def badRecordValue(): AsyncResult = await {
+    val recordValue = RecordValue(
+      RecordType(List(
+        RecordType.Field("i", NON, IntType, false),
+        RecordType.Field("s", NON, StringType, false),
+      )),
+      List(int(1), str("foo")),
+    )
+
+    val classDefs = Seq(
+      mainTestClassDef(Block(
+        RecordValue(RecordType(Nil), List(int(1))),
+        RecordValue(
+            RecordType(List(RecordType.Field("i", NON, IntType, false))),
+            List(str("foo")),
+        )
+      ))
+    )
+
+    for {
+      log <- testLinkIRErrors(classDefs, MainTestModuleInitializers, postOptimizer = true)
+    } yield {
+      log.assertContainsError("Mismatched size for record fields / elements: 0 fields vs 1 elements")
+      log.assertContainsError("int expected but string found")
+    }
+  }
+
+  @Test
+  def badRecordAssign(): AsyncResult = await {
+    val classDefs = Seq(
+      mainTestClassDef({
+        Assign(
+            RecordSelect(
+                RecordValue(
+                    RecordType(List(RecordType.Field("i", NON, IntType, false))),
+                    List(int(1))
+                ),
+                "i"
+            )(IntType),
+            int(1)
+        )
+      })
+    )
+
+    for {
+      log <- testLinkIRErrors(classDefs, MainTestModuleInitializers, postOptimizer = true)
+    } yield {
+      log.assertContainsError("assignment to immutable record field i")
+    }
+  }
+
 }
 
 object IRCheckerTest {
