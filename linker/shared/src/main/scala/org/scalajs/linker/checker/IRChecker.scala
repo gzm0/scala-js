@@ -227,25 +227,17 @@ private final class IRChecker(unit: LinkingUnit, reporter: ErrorReporter,
 
       case Assign(lhs, rhs) =>
         def checkNonStaticField(receiver: Tree, name: FieldName): Unit = {
-          val fieldClassName = name.className
-
-          def allowWriteImmutable = env.inConstructorOf match {
-            case Some(`fieldClassName`) =>
-              // ctors can write immutable fields of the class they are constructing.
-              true
-
-            case Some(ctorClassName) if postOptimizer =>
-              // postOptimizer, due to ctor inlining, we may write immutable parent class fields as well.
-              lookupClass(ctorClassName).ancestors.contains(fieldClassName)
-
-            case _ => false
-          }
-
           receiver match {
-            case This() if allowWriteImmutable =>
-              // ok
+            case This() if postOptimizer && env.inConstructorOf.isDefined ||
+                env.inConstructorOf == Some(name.className) =>
+              /* ctors can write immutable fields of the class they are constructing.
+               * postOptimizer, due to ctor inlining, we may write immutable parent class fields as well.
+               * IR checking of the lhs makes sure this field is actually in the parent class chain
+               * (otherwise `This` would be ill-typed).
+               */
+
             case _ =>
-              if (lookupClass(fieldClassName).lookupField(name).exists(!_.flags.isMutable))
+              if (lookupClass(name.className).lookupField(name).exists(!_.flags.isMutable))
                 reportError(i"Assignment to immutable field $name.")
           }
         }
