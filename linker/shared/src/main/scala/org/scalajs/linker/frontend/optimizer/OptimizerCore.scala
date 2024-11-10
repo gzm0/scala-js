@@ -3612,10 +3612,9 @@ private[optimizer] abstract class OptimizerCore(
     withBinding(rtLongBinding) { (scope1, cont1) =>
       implicit val scope = scope1
       val tRef = VarRef(LocalIdent(tName))(rtLongClassType)
-      val newTree = New(LongImpl.RuntimeLongClass,
-          MethodIdent(LongImpl.initFromParts),
-          List(Apply(ApplyFlags.empty, tRef, MethodIdent(LongImpl.lo), Nil)(IntType),
-              Apply(ApplyFlags.empty, tRef, MethodIdent(LongImpl.hi), Nil)(IntType)))
+      val newTree = createNewLong(
+          Apply(ApplyFlags.empty, tRef, MethodIdent(LongImpl.lo), Nil)(IntType),
+          Apply(ApplyFlags.empty, tRef, MethodIdent(LongImpl.hi), Nil)(IntType))
       pretransformExpr(newTree)(cont1)
     } (cont)
   }
