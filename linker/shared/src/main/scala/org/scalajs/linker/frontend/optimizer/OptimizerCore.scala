@@ -272,27 +272,8 @@ private[optimizer] abstract class OptimizerCore(
 
   private val isSubclassFun = isSubclass _
 
-  private def isSubtype(lhs: Type, rhs: Type): Boolean = {
-    assert(lhs != VoidType)
-    assert(rhs != VoidType)
-
-    Types.isSubtype(lhs, rhs)(isSubclassFun) || {
-      (lhs, rhs) match {
-        case (LongType, ClassType(LongImpl.RuntimeLongClass, _)) =>
-          true
-        case (ClassType(BoxedLongClass, lhsNullable),
-            ClassType(LongImpl.RuntimeLongClass, rhsNullable)) =>
-          rhsNullable || !lhsNullable
-
-        case (ClassType(LongImpl.RuntimeLongClass, lhsNullable),
-            ClassType(BoxedLongClass, rhsNullable)) =>
-          rhsNullable || !lhsNullable
-
-        case _ =>
-          false
-      }
-    }
-  }
+  private def isSubtype(lhs: Type, rhs: Type): Boolean =
+    Types.isSubtype(lhs, rhs)(isSubclassFun)
 
   /** Transforms a statement.
    *
@@ -795,15 +776,19 @@ private[optimizer] abstract class OptimizerCore(
       def addCaptureParam(newName: LocalName): LocalDef = {
         val newOriginalName = originalNameForFresh(paramName, originalName, newName)
 
+        val isRTLong = useRuntimeLong && paramDef.ptpe == LongType
+
+        val paramTpe = if (isRTLong) LongType else tcaptureValue.tpe.base
+
         val replacement = ReplaceWithVarRef(newName, newSimpleState(Unused))
         val localDef = LocalDef(tcaptureValue.tpe, mutable, replacement)
         val localIdent = LocalIdent(newName)(ident.pos)
-        val newParamDef = ParamDef(localIdent, newOriginalName, tcaptureValue.tpe.base, mutable)(paramDef.pos)
+        val newParamDef = ParamDef(localIdent, newOriginalName, paramTpe, mutable)(paramDef.pos)
 
         /* Note that the binding will never create a fresh name for a
          * ReplaceWithVarRef. So this will not put our name alignment at risk.
          */
-        val valueBinding = Binding.temp(paramName, tcaptureValue)
+        val valueBinding = Binding.temp(paramName, if (isRTLong) foldCast(tcaptureValue, LongType) else tcaptureValue)
 
         captureParamLocalDefs += paramName -> localDef
         newCaptureParamDefsAndRepls += newParamDef -> replacement
@@ -3608,7 +3593,7 @@ private[optimizer] abstract class OptimizerCore(
     val tName = LocalName("t")
     val rtLongClassType = ClassType(LongImpl.RuntimeLongClass, nullable = false)
     val rtLongBinding = Binding.temp(tName, rtLongClassType, mutable = false,
-        value)
+        foldCast(value, rtLongClassType))
     withBinding(rtLongBinding) { (scope1, cont1) =>
       implicit val scope = scope1
       val tRef = VarRef(LocalIdent(tName))(rtLongClassType)
@@ -3626,6 +3611,9 @@ private[optimizer] abstract class OptimizerCore(
     // unfortunately nullable for the result types of methods
     def rtLongClassType = ClassType(LongImpl.RuntimeLongClass, nullable = true)
 
+    def castToRTLong(value: PreTransform) =
+      foldCast(value, rtLongClassType)
+
     def expandLongModuleOp(methodName: MethodName,
         arg: PreTransform): TailRec[Tree] = {
       import LongImpl.{RuntimeLongModuleClass => modCls}
@@ -3639,7 +3627,7 @@ private[optimizer] abstract class OptimizerCore(
 
     def expandUnaryOp(methodName: MethodName, arg: PreTransform,
         resultType: Type = rtLongClassType): TailRec[Tree] = {
-      pretransformApply(ApplyFlags.empty, arg, MethodIdent(methodName), Nil,
+      pretransformApply(ApplyFlags.empty, castToRTLong(arg), MethodIdent(methodName), Nil,
           resultType, isStat = false, usePreTransform = true)(
           cont)
     }
@@ -3647,7 +3635,7 @@ private[optimizer] abstract class OptimizerCore(
     def expandBinaryOp(methodName: MethodName, lhs: PreTransform,
         rhs: PreTransform,
         resultType: Type = rtLongClassType): TailRec[Tree] = {
-      pretransformApply(ApplyFlags.empty, lhs, MethodIdent(methodName), rhs :: Nil,
+      pretransformApply(ApplyFlags.empty, castToRTLong(lhs), MethodIdent(methodName), rhs :: Nil,
           resultType, isStat = false, usePreTransform = true)(
           cont)
     }
@@ -3661,16 +3649,16 @@ private[optimizer] abstract class OptimizerCore(
             expandLongModuleOp(LongImpl.fromInt, arg)
 
           case LongToInt =>
-            expandUnaryOp(LongImpl.toInt, arg, IntType)
+            expandUnaryOp(LongImpl.toInt, castToRTLong(arg), IntType)
 
           case LongToDouble =>
-            expandUnaryOp(LongImpl.toDouble, arg, DoubleType)
+            expandUnaryOp(LongImpl.toDouble, castToRTLong(arg), DoubleType)
 
           case DoubleToLong =>
             expandLongModuleOp(LongImpl.fromDouble, arg)
 
           case LongToFloat =>
-            expandUnaryOp(LongImpl.toFloat, arg, FloatType)
+            expandUnaryOp(LongImpl.toFloat, castToRTLong(arg), FloatType)
 
           case _ =>
             cont(pretrans)
@@ -3680,34 +3668,34 @@ private[optimizer] abstract class OptimizerCore(
         import BinaryOp._
 
         (op: @switch) match {
-          case Long_+ => expandBinaryOp(LongImpl.+, lhs, rhs)
+          case Long_+ => expandBinaryOp(LongImpl.+, lhs, castToRTLong(rhs))
 
           case Long_- =>
             lhs match {
               case PreTransLit(LongLiteral(0L)) =>
-                expandUnaryOp(LongImpl.UNARY_-, rhs)
+                expandUnaryOp(LongImpl.UNARY_-, castToRTLong(rhs))
               case _ =>
-                expandBinaryOp(LongImpl.-, lhs, rhs)
+                expandBinaryOp(LongImpl.-, lhs, castToRTLong(rhs))
             }
 
-          case Long_* => expandBinaryOp(LongImpl.*, lhs, rhs)
-          case Long_/ => expandBinaryOp(LongImpl./, lhs, rhs)
-          case Long_% => expandBinaryOp(LongImpl.%, lhs, rhs)
+          case Long_* => expandBinaryOp(LongImpl.*, lhs, castToRTLong(rhs))
+          case Long_/ => expandBinaryOp(LongImpl./, lhs, castToRTLong(rhs))
+          case Long_% => expandBinaryOp(LongImpl.%, lhs, castToRTLong(rhs))
 
-          case Long_& => expandBinaryOp(LongImpl.&, lhs, rhs)
-          case Long_| => expandBinaryOp(LongImpl.|, lhs, rhs)
-          case Long_^ => expandBinaryOp(LongImpl.^, lhs, rhs)
+          case Long_& => expandBinaryOp(LongImpl.&, lhs, castToRTLong(rhs))
+          case Long_| => expandBinaryOp(LongImpl.|, lhs, castToRTLong(rhs))
+          case Long_^ => expandBinaryOp(LongImpl.^, lhs, castToRTLong(rhs))
 
           case Long_<<  => expandBinaryOp(LongImpl.<<, lhs, rhs)
           case Long_>>> => expandBinaryOp(LongImpl.>>>, lhs, rhs)
           case Long_>>  => expandBinaryOp(LongImpl.>>, lhs, rhs)
 
-          case Long_== => expandBinaryOp(LongImpl.===, lhs, rhs)
-          case Long_!= => expandBinaryOp(LongImpl.!==, lhs, rhs)
-          case Long_<  => expandBinaryOp(LongImpl.<, lhs, rhs)
-          case Long_<= => expandBinaryOp(LongImpl.<=, lhs, rhs)
-          case Long_>  => expandBinaryOp(LongImpl.>, lhs, rhs)
-          case Long_>= => expandBinaryOp(LongImpl.>=, lhs, rhs)
+          case Long_== => expandBinaryOp(LongImpl.===, lhs, castToRTLong(rhs))
+          case Long_!= => expandBinaryOp(LongImpl.!==, lhs, castToRTLong(rhs))
+          case Long_<  => expandBinaryOp(LongImpl.<, lhs, castToRTLong(rhs))
+          case Long_<= => expandBinaryOp(LongImpl.<=, lhs, castToRTLong(rhs))
+          case Long_>  => expandBinaryOp(LongImpl.>, lhs, castToRTLong(rhs))
+          case Long_>= => expandBinaryOp(LongImpl.>=, lhs, castToRTLong(rhs))
 
           case _ =>
             cont(pretrans)
@@ -5157,7 +5145,18 @@ private[optimizer] abstract class OptimizerCore(
       }
     }
 
-    val newBody0 = transform(body, resultType == VoidType)(scope)
+    val newBody0 = {
+      if (useRuntimeLong && resultType == LongType) {
+        trampoline {
+          pretransformExpr(body) { tbody =>
+            val newBody = finishTransformExpr(foldCast(tbody, LongType)(body.pos))
+            TailCalls.done(newBody)
+          } (scope)
+        }
+      } else {
+        transform(body, resultType == VoidType)(scope)
+      }
+    }
 
     val newBody =
       if (isNoArgCtor) tryElimStoreModule(newBody0)

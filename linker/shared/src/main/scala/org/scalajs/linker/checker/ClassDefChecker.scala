@@ -35,6 +35,10 @@ private final class ClassDefChecker(classDef: ClassDef,
 
   private[this] val isJLObject = classDef.name.name == ObjectClass
 
+  if (postOptimizer && classDef.name.name == ClassName("helloworld.HelloWorld$")) {
+    println(classDef.show)
+  }
+
   private[this] val instanceThisType: Type = {
     val cls = classDef.name.name
     if (classDef.kind.isJSType)

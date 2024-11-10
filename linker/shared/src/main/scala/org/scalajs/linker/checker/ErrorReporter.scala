@@ -67,7 +67,9 @@ private[checker] object ErrorReporter {
 
     override def toString(): String = {
       val (pos, name) = nodeOrLinkedClass match {
-        case tree: IRNode             => (tree.pos, tree.getClass.getSimpleName)
+        case tree: IRNode             =>
+          println(tree.show)
+          (tree.pos, tree.getClass.getSimpleName)
         case linkedClass: LinkedClass => (linkedClass.pos, "ClassDef")
       }
       s"${pos.source}(${pos.line+1}:${pos.column+1}:$name)"
