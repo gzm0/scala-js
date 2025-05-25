@@ -391,14 +391,14 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
      *  We do not try to use the names of `JSFieldDef`s because they are
      *  `Tree`s, which are not efficiently comparable nor versionable here.
      */
-    private def computeFieldDefsVersion(linkedClass: LinkedClass): Version = {
-      val hasAnyJSField = linkedClass.fields.exists(_.isInstanceOf[JSFieldDef])
-      val hasAnyJSFieldVersion = Version.fromByte(if (hasAnyJSField) 1 else 0)
-      val scalaFieldNamesVersion = linkedClass.fields.collect {
-        case FieldDef(_, FieldIdent(name), _, _) => Version.fromUTF8String(name.simpleName.encoded)
-      }
-      Version.combine((linkedClass.version :: hasAnyJSFieldVersion :: scalaFieldNamesVersion): _*)
-    }
+    //private def computeFieldDefsVersion(linkedClass: LinkedClass): Version = {
+    //  val hasAnyJSField = linkedClass.fields.exists(_.isInstanceOf[JSFieldDef])
+    //  val hasAnyJSFieldVersion = Version.fromByte(if (hasAnyJSField) 1 else 0)
+    //  val scalaFieldNamesVersion = linkedClass.fields.collect {
+    //    case FieldDef(_, FieldIdent(name), _, _) => Version.fromUTF8String(name.simpleName.encoded)
+    //  }
+    //  Version.combine((linkedClass.version :: hasAnyJSFieldVersion :: scalaFieldNamesVersion): _*)
+    //}
 
     private def computeFieldDefs(linkedClass: LinkedClass): List[AnyFieldDef] =
       linkedClass.fields

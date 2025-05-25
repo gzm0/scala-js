@@ -101,8 +101,7 @@ final class Desugarer(config: CommonPhaseConfig, checkIR: Boolean) {
         staticDependencies,
         externalDependencies,
         dynamicDependencies,
-        LinkedClass.DesugaringRequirements.Empty,
-        version
+        LinkedClass.DesugaringRequirements.Empty
       )
     }
   }

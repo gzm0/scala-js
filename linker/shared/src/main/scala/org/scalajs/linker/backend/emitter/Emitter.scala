@@ -438,7 +438,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     /* The class version itself; it's OK to get that one as long as we don't
      * use it to *produce* trees, which we should never do anyway.
      */
-    val classVersion = linkedClass_!.version
+    val classVersion = ???
 
     val classTreeCache = extractChanged(classCache.getCache(classVersion))
 
