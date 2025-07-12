@@ -77,18 +77,14 @@ object Infos {
   final class MethodInfo private (
     val isAbstract: Boolean,
     version: Version,
-    byClass: Array[ReachabilityInfoInClass],
-    lambdaDescriptorsUsed: Array[NewLambda.Descriptor],
-    globalFlags: ReachabilityInfo.Flags,
-    referencedLinkTimeProperties: Array[(String, Type)]
-  ) extends ReachabilityInfo(version, byClass, lambdaDescriptorsUsed,
-      globalFlags, referencedLinkTimeProperties)
+    items: Array[ReachabilityInfoItem],
+    globalFlags: ReachabilityInfo.Flags
+  ) extends ReachabilityInfo(version, items, globalFlags)
 
   object MethodInfo {
     def apply(isAbstract: Boolean, reachabilityInfo: ReachabilityInfo): MethodInfo = {
       import reachabilityInfo._
-      new MethodInfo(isAbstract, version, byClass, lambdaDescriptorsUsed,
-          globalFlags, referencedLinkTimeProperties)
+      new MethodInfo(isAbstract, version, items, globalFlags)
     }
   }
 
@@ -105,10 +101,8 @@ object Infos {
      * This reduces the memory we need to cache infos between incremental runs.
      */
     val version: Version,
-    val byClass: Array[ReachabilityInfoInClass],
-    val lambdaDescriptorsUsed: Array[NewLambda.Descriptor],
-    val globalFlags: ReachabilityInfo.Flags,
-    val referencedLinkTimeProperties: Array[(String, Type)]
+    val items: Array[ReachabilityInfoItem],
+    val globalFlags: ReachabilityInfo.Flags
   )
 
   object ReachabilityInfo {
@@ -124,6 +118,16 @@ object Infos {
     final val FlagNeedsDesugaring = 1 << 7
   }
 
+  sealed trait ReachabilityInfoItem
+
+  final case class LambdaDescriptorsUsed(
+    descriptors: Array[NewLambda.Descriptor]
+  ) extends ReachabilityInfoItem
+
+  final case class ReferencedLinkTimeProperties(
+    properties: Array[(String, Type)]
+  ) extends ReachabilityInfoItem
+
   /** Things from a given class that are reached by one method. */
   final class ReachabilityInfoInClass private[Infos] (
       val className: ClassName,
@@ -134,7 +138,7 @@ object Infos {
        */
       val memberInfos: Array[MemberReachabilityInfo], // nullable!
       val flags: ReachabilityInfoInClass.Flags
-  )
+  ) extends ReachabilityInfoItem
 
   object ReachabilityInfoInClass {
     type Flags = Int
@@ -184,7 +188,6 @@ object Infos {
   ) extends MemberReachabilityInfo
 
   final class ReachabilityInfoBuilder(version: Version) {
-    import ReachabilityInfoBuilder._
     private val byClass = mutable.Map.empty[ClassName, ReachabilityInfoInClassBuilder]
     private val lambdaDescriptorsUsed = mutable.Set.empty[NewLambda.Descriptor]
     private var flags: ReachabilityInfo.Flags = 0
@@ -403,22 +406,18 @@ object Infos {
     }
 
     def result(): ReachabilityInfo = {
-      val lambdaDescriptorsUsedArray =
-        if (lambdaDescriptorsUsed.isEmpty) emptyLambdaDescriptorArray
-        else lambdaDescriptorsUsed.toArray
+      val itemsBuilder = Array.newBuilder[ReachabilityInfoItem]
 
-      val referencedLinkTimeProperties =
-        if (linkTimeProperties.isEmpty) emptyLinkTimePropertyArray
-        else linkTimeProperties.toArray
+      itemsBuilder ++= byClass.valuesIterator.map(_.result())
 
-      new ReachabilityInfo(version, byClass.valuesIterator.map(_.result()).toArray,
-          lambdaDescriptorsUsedArray, flags, referencedLinkTimeProperties)
+      if (lambdaDescriptorsUsed.nonEmpty)
+        itemsBuilder += LambdaDescriptorsUsed(lambdaDescriptorsUsed.toArray)
+
+      if (linkTimeProperties.nonEmpty)
+        itemsBuilder += ReferencedLinkTimeProperties(linkTimeProperties.toArray)
+
+      new ReachabilityInfo(version, itemsBuilder.result(), flags)
     }
-  }
-
-  object ReachabilityInfoBuilder {
-    private val emptyLinkTimePropertyArray = new Array[(String, Type)](0)
-    private val emptyLambdaDescriptorArray = new Array[NewLambda.Descriptor](0)
   }
 
   final class ReachabilityInfoInClassBuilder(val className: ClassName) {

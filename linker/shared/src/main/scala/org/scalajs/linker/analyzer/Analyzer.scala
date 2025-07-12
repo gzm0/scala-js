@@ -1422,80 +1422,87 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         moduleUnit.addStaticDependency(info.className)
     }
 
-    for (dataInClass <- data.byClass) {
-      lookupClass(dataInClass.className) { clazz =>
-        val className = dataInClass.className
+    data.items.foreach {
+      case dataInClass: ReachabilityInfoInClass =>
+        lookupClass(dataInClass.className) { clazz =>
+          val className = dataInClass.className
 
-        val flags = dataInClass.flags
-        if (flags != 0) {
-          if ((flags & ReachabilityInfoInClass.FlagModuleAccessed) != 0) {
-            clazz.accessModule()
-            addInstanceDependency(clazz)
+          val flags = dataInClass.flags
+          if (flags != 0) {
+            if ((flags & ReachabilityInfoInClass.FlagModuleAccessed) != 0) {
+              clazz.accessModule()
+              addInstanceDependency(clazz)
+            }
+
+            if ((flags & ReachabilityInfoInClass.FlagInstantiated) != 0) {
+              clazz.instantiated()
+              addInstanceDependency(clazz)
+            }
+
+            if ((flags & ReachabilityInfoInClass.FlagInstanceTestsUsed) != 0) {
+              moduleUnit.addStaticDependency(className)
+              clazz.useInstanceTests()
+            }
+
+            if ((flags & ReachabilityInfoInClass.FlagClassDataAccessed) != 0) {
+              moduleUnit.addStaticDependency(className)
+              clazz.accessData()
+            }
+
+            if ((flags & ReachabilityInfoInClass.FlagStaticallyReferenced) != 0) {
+              moduleUnit.addStaticDependency(className)
+            }
+
+            if ((flags & ReachabilityInfoInClass.FlagDynamicallyReferenced) != 0) {
+              if (isNoModule)
+                _errors ::= DynamicImportWithoutModuleSupport(from)
+              else
+                moduleUnit.addDynamicDependency(className)
+            }
           }
 
-          if ((flags & ReachabilityInfoInClass.FlagInstantiated) != 0) {
-            clazz.instantiated()
-            addInstanceDependency(clazz)
-          }
+          if (dataInClass.memberInfos != null) {
+            dataInClass.memberInfos.foreach {
+              case field: Infos.FieldReachable =>
+                clazz.reachField(field)
 
-          if ((flags & ReachabilityInfoInClass.FlagInstanceTestsUsed) != 0) {
-            moduleUnit.addStaticDependency(className)
-            clazz.useInstanceTests()
-          }
+              case Infos.StaticFieldReachable(fieldName, read, written) =>
+                if (read)
+                  clazz._staticFieldsRead.update(fieldName, ())
+                if (written)
+                  clazz._staticFieldsWritten.update(fieldName, ())
 
-          if ((flags & ReachabilityInfoInClass.FlagClassDataAccessed) != 0) {
-            moduleUnit.addStaticDependency(className)
-            clazz.accessData()
-          }
+              case Infos.MethodReachable(methodName) =>
+                clazz.callMethod(methodName)
 
-          if ((flags & ReachabilityInfoInClass.FlagStaticallyReferenced) != 0) {
-            moduleUnit.addStaticDependency(className)
-          }
+              case Infos.MethodStaticallyReachable(namespace, methodName) =>
+                clazz.callMethodStatically(namespace, methodName)
 
-          if ((flags & ReachabilityInfoInClass.FlagDynamicallyReferenced) != 0) {
-            if (isNoModule)
-              _errors ::= DynamicImportWithoutModuleSupport(from)
-            else
-              moduleUnit.addDynamicDependency(className)
+              case Infos.JSNativeMemberReachable(methodName) =>
+                clazz.useJSNativeMember(methodName).foreach(addLoadSpec(moduleUnit, _))
+            }
           }
         }
 
-        if (dataInClass.memberInfos != null) {
-          dataInClass.memberInfos.foreach {
-            case field: Infos.FieldReachable =>
-              clazz.reachField(field)
+      case Infos.LambdaDescriptorsUsed(descriptors) =>
+        for (descriptor <- descriptors) {
+          val (className, ctorName) = syntheticLambdaNamesCache.getOrElseUpdate(descriptor, {
+            (LambdaSynthesizer.makeClassName(descriptor), LambdaSynthesizer.makeConstructorName(descriptor))
+          })
 
-            case Infos.StaticFieldReachable(fieldName, read, written) =>
-              if (read)
-                clazz._staticFieldsRead.update(fieldName, ())
-              if (written)
-                clazz._staticFieldsWritten.update(fieldName, ())
-
-            case Infos.MethodReachable(methodName) =>
-              clazz.callMethod(methodName)
-
-            case Infos.MethodStaticallyReachable(namespace, methodName) =>
-              clazz.callMethodStatically(namespace, methodName)
-
-            case Infos.JSNativeMemberReachable(methodName) =>
-              clazz.useJSNativeMember(methodName).foreach(addLoadSpec(moduleUnit, _))
+          lookupOrSynthesizeClass(className, SyntheticClassKind.Lambda(descriptor)) { lambdaClassInfo =>
+            lambdaClassInfo.instantiated()
+            lambdaClassInfo.callMethodStatically(MemberNamespace.Constructor, ctorName)
+            moduleUnit.addStaticDependency(lambdaClassInfo.className)
           }
         }
-      }
-    }
 
-    if (data.lambdaDescriptorsUsed.nonEmpty) {
-      for (descriptor <- data.lambdaDescriptorsUsed) {
-        val (className, ctorName) = syntheticLambdaNamesCache.getOrElseUpdate(descriptor, {
-          (LambdaSynthesizer.makeClassName(descriptor), LambdaSynthesizer.makeConstructorName(descriptor))
-        })
-
-        lookupOrSynthesizeClass(className, SyntheticClassKind.Lambda(descriptor)) { lambdaClassInfo =>
-          lambdaClassInfo.instantiated()
-          lambdaClassInfo.callMethodStatically(MemberNamespace.Constructor, ctorName)
-          moduleUnit.addStaticDependency(lambdaClassInfo.className)
+      case Infos.ReferencedLinkTimeProperties(properties) =>
+        for ((name, tpe) <- properties) {
+          if (!linkTimeProperties.get(name).exists(_.tpe == tpe)) {
+            _errors ::= InvalidLinkTimeProperty(name, tpe, from)
+          }
         }
-      }
     }
 
     val globalFlags = data.globalFlags & ~ReachabilityInfo.FlagNeedsDesugaring
@@ -1539,14 +1546,6 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       if ((globalFlags & ReachabilityInfo.FlagUsedClassSuperClass) != 0) {
         _classSuperClassUsed.set(true)
-      }
-    }
-
-    if (data.referencedLinkTimeProperties.nonEmpty) {
-      for ((name, tpe) <- data.referencedLinkTimeProperties) {
-        if (!linkTimeProperties.get(name).exists(_.tpe == tpe)) {
-          _errors ::= InvalidLinkTimeProperty(name, tpe, from)
-        }
       }
     }
   }
