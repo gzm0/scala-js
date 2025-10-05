@@ -152,10 +152,13 @@ private[frontend] final class MethodSynthesizer(
   private def findMethodDef(classInfo: ClassInfo, methodName: MethodName)(
       implicit ec: ExecutionContext): Future[MethodDef] = {
     val classDefFuture = classInfo.syntheticKind match {
-      case None =>
+      case SyntheticClassKind.Normal =>
         inputProvider.loadClassDef(classInfo.className)
 
-      case Some(SyntheticClassKind.Lambda(descriptor)) =>
+      case SyntheticClassKind.Missing =>
+        throw new AssertionError("TODO")
+
+      case SyntheticClassKind.Lambda(descriptor) =>
         /* We are *re*-generating the full ClassDef, in addition to the
          * generation done in `BaseLinker`.
          *

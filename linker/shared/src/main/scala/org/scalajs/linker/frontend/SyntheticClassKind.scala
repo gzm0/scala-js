@@ -17,5 +17,7 @@ import org.scalajs.ir.Trees.NewLambda
 sealed abstract class SyntheticClassKind
 
 object SyntheticClassKind {
+  case object Normal extends SyntheticClassKind
+  case object Missing extends SyntheticClassKind
   final case class Lambda(descriptor: NewLambda.Descriptor) extends SyntheticClassKind
 }

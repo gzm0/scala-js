@@ -81,9 +81,11 @@ final class BaseLinker(config: CommonPhaseConfig, checkIR: Boolean) {
       analysis: Analysis)(implicit ec: ExecutionContext): Future[LinkingUnit] = {
     def assembleClass(info: ClassInfo) = {
       val (version, classDefFuture) = info.syntheticKind match {
-        case None =>
+        case SyntheticClassKind.Normal =>
           (irLoader.irFileVersion(info.className), irLoader.loadClassDef(info.className))
-        case Some(SyntheticClassKind.Lambda(descriptor)) =>
+        case SyntheticClassKind.Missing =>
+          throw new AssertionError("TODO")
+        case SyntheticClassKind.Lambda(descriptor) =>
           // Not cached; measurements suggest it takes only a few ms for all synthesized classes combined
           val classDef = LambdaSynthesizer.makeClassDef(descriptor, info.className)
           (LambdaSynthesizer.constantVersion, Future.successful(classDef))

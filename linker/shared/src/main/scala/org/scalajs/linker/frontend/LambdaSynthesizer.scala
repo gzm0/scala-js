@@ -80,7 +80,8 @@ private[linker] object LambdaSynthesizer {
    *
    *  The `className` must be the result of `makeClassName(descriptor)`.
    */
-  def makeClassInfo(descriptor: NewLambda.Descriptor, className: ClassName): ClassInfo = {
+  def makeClassInfo(syntheticKind: SyntheticClassKind.Lambda, className: ClassName): ClassInfo = {
+    val descriptor = syntheticKind.descriptor
     val methodInfos = Array.fill(MemberNamespace.Count)(Map.empty[MethodName, MethodInfo])
 
     val fFieldName = FieldName(className, fFieldSimpleName)
@@ -104,7 +105,7 @@ private[linker] object LambdaSynthesizer {
     methodInfos(MemberNamespace.Public.ordinal) =
       Map(descriptor.methodName -> implMethodInfo)
 
-    new ClassInfo(className, ClassKind.Class,
+    new ClassInfo(className, ClassKind.Class, syntheticKind,
         Some(descriptor.superClass), descriptor.interfaces,
         jsNativeLoadSpec = None, referencedFieldClasses = Map.empty, methodInfos,
         jsNativeMembers = Map.empty, jsMethodProps = Nil, topLevelExports = Nil)

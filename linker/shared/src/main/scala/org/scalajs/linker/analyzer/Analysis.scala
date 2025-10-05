@@ -58,8 +58,8 @@ object Analysis {
     def superClass: Option[ClassInfo]
     def interfaces: scala.collection.Seq[ClassInfo]
     def ancestors: scala.collection.Seq[ClassInfo]
-    def syntheticKind: Option[SyntheticClassKind]
-    def nonExistent: Boolean
+    def syntheticKind: SyntheticClassKind
+    final def nonExistent: Boolean = syntheticKind == SyntheticClassKind.Missing
     /** For a Scala class, it is instantiated with a `New`; for a JS class,
      *  its constructor is accessed with a `JSLoadConstructor` or because it
      *  is needed for a subclass. For modules (Scala or JS), the module is

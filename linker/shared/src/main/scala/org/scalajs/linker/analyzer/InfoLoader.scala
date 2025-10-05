@@ -23,7 +23,7 @@ import org.scalajs.ir.Trees._
 import org.scalajs.logging._
 
 import org.scalajs.linker.checker._
-import org.scalajs.linker.frontend.{IRLoader, LinkTimeProperties}
+import org.scalajs.linker.frontend.{IRLoader, LinkTimeProperties, SyntheticClassKind}
 import org.scalajs.linker.interface.LinkingException
 import org.scalajs.linker.CollectionsCompat.MutableMapCompatOps
 
@@ -126,7 +126,7 @@ private[analyzer] object InfoLoader {
       val jsNativeMembers = classDef.jsNativeMembers
         .map(m => m.name.name -> m.jsNativeLoadSpec).toMap
 
-      new Infos.ClassInfo(classDef.className, classDef.kind,
+      new Infos.ClassInfo(classDef.className, classDef.kind, SyntheticClassKind.Normal,
           classDef.superClass.map(_.name), classDef.interfaces.map(_.name),
           classDef.jsNativeLoadSpec, referencedFieldClasses, prevMethodInfos,
           jsNativeMembers, exportedMembers, topLevelExports)

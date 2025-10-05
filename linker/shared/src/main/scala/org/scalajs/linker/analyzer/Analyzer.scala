@@ -330,16 +330,11 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
   private def lookupClass(className: ClassName)(
       onSuccess: ClassInfo => Unit)(implicit from: From): Unit = {
-    lookupOrSynthesizeClassCommon(className, None)(onSuccess)
+    lookupOrSynthesizeClass(className, SyntheticClassKind.Normal)(onSuccess)
   }
 
-  private def lookupOrSynthesizeClass(className: ClassName, syntheticKind: SyntheticClassKind)(
-      onSuccess: ClassInfo => Unit)(implicit from: From): Unit = {
-    lookupOrSynthesizeClassCommon(className, Some(syntheticKind))(onSuccess)
-  }
-
-  private def lookupOrSynthesizeClassCommon(className: ClassName,
-      syntheticKind: Option[SyntheticClassKind])(
+  private def lookupOrSynthesizeClass(className: ClassName,
+      syntheticKind: SyntheticClassKind)(
       onSuccess: ClassInfo => Unit)(implicit from: From): Unit = {
     workTracker.track {
       classLoader.lookupClass(className, syntheticKind).map {
@@ -358,7 +353,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     private[this] val _classInfos = emptyThreadSafeMap[ClassName, ClassLoadingState]
 
     def lookupClass(className: ClassName,
-        syntheticKind: Option[SyntheticClassKind]): Future[LoadingResult] = {
+        syntheticKind: SyntheticClassKind): Future[LoadingResult] = {
       ensureLoading(className, syntheticKind) match {
         case loading: LoadingClass => loading.result
         case info: ClassInfo       => Future.successful(info)
@@ -377,14 +372,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
     private def lookupClassForLinking(className: ClassName,
         origin: LoadingClass): Future[LoadingResult] = {
-      ensureLoading(className, syntheticKind = None) match {
+      ensureLoading(className, syntheticKind = SyntheticClassKind.Normal) match {
         case loading: LoadingClass => loading.requestLink(origin)
         case info: ClassInfo       => Future.successful(info)
       }
     }
 
     private def ensureLoading(className: ClassName,
-        syntheticKind: Option[SyntheticClassKind]): ClassLoadingState = {
+        syntheticKind: SyntheticClassKind): ClassLoadingState = {
       var loading: LoadingClass = null
       val state = _classInfos.getOrElseUpdate(className, {
         loading = new LoadingClass(className)
@@ -394,18 +389,20 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       if (state eq loading) {
         // We just added `loading`, actually load.
         val result: Future[LoadingResult] = syntheticKind match {
-          case None =>
+          case SyntheticClassKind.Normal =>
             val maybeInfo = infoLoader.loadInfo(className)
             val info = maybeInfo.getOrElse {
               Future.successful(createMissingClassInfo(className))
             }
-            info.flatMap { data =>
-              doLoad(data, loading, syntheticKind, nonExistent = maybeInfo.isEmpty)
-            }
+            info.flatMap { data => doLoad(data, loading) }
 
-          case Some(SyntheticClassKind.Lambda(descriptor)) =>
-            val data = LambdaSynthesizer.makeClassInfo(descriptor, className)
-            doLoad(data, loading, syntheticKind, nonExistent = false)
+          case SyntheticClassKind.Missing =>
+            // TODO: Shouldn't happen
+            ???
+
+          case lambda: SyntheticClassKind.Lambda =>
+            val data = LambdaSynthesizer.makeClassInfo(lambda, className)
+            doLoad(data, loading)
         }
 
         loading.completeWith(result)
@@ -414,9 +411,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       state
     }
 
-    private def doLoad(data: Infos.ClassInfo, origin: LoadingClass,
-        syntheticKind: Option[SyntheticClassKind],
-        nonExistent: Boolean): Future[LoadingResult] = {
+    private def doLoad(data: Infos.ClassInfo, origin: LoadingClass): Future[LoadingResult] = {
       val className = data.className
 
       for {
@@ -440,7 +435,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
             if (data.superClass.isEmpty) (None, ancestors)
             else (Some(ancestors.head), ancestors.tail)
 
-          val info = new ClassInfo(data, superClass, interfaces, syntheticKind, nonExistent)
+          val info = new ClassInfo(data, superClass, interfaces)
 
           _classInfos.put(className, info)
 
@@ -492,9 +487,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
   private class ClassInfo(
       val data: Infos.ClassInfo,
       unvalidatedSuperClass: Option[ClassInfo],
-      unvalidatedInterfaces: List[ClassInfo],
-      val syntheticKind: Option[SyntheticClassKind],
-      val nonExistent: Boolean)
+      unvalidatedInterfaces: List[ClassInfo])
       extends Analysis.ClassInfo with ClassLoadingState with LoadingResult with ModuleUnit {
 
     private[this] val _linkedFrom = new GrowingList[From]
@@ -502,6 +495,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
     val className = data.className
     val kind = data.kind
+    val syntheticKind = data.syntheticKind
     val isAnyModuleClass =
       data.kind.hasModuleAccessor || data.kind == ClassKind.NativeJSModuleClass
     val isInterface = data.kind == ClassKind.Interface
@@ -1578,7 +1572,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         Map.empty
     }
 
-    new Infos.ClassInfo(className, ClassKind.Class,
+    new Infos.ClassInfo(className, ClassKind.Class, SyntheticClassKind.Missing,
         superClass = superClass, interfaces = Nil, jsNativeLoadSpec = None,
         referencedFieldClasses = Map.empty, methods = methods,
         jsNativeMembers = Map.empty, jsMethodProps = Nil, topLevelExports = Nil)
