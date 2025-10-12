@@ -398,7 +398,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         data <- infoFuture
         parentsResult <- loadParentChain(className, data)
       } yield parentsResult match {
-        case Left(parents) =>
+        case Some(parents) =>
           val (superClass, interfaces) =
             if (data.superClass.isEmpty) (None, parents)
             else (Some(parents.head), parents.tail)
@@ -410,9 +410,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
           info
 
-        case Right(cyclePath) =>
-          _errors ::= CycleInInheritanceChain(cyclePath, fromAnalyzer)
-          InheritanceCycle
+        case None => InheritanceCycle
       }
 
       new LoadingClass(className, infoFuture, result)
@@ -441,40 +439,56 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
      *  If there are multiple cycles in the ancestry, an arbitrary one is returned.
      */
     private def loadParentChain(curClass: ClassName,
-        info: Infos.ClassInfo): Future[Either[List[ClassInfo], List[ClassName]]] = {
+        info: Infos.ClassInfo): Future[Option[List[ClassInfo]]] = {
 
       val parents = ensureParentsLoading(info)
 
       checkParentChain(curClass, parents, Set()).flatMap {
-        case Some(cycleInfo) =>
-          // Report cycle.
-          Future.successful(Right(cycleInfo.cycle))
-        case None =>
+        case Right(cycleInfo) =>
+          // We found a new cycle. Report it.
+          _errors ::= CycleInInheritanceChain(cycleInfo.cycle, fromAnalyzer)
+          Future.successful(None)
+        case Left(true) =>
+          // There already was a cycle elsewhere.
+          Future.successful(None)
+        case Left(false) =>
           // There is no cycle. We can safely wait until all parents are loaded.
           Future.traverse(parents)(_.result).map { loadedParents =>
-            Left(loadedParents.asInstanceOf[List[ClassInfo]])
+            Some(loadedParents.asInstanceOf[List[ClassInfo]])
           }
       }
     }
 
     private def checkParentChain(curClass: ClassName, parents: List[LoadingClass],
-        knownDescendants: Set[ClassName]): Future[Option[CycleInfo]] = {
+        knownDescendants: Set[ClassName]): Future[Either[Boolean, CycleInfo]] = {
       val newKnowDescendants = knownDescendants + curClass
       val parentResults = Future.traverse(parents) { loading =>
         val nextClass = loading.className
         if (knownDescendants.contains(nextClass)) {
-          Future.successful(Some(CycleInfo(Nil, nextClass)))
+          Future.successful(Right(CycleInfo(Nil, nextClass)))
         } else {
-          loading.info.flatMap { info =>
-            val parents = ensureParentsLoading(info)
-            checkParentChain(nextClass, parents, newKnowDescendants)
+          loading.result.value match {
+            case Some(Success(InheritanceCycle)) =>
+              // We already found a cycle somewhere else.
+              Future.successful(Left(true))
+            case Some(_) =>
+              // The future failed or loaded correctly.
+              // In any case, should let upstream propagate the result.
+              Future.successful(Left(false))
+            case None =>
+              // Parent has not completed yet, recurse.
+              loading.info.flatMap { info =>
+                val parents = ensureParentsLoading(info)
+                checkParentChain(nextClass, parents, newKnowDescendants)
+              }
           }
         }
       }
 
       parentResults.map {
         _.collectFirst {
-          case Some(cycle) => resolveCycle(curClass, cycle)
+          case Left(true)   =>
+          case Right(cycle) => Right(resolveCycle(curClass, cycle))
         }
       }
     }
