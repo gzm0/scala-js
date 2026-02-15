@@ -117,20 +117,8 @@ object Trees {
     val tpe = VoidType
   }
 
-  sealed class Block private (val stats: List[Tree])(
-      implicit val pos: Position)
-      extends Tree {
-    val tpe = stats.last.tpe
-
-    override def toString(): String =
-      stats.mkString("Block(", ",", ")")
-
-    override def equals(that: Any): Boolean = that match {
-      case that: Block => this.stats == that.stats
-      case _           => false
-    }
-
-    override def hashCode(): Int = stats.##
+  sealed abstract class Block extends Tree{
+    def stats: List[Tree]
   }
 
   object Block {
@@ -142,8 +130,11 @@ object Trees {
       }
       flattenedStats match {
         case Nil         => Skip()
-        case only :: Nil => only
-        case _           => new Block(flattenedStats)
+        case List(only)  => only
+        case List(stat0, stat1) => Block2(stat0, stat1)
+        case List(stat0, stat1, stat2) => Block3(stat0, stat1, stat2)
+        case List(stat0, stat1, stat2, stat3) => Block4(stat0, stat1, stat2, stat3)
+        case _           => BlockN(flattenedStats)
       }
     }
 
@@ -154,6 +145,33 @@ object Trees {
       apply(stats.toList)
 
     def unapply(block: Block): Some[List[Tree]] = Some(block.stats)
+  }
+
+  sealed case class BlockN private (stats: List[Tree])(
+      implicit val pos: Position)
+      extends Block {
+    val tpe = stats.last.tpe
+  }
+
+  sealed case class Block2 private (stat0: Tree, stat1: Tree)(
+      implicit val pos: Position)
+      extends Block {
+    def stats = stat0 :: stat1 :: Nil
+    val tpe = stat1.tpe
+  }
+
+  sealed case class Block3 private (stat0: Tree, stat1: Tree, stat2: Tree)(
+      implicit val pos: Position)
+      extends Block {
+    def stats = stat0 :: stat1 :: stat2 :: Nil
+    val tpe = stat2.tpe
+  }
+
+  sealed case class Block4 private (stat0: Tree, stat1: Tree, stat2: Tree, stat3: Tree)(
+      implicit val pos: Position)
+      extends Block {
+    def stats = stat0 :: stat1 :: stat2 :: stat3 :: Nil
+    val tpe = stat3.tpe
   }
 
   sealed case class Labeled(label: LabelName, tpe: Type, body: Tree)(
@@ -287,11 +305,46 @@ object Trees {
 
   // Scala expressions
 
-  sealed case class New(className: ClassName, ctor: MethodIdent,
-      args: List[Tree])(
-      implicit val pos: Position)
-      extends Tree {
+  sealed abstract class New extends Tree {
+    val className: ClassName
+    val ctor: MethodIdent
+    def args: List[Tree]
     val tpe: ClassType = ClassType(className, nullable = false, exact = true)
+  }
+
+  object New {
+    def apply(className: ClassName, ctor: MethodIdent, args: List[Tree])(
+        implicit pos: Position): New = args match {
+      case Nil              => New0(className, ctor)
+      case List(a0)         => New1(className, ctor, a0)
+      case List(a0, a1)     => New2(className, ctor, a0, a1)
+      case _                => NewN(className, ctor, args)
+    }
+
+    def unapply(n: New): Some[(ClassName, MethodIdent, List[Tree])] =
+      Some((n.className, n.ctor, n.args))
+  }
+
+  sealed case class NewN(className: ClassName, ctor: MethodIdent, args: List[Tree])(
+      implicit val pos: Position)
+      extends New
+
+  sealed case class New0(className: ClassName, ctor: MethodIdent)(
+      implicit val pos: Position)
+      extends New {
+    def args = Nil
+  }
+
+  sealed case class New1(className: ClassName, ctor: MethodIdent, arg0: Tree)(
+      implicit val pos: Position)
+      extends New {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class New2(className: ClassName, ctor: MethodIdent, arg0: Tree, arg1: Tree)(
+      implicit val pos: Position)
+      extends New {
+    def args = arg0 :: arg1 :: Nil
   }
 
   sealed case class LoadModule(className: ClassName)(
@@ -324,29 +377,189 @@ object Trees {
   }
 
   /** Apply an instance method with dynamic dispatch (the default). */
-  sealed case class Apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent,
-      args: List[Tree])(
+  sealed abstract class Apply extends Tree {
+    val flags: ApplyFlags
+    val receiver: Tree
+    val method: MethodIdent
+    def args: List[Tree]
+  }
+
+  object Apply {
+    def apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent, args: List[Tree])(
+        tpe: Type)(implicit pos: Position): Apply = args match {
+      case List(arg0) => Apply1(flags, receiver, method, arg0)(tpe)
+      case List(arg0, arg1) => Apply2(flags, receiver, method, arg0, arg1)(tpe)
+      case List(arg0, arg1, arg2) => Apply3(flags, receiver, method, arg0, arg1, arg2)(tpe)
+      case args => ApplyN(flags, receiver, method, args)(tpe)
+    }
+
+    def unapply(tree: Apply): Some[(ApplyFlags, Tree, MethodIdent, List[Tree])] = {
+      import tree._
+      Some((flags, receiver, method, args))
+    }
+  }
+
+  sealed case class ApplyN(flags: ApplyFlags, receiver: Tree, method: MethodIdent, args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends Apply
+
+  sealed case class Apply1(flags: ApplyFlags, receiver: Tree, method: MethodIdent, arg0: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends Apply {
+    def args: List[Tree] = arg0 :: Nil
+  }
+
+  sealed case class Apply2(flags: ApplyFlags, receiver: Tree, method: MethodIdent, arg0: Tree, arg1: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends Apply {
+    def args: List[Tree] = arg0 :: arg1 :: Nil
+  }
+
+  sealed case class Apply3(flags: ApplyFlags, receiver: Tree, method: MethodIdent, arg0: Tree, arg1: Tree, arg2: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends Apply {
+    def args: List[Tree] = arg0 :: arg1 :: arg2 :: Nil
+  }
 
   /** Apply an instance method with static dispatch (e.g., super calls). */
-  sealed case class ApplyStatically(flags: ApplyFlags, receiver: Tree,
+  sealed abstract class ApplyStatically extends Tree {
+    val flags: ApplyFlags
+    val receiver: Tree
+    val className: ClassName
+    val method: MethodIdent
+    def args: List[Tree]
+  }
+
+  object ApplyStatically {
+    def apply(flags: ApplyFlags, receiver: Tree, className: ClassName,
+        method: MethodIdent, args: List[Tree])(
+        tpe: Type)(implicit pos: Position): ApplyStatically = args match {
+      case Nil          => ApplyStatically0(flags, receiver, className, method)(tpe)
+      case List(a0)     => ApplyStatically1(flags, receiver, className, method, a0)(tpe)
+      case List(a0, a1) => ApplyStatically2(flags, receiver, className, method, a0, a1)(tpe)
+      case _            => ApplyStaticallyN(flags, receiver, className, method, args)(tpe)
+    }
+
+    def unapply(t: ApplyStatically): Some[(ApplyFlags, Tree, ClassName, MethodIdent, List[Tree])] =
+      Some((t.flags, t.receiver, t.className, t.method, t.args))
+  }
+
+  sealed case class ApplyStaticallyN(flags: ApplyFlags, receiver: Tree,
       className: ClassName, method: MethodIdent, args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends ApplyStatically
+
+  sealed case class ApplyStatically0(flags: ApplyFlags, receiver: Tree,
+      className: ClassName, method: MethodIdent)(
+      val tpe: Type)(implicit val pos: Position)
+      extends ApplyStatically {
+    def args = Nil
+  }
+
+  sealed case class ApplyStatically1(flags: ApplyFlags, receiver: Tree,
+      className: ClassName, method: MethodIdent, arg0: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends ApplyStatically {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class ApplyStatically2(flags: ApplyFlags, receiver: Tree,
+      className: ClassName, method: MethodIdent, arg0: Tree, arg1: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends ApplyStatically {
+    def args = arg0 :: arg1 :: Nil
+  }
 
   /** Apply a static method. */
-  sealed case class ApplyStatic(flags: ApplyFlags, className: ClassName,
+  sealed abstract class ApplyStatic extends Tree {
+    val flags: ApplyFlags
+    val className: ClassName
+    val method: MethodIdent
+    def args: List[Tree]
+  }
+
+  object ApplyStatic {
+    def apply(flags: ApplyFlags, className: ClassName, method: MethodIdent,
+        args: List[Tree])(tpe: Type)(implicit pos: Position): ApplyStatic = args match {
+      case Nil          => ApplyStatic0(flags, className, method)(tpe)
+      case List(a0)     => ApplyStatic1(flags, className, method, a0)(tpe)
+      case List(a0, a1) => ApplyStatic2(flags, className, method, a0, a1)(tpe)
+      case _            => ApplyStaticN(flags, className, method, args)(tpe)
+    }
+
+    def unapply(t: ApplyStatic): Some[(ApplyFlags, ClassName, MethodIdent, List[Tree])] =
+      Some((t.flags, t.className, t.method, t.args))
+  }
+
+  sealed case class ApplyStaticN(flags: ApplyFlags, className: ClassName,
       method: MethodIdent, args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends ApplyStatic
+
+  sealed case class ApplyStatic0(flags: ApplyFlags, className: ClassName,
+      method: MethodIdent)(
+      val tpe: Type)(implicit val pos: Position)
+      extends ApplyStatic {
+    def args = Nil
+  }
+
+  sealed case class ApplyStatic1(flags: ApplyFlags, className: ClassName,
+      method: MethodIdent, arg0: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends ApplyStatic {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class ApplyStatic2(flags: ApplyFlags, className: ClassName,
+      method: MethodIdent, arg0: Tree, arg1: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends ApplyStatic {
+    def args = arg0 :: arg1 :: Nil
+  }
 
   /** Apply a static method via dynamic import. */
-  sealed case class ApplyDynamicImport(flags: ApplyFlags, className: ClassName,
+  sealed abstract class ApplyDynamicImport extends Tree {
+    val tpe = AnyType
+    val flags: ApplyFlags
+    val className: ClassName
+    val method: MethodIdent
+    def args: List[Tree]
+  }
+
+  object ApplyDynamicImport {
+    def apply(flags: ApplyFlags, className: ClassName, method: MethodIdent,
+        args: List[Tree])(implicit pos: Position): ApplyDynamicImport = args match {
+      case Nil          => ApplyDynamicImport0(flags, className, method)
+      case List(a0)     => ApplyDynamicImport1(flags, className, method, a0)
+      case List(a0, a1) => ApplyDynamicImport2(flags, className, method, a0, a1)
+      case _            => ApplyDynamicImportN(flags, className, method, args)
+    }
+
+    def unapply(t: ApplyDynamicImport): Some[(ApplyFlags, ClassName, MethodIdent, List[Tree])] =
+      Some((t.flags, t.className, t.method, t.args))
+  }
+
+  sealed case class ApplyDynamicImportN(flags: ApplyFlags, className: ClassName,
       method: MethodIdent, args: List[Tree])(
       implicit val pos: Position)
-      extends Tree {
-    val tpe = AnyType
+      extends ApplyDynamicImport
+
+  sealed case class ApplyDynamicImport0(flags: ApplyFlags, className: ClassName,
+      method: MethodIdent)(implicit val pos: Position)
+      extends ApplyDynamicImport {
+    def args = Nil
+  }
+
+  sealed case class ApplyDynamicImport1(flags: ApplyFlags, className: ClassName,
+      method: MethodIdent, arg0: Tree)(implicit val pos: Position)
+      extends ApplyDynamicImport {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class ApplyDynamicImport2(flags: ApplyFlags, className: ClassName,
+      method: MethodIdent, arg0: Tree, arg1: Tree)(implicit val pos: Position)
+      extends ApplyDynamicImport {
+    def args = arg0 :: arg1 :: Nil
   }
 
   /** Apply a typed closure
@@ -366,15 +579,51 @@ object Trees {
    *  3. Let `argsV` be the result of evaluating `args`, in order.
    *  4. Invoke `funV` with arguments `argsV`, and return the result.
    */
-  sealed case class ApplyTypedClosure(flags: ApplyFlags, fun: Tree, args: List[Tree])(
-      implicit val pos: Position)
-      extends Tree {
+  sealed abstract class ApplyTypedClosure extends Tree {
+    val fun: Tree
+    val flags: ApplyFlags
+    def args: List[Tree]
 
     val tpe: Type = fun.tpe match {
-      case ClosureType(_, resultType, _) => resultType
-      case NothingType                   => NothingType
-      case _                             => NothingType // never a valid tree
+       case ClosureType(_, resultType, _) => resultType
+       case NothingType                   => NothingType
+       case _                             => NothingType // never a valid tree
     }
+  }
+
+  object ApplyTypedClosure {
+    def apply(flags: ApplyFlags, fun: Tree, args: List[Tree])(
+        implicit pos: Position): ApplyTypedClosure = args match {
+      case Nil          => ApplyTypedClosure0(flags, fun)
+      case List(a0)     => ApplyTypedClosure1(flags, fun, a0)
+      case List(a0, a1) => ApplyTypedClosure2(flags, fun, a0, a1)
+      case _            => ApplyTypedClosureN(flags, fun, args)
+    }
+
+    def unapply(t: ApplyTypedClosure): Some[(ApplyFlags, Tree, List[Tree])] =
+      Some((t.flags, t.fun, t.args))
+  }
+
+  sealed case class ApplyTypedClosureN(flags: ApplyFlags, fun: Tree, args: List[Tree])(
+      implicit val pos: Position)
+      extends ApplyTypedClosure
+
+  sealed case class ApplyTypedClosure0(flags: ApplyFlags, fun: Tree)(
+      implicit val pos: Position)
+      extends ApplyTypedClosure {
+    def args = Nil
+  }
+
+  sealed case class ApplyTypedClosure1(flags: ApplyFlags, fun: Tree, arg0: Tree)(
+      implicit val pos: Position)
+      extends ApplyTypedClosure {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class ApplyTypedClosure2(flags: ApplyFlags, fun: Tree, arg0: Tree, arg1: Tree)(
+      implicit val pos: Position)
+      extends ApplyTypedClosure {
+    def args = arg0 :: arg1 :: Nil
   }
 
   /** New lambda instance of a SAM class.
@@ -801,10 +1050,38 @@ object Trees {
 
   // JavaScript expressions
 
-  sealed case class JSNew(ctor: Tree, args: List[TreeOrJSSpread])(
-      implicit val pos: Position)
-      extends Tree {
+  sealed abstract class JSNew extends Tree {
     val tpe = AnyType
+    val ctor: Tree
+    def args: List[TreeOrJSSpread]
+  }
+
+  object JSNew {
+    def apply(ctor: Tree, args: List[TreeOrJSSpread])(implicit pos: Position): JSNew = args match {
+      case Nil          => JSNew0(ctor)
+      case List(a0)     => JSNew1(ctor, a0)
+      case List(a0, a1) => JSNew2(ctor, a0, a1)
+      case _            => JSNewN(ctor, args)
+    }
+
+    def unapply(t: JSNew): Some[(Tree, List[TreeOrJSSpread])] =
+      Some((t.ctor, t.args))
+  }
+
+  sealed case class JSNewN(ctor: Tree, args: List[TreeOrJSSpread])(
+      implicit val pos: Position)
+      extends JSNew
+
+  sealed case class JSNew0(ctor: Tree)(implicit val pos: Position) extends JSNew {
+    def args = Nil
+  }
+
+  sealed case class JSNew1(ctor: Tree, arg0: TreeOrJSSpread)(implicit val pos: Position) extends JSNew {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class JSNew2(ctor: Tree, arg0: TreeOrJSSpread, arg1: TreeOrJSSpread)(implicit val pos: Position) extends JSNew {
+    def args = arg0 :: arg1 :: Nil
   }
 
   sealed case class JSPrivateSelect(qualifier: Tree, field: FieldIdent)(
@@ -819,16 +1096,73 @@ object Trees {
     val tpe = AnyType
   }
 
-  sealed case class JSFunctionApply(fun: Tree, args: List[TreeOrJSSpread])(
-      implicit val pos: Position)
-      extends Tree {
+  sealed abstract class JSFunctionApply extends Tree {
     val tpe = AnyType
+    val fun: Tree
+    def args: List[TreeOrJSSpread]
   }
 
-  sealed case class JSMethodApply(receiver: Tree, method: Tree,
-      args: List[TreeOrJSSpread])(implicit val pos: Position)
-      extends Tree {
+  object JSFunctionApply {
+    def apply(fun: Tree, args: List[TreeOrJSSpread])(implicit pos: Position): JSFunctionApply = args match {
+      case Nil          => JSFunctionApply0(fun)
+      case List(a0)     => JSFunctionApply1(fun, a0)
+      case List(a0, a1) => JSFunctionApply2(fun, a0, a1)
+      case _            => JSFunctionApplyN(fun, args)
+    }
+
+    def unapply(t: JSFunctionApply): Some[(Tree, List[TreeOrJSSpread])] =
+      Some((t.fun, t.args))
+  }
+
+  sealed case class JSFunctionApplyN(fun: Tree, args: List[TreeOrJSSpread])(
+      implicit val pos: Position)
+      extends JSFunctionApply
+
+  sealed case class JSFunctionApply0(fun: Tree)(implicit val pos: Position) extends JSFunctionApply {
+    def args = Nil
+  }
+
+  sealed case class JSFunctionApply1(fun: Tree, arg0: TreeOrJSSpread)(implicit val pos: Position) extends JSFunctionApply {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class JSFunctionApply2(fun: Tree, arg0: TreeOrJSSpread, arg1: TreeOrJSSpread)(implicit val pos: Position) extends JSFunctionApply {
+    def args = arg0 :: arg1 :: Nil
+  }
+
+  sealed abstract class JSMethodApply extends Tree {
     val tpe = AnyType
+    val receiver: Tree
+    val method: Tree
+    def args: List[TreeOrJSSpread]
+  }
+
+  object JSMethodApply {
+    def apply(receiver: Tree, method: Tree, args: List[TreeOrJSSpread])(implicit pos: Position): JSMethodApply = args match {
+      case Nil          => JSMethodApply0(receiver, method)
+      case List(a0)     => JSMethodApply1(receiver, method, a0)
+      case List(a0, a1) => JSMethodApply2(receiver, method, a0, a1)
+      case _            => JSMethodApplyN(receiver, method, args)
+    }
+
+    def unapply(t: JSMethodApply): Some[(Tree, Tree, List[TreeOrJSSpread])] =
+      Some((t.receiver, t.method, t.args))
+  }
+
+  sealed case class JSMethodApplyN(receiver: Tree, method: Tree, args: List[TreeOrJSSpread])(
+      implicit val pos: Position)
+      extends JSMethodApply
+
+  sealed case class JSMethodApply0(receiver: Tree, method: Tree)(implicit val pos: Position) extends JSMethodApply {
+    def args = Nil
+  }
+
+  sealed case class JSMethodApply1(receiver: Tree, method: Tree, arg0: TreeOrJSSpread)(implicit val pos: Position) extends JSMethodApply {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class JSMethodApply2(receiver: Tree, method: Tree, arg0: TreeOrJSSpread, arg1: TreeOrJSSpread)(implicit val pos: Position) extends JSMethodApply {
+    def args = arg0 :: arg1 :: Nil
   }
 
   /** Selects a property inherited from the given `superClass` on `receiver`.
@@ -911,11 +1245,41 @@ object Trees {
    *  super[method](...args)
    *  }}}
    */
-  sealed case class JSSuperMethodCall(superClass: Tree, receiver: Tree,
+  sealed abstract class JSSuperMethodCall extends Tree {
+    val tpe = AnyType
+    val superClass: Tree
+    val receiver: Tree
+    val method: Tree
+    def args: List[TreeOrJSSpread]
+  }
+
+  object JSSuperMethodCall {
+    def apply(superClass: Tree, receiver: Tree, method: Tree, args: List[TreeOrJSSpread])(implicit pos: Position): JSSuperMethodCall = args match {
+      case Nil          => JSSuperMethodCall0(superClass, receiver, method)
+      case List(a0)     => JSSuperMethodCall1(superClass, receiver, method, a0)
+      case List(a0, a1) => JSSuperMethodCall2(superClass, receiver, method, a0, a1)
+      case _            => JSSuperMethodCallN(superClass, receiver, method, args)
+    }
+
+    def unapply(t: JSSuperMethodCall): Some[(Tree, Tree, Tree, List[TreeOrJSSpread])] =
+      Some((t.superClass, t.receiver, t.method, t.args))
+  }
+
+  sealed case class JSSuperMethodCallN(superClass: Tree, receiver: Tree,
       method: Tree, args: List[TreeOrJSSpread])(
       implicit val pos: Position)
-      extends Tree {
-    val tpe = AnyType
+      extends JSSuperMethodCall
+
+  sealed case class JSSuperMethodCall0(superClass: Tree, receiver: Tree, method: Tree)(implicit val pos: Position) extends JSSuperMethodCall {
+    def args = Nil
+  }
+
+  sealed case class JSSuperMethodCall1(superClass: Tree, receiver: Tree, method: Tree, arg0: TreeOrJSSpread)(implicit val pos: Position) extends JSSuperMethodCall {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class JSSuperMethodCall2(superClass: Tree, receiver: Tree, method: Tree, arg0: TreeOrJSSpread, arg1: TreeOrJSSpread)(implicit val pos: Position) extends JSSuperMethodCall {
+    def args = arg0 :: arg1 :: Nil
   }
 
   /** Super constructor call in the constructor of a non-native JS class.
@@ -955,10 +1319,37 @@ object Trees {
    *  }
    *  }}}
    */
-  sealed case class JSSuperConstructorCall(args: List[TreeOrJSSpread])(
-      implicit val pos: Position)
-      extends Tree {
+  sealed abstract class JSSuperConstructorCall extends Tree {
     val tpe = VoidType
+    def args: List[TreeOrJSSpread]
+  }
+
+  object JSSuperConstructorCall {
+    def apply(args: List[TreeOrJSSpread])(implicit pos: Position): JSSuperConstructorCall = args match {
+      case Nil          => JSSuperConstructorCall0()
+      case List(a0)     => JSSuperConstructorCall1(a0)
+      case List(a0, a1) => JSSuperConstructorCall2(a0, a1)
+      case _            => JSSuperConstructorCallN(args)
+    }
+
+    def unapply(t: JSSuperConstructorCall): Some[List[TreeOrJSSpread]] =
+      Some(t.args)
+  }
+
+  sealed case class JSSuperConstructorCallN(args: List[TreeOrJSSpread])(
+      implicit val pos: Position)
+      extends JSSuperConstructorCall
+
+  sealed case class JSSuperConstructorCall0()(implicit val pos: Position) extends JSSuperConstructorCall {
+    def args = Nil
+  }
+
+  sealed case class JSSuperConstructorCall1(arg0: TreeOrJSSpread)(implicit val pos: Position) extends JSSuperConstructorCall {
+    def args = arg0 :: Nil
+  }
+
+  sealed case class JSSuperConstructorCall2(arg0: TreeOrJSSpread, arg1: TreeOrJSSpread)(implicit val pos: Position) extends JSSuperConstructorCall {
+    def args = arg0 :: arg1 :: Nil
   }
 
   /** JavaScript dynamic import of the form `import(arg)`.
@@ -1382,11 +1773,38 @@ object Trees {
    *    Actual values for the captured parameters (in the `ClassDef`'s
    *    `jsClassCaptures.get`)
    */
-  sealed case class CreateJSClass(className: ClassName,
-      captureValues: List[Tree])(
-      implicit val pos: Position)
-      extends Tree {
+  sealed abstract class CreateJSClass extends Tree {
     val tpe = AnyType
+    val className: ClassName
+    def captureValues: List[Tree]
+  }
+
+  object CreateJSClass {
+    def apply(className: ClassName, captureValues: List[Tree])(implicit pos: Position): CreateJSClass = captureValues match {
+      case Nil          => CreateJSClass0(className)
+      case List(a0)     => CreateJSClass1(className, a0)
+      case List(a0, a1) => CreateJSClass2(className, a0, a1)
+      case _            => CreateJSClassN(className, captureValues)
+    }
+
+    def unapply(t: CreateJSClass): Some[(ClassName, List[Tree])] =
+      Some((t.className, t.captureValues))
+  }
+
+  sealed case class CreateJSClassN(className: ClassName, captureValues: List[Tree])(
+      implicit val pos: Position)
+      extends CreateJSClass
+
+  sealed case class CreateJSClass0(className: ClassName)(implicit val pos: Position) extends CreateJSClass {
+    def captureValues = Nil
+  }
+
+  sealed case class CreateJSClass1(className: ClassName, captureValue0: Tree)(implicit val pos: Position) extends CreateJSClass {
+    def captureValues = captureValue0 :: Nil
+  }
+
+  sealed case class CreateJSClass2(className: ClassName, captureValue0: Tree, captureValue1: Tree)(implicit val pos: Position) extends CreateJSClass {
+    def captureValues = captureValue0 :: captureValue1 :: Nil
   }
 
   // Transient, a special one
