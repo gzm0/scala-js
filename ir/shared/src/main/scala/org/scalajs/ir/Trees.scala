@@ -324,10 +324,49 @@ object Trees {
   }
 
   /** Apply an instance method with dynamic dispatch (the default). */
-  sealed case class Apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent,
-      args: List[Tree])(
+  sealed abstract class Apply extends Tree {
+    def flags: ApplyFlags
+    def receiver: Tree
+    def method: MethodIdent
+    def args: List[Tree]
+  }
+
+  object Apply {
+    def apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent, args: List[Tree])(
+        tpe: Type)(implicit pos: Position): Apply = args match {
+      case List(arg0) => Apply1(flags, receiver, method, arg0)(tpe)
+      case List(arg0, arg1) => Apply2(flags, receiver, method, arg0, arg1)(tpe)
+      case List(arg0, arg1, arg2) => Apply3(flags, receiver, method, arg0, arg1, arg2)(tpe)
+      case args => ApplyN(flags, receiver, method, args)(tpe)
+    }
+
+    def unapply(tree: Apply): Some[(ApplyFlags, Tree, MethodIdent, List[Tree])] = {
+      import tree._
+      Some((flags, receiver, method, args))
+    }
+  }
+
+  sealed case class ApplyN(flags: ApplyFlags, receiver: Tree, method: MethodIdent, args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends Apply
+
+  sealed case class Apply1(flags: ApplyFlags, receiver: Tree, method: MethodIdent, arg0: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends Apply {
+    def args: List[Tree] = arg0 :: Nil
+  }
+
+  sealed case class Apply2(flags: ApplyFlags, receiver: Tree, method: MethodIdent, arg0: Tree, arg1: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends Apply {
+    def args: List[Tree] = arg0 :: arg1 :: Nil
+  }
+
+  sealed case class Apply3(flags: ApplyFlags, receiver: Tree, method: MethodIdent, arg0: Tree, arg1: Tree, arg2: Tree)(
+      val tpe: Type)(implicit val pos: Position)
+      extends Apply {
+    def args: List[Tree] = arg0 :: arg1 :: arg2 :: Nil
+  }
 
   /** Apply an instance method with static dispatch (e.g., super calls). */
   sealed case class ApplyStatically(flags: ApplyFlags, receiver: Tree,
