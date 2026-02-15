@@ -117,20 +117,8 @@ object Trees {
     val tpe = VoidType
   }
 
-  sealed class Block private (val stats: List[Tree])(
-      implicit val pos: Position)
-      extends Tree {
-    val tpe = stats.last.tpe
-
-    override def toString(): String =
-      stats.mkString("Block(", ",", ")")
-
-    override def equals(that: Any): Boolean = that match {
-      case that: Block => this.stats == that.stats
-      case _           => false
-    }
-
-    override def hashCode(): Int = stats.##
+  sealed abstract class Block extends Tree{
+    def stats: List[Tree]
   }
 
   object Block {
@@ -142,8 +130,10 @@ object Trees {
       }
       flattenedStats match {
         case Nil         => Skip()
-        case only :: Nil => only
-        case _           => new Block(flattenedStats)
+        case List(only)  => only
+        case List(stat0, stat1) => Block2(stat0, stat1)
+        case List(stat0, stat1, stat2) => Block3(stat0, stat1, stat2)
+        case _           => BlockN(flattenedStats.toVector)
       }
     }
 
@@ -154,6 +144,27 @@ object Trees {
       apply(stats.toList)
 
     def unapply(block: Block): Some[List[Tree]] = Some(block.stats)
+  }
+
+  sealed case class BlockN private (vecStats: Vector[Tree])(
+      implicit val pos: Position)
+      extends Block {
+    def stats = vecStats.toList
+    val tpe = stats.last.tpe
+  }
+
+  sealed case class Block2 private (stat0: Tree, stat1: Tree)(
+      implicit val pos: Position)
+      extends Block {
+    def stats = stat0 :: stat1 :: Nil
+    val tpe = stat1.tpe
+  }
+
+  sealed case class Block3 private (stat0: Tree, stat1: Tree, stat2: Tree)(
+      implicit val pos: Position)
+      extends Block {
+    def stats = stat0 :: stat1 :: stat2 :: Nil
+    val tpe = stat2.tpe
   }
 
   sealed case class Labeled(label: LabelName, tpe: Type, body: Tree)(
