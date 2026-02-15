@@ -133,7 +133,7 @@ object Trees {
         case List(only)  => only
         case List(stat0, stat1) => Block2(stat0, stat1)
         case List(stat0, stat1, stat2) => Block3(stat0, stat1, stat2)
-        case _           => BlockN(flattenedStats.toVector)
+        case _           => BlockN(flattenedStats)
       }
     }
 
@@ -146,10 +146,9 @@ object Trees {
     def unapply(block: Block): Some[List[Tree]] = Some(block.stats)
   }
 
-  sealed case class BlockN private (vecStats: Vector[Tree])(
+  sealed case class BlockN private (stats: List[Tree])(
       implicit val pos: Position)
       extends Block {
-    def stats = vecStats.toList
     val tpe = stats.last.tpe
   }
 
