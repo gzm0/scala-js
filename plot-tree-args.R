@@ -1,3 +1,29 @@
+> d %>% filter(category == "params") %>% summarise(p = mean(size <= 2))
+
+# A tibble: 1 × 1
+      p
+  <dbl>
+1 0.962
+
+> d %>% filter(tree == "Block") %>% summarise(p = mean(size <= 4))
+
+
+# A tibble: 1 × 1
+      p
+  <dbl>
+1 0.730
+
+> d %>% summarise(p = mean(tree == "Block" & size <= 4 | category == "params" & size <= 2))
+
+# A tibble: 1 × 1
+      p
+  <dbl>
+1 0.814
+
+
+
+
+
 library(readr)
 library(ggplot2)
 library(dplyr)
@@ -38,6 +64,15 @@ ggplot(d, aes(x = size, fill = category)) +
   geom_histogram(binwidth = 1) +
   xlim(0, 60) +
   facet_grid(cols = vars(category))
+
+ggsave("tree-arg-sizes.png", width = 12, height = 5)
+
+d_block <- d %>% filter(tree == "Block")
+
+ggplot(d_block, aes(x = size)) +
+  geom_histogram(binwidth = 1) +
+  xlim(0, 60)
+
 
 #%p <- ggplot(data, aes(x=x) ) +
 %%  geom_histogram( aes(x = var1, y = ..density..), fill="#69b3a2" ) +
