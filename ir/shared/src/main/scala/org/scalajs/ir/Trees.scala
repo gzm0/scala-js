@@ -121,6 +121,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = stats.last.tpe
+    TreeInstrumentation.record("Block", "stats", stats.size)
 
     override def toString(): String =
       stats.mkString("Block(", ",", ")")
@@ -263,7 +264,9 @@ object Trees {
    */
   sealed case class Match(selector: Tree, cases: List[(List[MatchableLiteral], Tree)],
       default: Tree)(val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends Tree {
+    TreeInstrumentation.record("Match", "cases", cases.size)
+  }
 
   /** `await arg`.
    *
@@ -292,6 +295,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe: ClassType = ClassType(className, nullable = false, exact = true)
+    TreeInstrumentation.record("New", "args", args.size)
   }
 
   sealed case class LoadModule(className: ClassName)(
@@ -327,19 +331,25 @@ object Trees {
   sealed case class Apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent,
       args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends Tree {
+    TreeInstrumentation.record("Apply", "args", args.size)
+  }
 
   /** Apply an instance method with static dispatch (e.g., super calls). */
   sealed case class ApplyStatically(flags: ApplyFlags, receiver: Tree,
       className: ClassName, method: MethodIdent, args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends Tree {
+    TreeInstrumentation.record("ApplyStatically", "args", args.size)
+  }
 
   /** Apply a static method. */
   sealed case class ApplyStatic(flags: ApplyFlags, className: ClassName,
       method: MethodIdent, args: List[Tree])(
       val tpe: Type)(implicit val pos: Position)
-      extends Tree
+      extends Tree {
+    TreeInstrumentation.record("ApplyStatic", "args", args.size)
+  }
 
   /** Apply a static method via dynamic import. */
   sealed case class ApplyDynamicImport(flags: ApplyFlags, className: ClassName,
@@ -347,6 +357,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
+    TreeInstrumentation.record("ApplyDynamicImport", "args", args.size)
   }
 
   /** Apply a typed closure
@@ -369,6 +380,7 @@ object Trees {
   sealed case class ApplyTypedClosure(flags: ApplyFlags, fun: Tree, args: List[Tree])(
       implicit val pos: Position)
       extends Tree {
+    TreeInstrumentation.record("ApplyTypedClosure", "args", args.size)
 
     val tpe: Type = fun.tpe match {
       case ClosureType(_, resultType, _) => resultType
@@ -774,6 +786,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe: ArrayType = ArrayType(typeRef, nullable = false, exact = true)
+    TreeInstrumentation.record("ArrayValue", "elems", elems.size)
   }
 
   sealed case class ArraySelect(array: Tree, index: Tree)(val tpe: Type)(
@@ -782,7 +795,9 @@ object Trees {
 
   sealed case class RecordValue(tpe: RecordType, elems: List[Tree])(
       implicit val pos: Position)
-      extends Tree
+      extends Tree {
+    TreeInstrumentation.record("RecordValue", "elems", elems.size)
+  }
 
   sealed case class RecordSelect(record: Tree, field: SimpleFieldIdent)(
       val tpe: Type)(
@@ -805,6 +820,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
+    TreeInstrumentation.record("JSNew", "args", args.size)
   }
 
   sealed case class JSPrivateSelect(qualifier: Tree, field: FieldIdent)(
@@ -823,12 +839,14 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
+    TreeInstrumentation.record("JSFunctionApply", "args", args.size)
   }
 
   sealed case class JSMethodApply(receiver: Tree, method: Tree,
       args: List[TreeOrJSSpread])(implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
+    TreeInstrumentation.record("JSMethodApply", "args", args.size)
   }
 
   /** Selects a property inherited from the given `superClass` on `receiver`.
@@ -916,6 +934,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
+    TreeInstrumentation.record("JSSuperMethodCall", "args", args.size)
   }
 
   /** Super constructor call in the constructor of a non-native JS class.
@@ -959,6 +978,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = VoidType
+    TreeInstrumentation.record("JSSuperConstructorCall", "args", args.size)
   }
 
   /** JavaScript dynamic import of the form `import(arg)`.
@@ -1137,12 +1157,14 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyNotNullType
+    TreeInstrumentation.record("JSArrayConstr", "items", items.size)
   }
 
   sealed case class JSObjectConstr(fields: List[(Tree, Tree)])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyNotNullType
+    TreeInstrumentation.record("JSObjectConstr", "fields", fields.size)
   }
 
   sealed case class JSGlobalRef(name: String)(
@@ -1370,6 +1392,9 @@ object Trees {
     val tpe: Type =
       if (flags.typed) ClosureType(params.map(_.ptpe), resultType, nullable = false)
       else AnyNotNullType
+    TreeInstrumentation.record("Closure", "captureParams", captureParams.size)
+    TreeInstrumentation.record("Closure", "params", params.size)
+    TreeInstrumentation.record("Closure", "captureValues", captureValues.size)
   }
 
   /** Creates a JavaScript class value.
@@ -1387,6 +1412,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
+    TreeInstrumentation.record("CreateJSClass", "captureValues", captureValues.size)
   }
 
   // Transient, a special one
