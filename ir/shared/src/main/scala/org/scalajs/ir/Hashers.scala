@@ -162,7 +162,7 @@ object Hashers {
       mixBoolean(paramDef.mutable)
     }
 
-    def mixParamDefs(paramDefs: List[ParamDef]): Unit =
+    def mixParamDefs(paramDefs: Vector[ParamDef]): Unit =
       paramDefs.foreach(mixParamDef)
 
     def mixTree(tree: Tree): Unit = {
@@ -574,10 +574,10 @@ object Hashers {
     def mixOptTree(optTree: Option[Tree]): Unit =
       optTree.foreach(mixTree)
 
-    def mixTrees(trees: List[Tree]): Unit =
+    def mixTrees(trees: Vector[Tree]): Unit =
       trees.foreach(mixTree)
 
-    def mixTreeOrJSSpreads(trees: List[TreeOrJSSpread]): Unit =
+    def mixTreeOrJSSpreads(trees: Vector[TreeOrJSSpread]): Unit =
       trees.foreach(mixTreeOrJSSpread)
 
     def mixTreeOrJSSpread(tree: TreeOrJSSpread): Unit = {
@@ -674,7 +674,7 @@ object Hashers {
         }
     }
 
-    def mixTypes(tpes: List[Type]): Unit =
+    def mixTypes(tpes: Vector[Type]): Unit =
       tpes.foreach(mixType)
 
     def mixLocalIdent(ident: LocalIdent): Unit = {
@@ -707,7 +707,7 @@ object Hashers {
     def mixName(name: Name): Unit =
       mixBytes(name.encoded.bytes)
 
-    def mixNames(names: List[Name]): Unit = {
+    def mixNames(names: Vector[Name]): Unit = {
       mixInt(names.size)
       names.foreach(mixName(_))
     }
