@@ -141,9 +141,9 @@ object Trees {
         case other           => Vector(other)
       }
       flattenedStats match {
-        case Nil         => Skip()
-        case only :: Nil => only
-        case _           => new Block(flattenedStats)
+        case Vector()     => Skip()
+        case Vector(only) => only
+        case _            => new Block(flattenedStats)
       }
     }
 

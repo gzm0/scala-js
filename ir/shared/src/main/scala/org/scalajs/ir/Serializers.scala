@@ -419,7 +419,7 @@ object Serializers {
         case NewArray(tpe, length) =>
           writeTagAndPos(TagNewArray)
           writeArrayTypeRef(tpe)
-          writeTrees(length :: Nil) // written as a list of historical reasons
+          writeTrees(Vector(length)) // written as a list of historical reasons
 
         case ArrayValue(tpe, elems) =>
           writeTagAndPos(TagArrayValue)
@@ -1143,7 +1143,7 @@ object Serializers {
       classNames = new Array(encodedNames.length)
       methodNames = Array.fill(readInt()) {
         val simpleName = readSimpleMethodName()
-        val paramTypeRefs = List.fill(readInt())(readTypeRef())
+        val paramTypeRefs = Vector.fill(readInt())(readTypeRef())
         val resultTypeRef = readTypeRef()
         val isReflectiveProxy = readBoolean()
         MethodName(simpleName, paramTypeRefs, resultTypeRef, isReflectiveProxy)
@@ -1197,7 +1197,7 @@ object Serializers {
     }
 
     def readTreeOrJSSpreads(): Vector[TreeOrJSSpread] =
-      List.fill(readInt())(readTreeOrJSSpread())
+      Vector.fill(readInt())(readTreeOrJSSpread())
 
     private def readTreeFromTag(tag: Byte): Tree = {
       implicit val pos = readPosition()
@@ -1255,7 +1255,7 @@ object Serializers {
           TryFinally(readTree(), readTree())
 
         case TagMatch =>
-          Match(readTree(), List.fill(readInt()) {
+          Match(readTree(), Vector.fill(readInt()) {
             (readTrees().map(_.asInstanceOf[MatchableLiteral]), readTree())
           }, readTree())(readType())
 
@@ -1472,7 +1472,7 @@ object Serializers {
         case TagJSBinaryOp             => JSBinaryOp(readInt(), readTree(), readTree())
         case TagJSArrayConstr          => JSArrayConstr(readTreeOrJSSpreads())
         case TagJSObjectConstr         =>
-          JSObjectConstr(List.fill(readInt())((readTree(), readTree())))
+          JSObjectConstr(Vector.fill(readInt())((readTree(), readTree())))
         case TagJSGlobalRef       => JSGlobalRef(readString())
         case TagJSTypeOfGlobalRef => JSTypeOfGlobalRef(readTree().asInstanceOf[JSGlobalRef])
 
@@ -1721,7 +1721,7 @@ object Serializers {
     }
 
     def readTrees(): Vector[Tree] =
-      List.fill(readInt())(readTree())
+      Vector.fill(readInt())(readTree())
 
     def readClassDef(): ClassDef = {
       implicit val pos = readPosition()
@@ -1987,7 +1987,7 @@ object Serializers {
                     Assign(
                       ArraySelect(result2.ref, i.ref)(AnyType),
                       Apply(EAF, ths, MethodIdent(newInstanceRecName),
-                          List(innerComponentType.ref, dimensions.ref, innerOffset.ref))(AnyType)
+                          Vector(innerComponentType.ref, dimensions.ref, innerOffset.ref))(AnyType)
                     ),
                     Assign(
                       i.ref,
@@ -2002,7 +2002,7 @@ object Serializers {
         }
 
         MethodDef(MemberFlags.empty, MethodIdent(newInstanceRecName),
-            NoOriginalName, List(componentType, dimensions, offset), AnyType,
+            NoOriginalName, Vector(componentType, dimensions, offset), AnyType,
             Some(body))(
             OptimizerHints.empty, Version.fromInt(1))
       }
@@ -2014,7 +2014,7 @@ object Serializers {
 
             implicit val pos = method.pos
 
-            val List(jlClassParam, lengthParam) = method.args
+            val Vector(jlClassParam, lengthParam) = method.args
 
             val newBody = BinaryOp(BinaryOp.Class_newArray,
                 UnaryOp(UnaryOp.CheckNotNull, jlClassParam.ref),
@@ -2037,7 +2037,7 @@ object Serializers {
 
             implicit val pos = method.pos
 
-            val List(jlClassParam, lengthsParam) = method.args
+            val Vector(jlClassParam, lengthsParam) = method.args
 
             val newBody = {
               val outermostComponentType = varDef("outermostComponentType",
@@ -2054,7 +2054,7 @@ object Serializers {
                       getClass(Apply(EAF,
                           This()(ClassType(ReflectArrayModClass, nullable = false, exact = false)),
                           MethodIdent(newInstanceSingleName),
-                          List(outermostComponentType.ref, IntLiteral(0)))(AnyType))
+                          Vector(outermostComponentType.ref, IntLiteral(0)))(AnyType))
                     ),
                     Assign(
                       i.ref,
@@ -2064,7 +2064,7 @@ object Serializers {
                 }),
                 Apply(EAF, This()(ClassType(ReflectArrayModClass, nullable = false, exact = false)),
                     MethodIdent(newInstanceRecName),
-                    List(outermostComponentType.ref, lengthsParam.ref, IntLiteral(0)))(
+                    Vector(outermostComponentType.ref, lengthsParam.ref, IntLiteral(0)))(
                     AnyType)
               )
             }
@@ -2484,7 +2484,7 @@ object Serializers {
     }
 
     def readTopLevelExportDefs(): Vector[TopLevelExportDef] =
-      List.fill(readInt())(readTopLevelExportDef())
+      Vector.fill(readInt())(readTopLevelExportDef())
 
     def readLocalIdent(): LocalIdent = {
       implicit val pos = readPosition()
@@ -2521,7 +2521,7 @@ object Serializers {
     }
 
     def readClassIdents(): Vector[ClassIdent] =
-      List.fill(readInt())(readClassIdent())
+      Vector.fill(readInt())(readClassIdent())
 
     def readOptClassIdent(): Option[ClassIdent] = {
       if (readBoolean()) Some(readClassIdent())
@@ -2544,11 +2544,11 @@ object Serializers {
     }
 
     def readParamDefs(): Vector[ParamDef] =
-      List.fill(readInt())(readParamDef())
+      Vector.fill(readInt())(readParamDef())
 
     def readParamDefsWithRest(): (Vector[ParamDef], Option[ParamDef]) = {
       if (hacks.useBelow(5)) {
-        val (params, isRest) = List.fill(readInt()) {
+        val (params, isRest) = Vector.fill(readInt()) {
           implicit val pos = readPosition()
           (ParamDef(readLocalIdent(), readOriginalName(), readType(), readBoolean()), readBoolean())
         }.unzip
@@ -2609,7 +2609,7 @@ object Serializers {
           ClosureType(paramTypes, resultType, nullable = tag == TagClosureType)
 
         case TagRecordType =>
-          RecordType(List.fill(readInt()) {
+          RecordType(Vector.fill(readInt()) {
             val name = readSimpleFieldName()
             val originalName = readString()
             val tpe = readType()
@@ -2620,7 +2620,7 @@ object Serializers {
     }
 
     def readTypes(): Vector[Type] =
-      List.fill(readInt())(readType())
+      Vector.fill(readInt())(readType())
 
     def readTypeRef(): TypeRef = {
       readByte() match {
@@ -2727,7 +2727,7 @@ object Serializers {
       strings(readInt())
 
     def readStrings(): Vector[String] =
-      List.fill(readInt())(readString())
+      Vector.fill(readInt())(readString())
 
     private def readLocalName(): LocalName = {
       val i = readInt()
@@ -2796,7 +2796,7 @@ object Serializers {
     }
 
     private def readClassNames(): Vector[ClassName] =
-      List.fill(readInt())(readClassName())
+      Vector.fill(readInt())(readClassName())
 
     private def readMethodName(): MethodName =
       methodNames(readInt())

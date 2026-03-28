@@ -349,7 +349,7 @@ object Hashers {
         case NewArray(typeRef, length) =>
           mixTag(TagNewArray)
           mixArrayTypeRef(typeRef)
-          mixTrees(length :: Nil) // mixed as a list for historical reasons
+          mixTrees(Vector(length)) // mixed as a list for historical reasons
 
         case ArrayValue(typeRef, elems) =>
           mixTag(TagArrayValue)

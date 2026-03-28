@@ -803,7 +803,7 @@ object Printers {
         case JSArrayConstr(items) =>
           printRow(items, "[", ", ", "]")
 
-        case JSObjectConstr(Nil) =>
+        case JSObjectConstr(Vector()) =>
           print("{}")
 
         case JSObjectConstr(fields) =>
