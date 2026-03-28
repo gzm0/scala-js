@@ -1926,7 +1926,7 @@ object Serializers {
       val jlClassType = ClassType(ClassClass, nullable = true, exact = false)
 
       val newInstanceRecName = MethodName("newInstanceRec",
-          List(jlClassRef, intArrayTypeRef, IntRef), objectRef)
+          Vector(jlClassRef, intArrayTypeRef, IntRef), objectRef)
 
       val EAF = ApplyFlags.empty
 
@@ -1950,7 +1950,7 @@ object Serializers {
 
         implicit val pos = Position.NoPosition
 
-        val getComponentTypeName = MethodName("getComponentType", Nil, jlClassRef)
+        val getComponentTypeName = MethodName("getComponentType", Vector.empty, jlClassRef)
 
         val ths = This()(ClassType(ReflectArrayModClass, nullable = false, exact = false))
 
@@ -2901,16 +2901,16 @@ object Serializers {
     private val applySimpleName = SimpleMethodName("apply")
 
     val cloneName: MethodName =
-      MethodName("clone", Nil, ObjectRef)
+      MethodName("clone", Vector.empty, ObjectRef)
 
     val identityHashCodeName: MethodName =
-      MethodName("identityHashCode", List(ObjectRef), IntRef)
+      MethodName("identityHashCode", Vector(ObjectRef), IntRef)
 
     val newInstanceSingleName: MethodName =
-      MethodName("newInstance", List(ClassRef(ClassClass), IntRef), ObjectRef)
+      MethodName("newInstance", Vector(ClassRef(ClassClass), IntRef), ObjectRef)
 
     val newInstanceMultiName: MethodName =
-      MethodName("newInstance", List(ClassRef(ClassClass), ArrayTypeRef(IntRef, 1)), ObjectRef)
+      MethodName("newInstance", Vector(ClassRef(ClassClass), ArrayTypeRef(IntRef, 1)), ObjectRef)
 
     private val anonFunctionArities: Map[ClassName, Int] =
       (0 to 22).map(arity => ClassName(s"scala.scalajs.runtime.AnonFunction$arity") -> arity).toMap
@@ -2928,7 +2928,7 @@ object Serializers {
         NewLambda.Descriptor(
           superClass = className,
           interfaces = Vector.empty,
-          methodName = MethodName(applySimpleName, List.fill(arity)(ObjectRef), ObjectRef),
+          methodName = MethodName(applySimpleName, Vector.fill(arity)(ObjectRef), ObjectRef),
           paramTypes = Vector.fill(arity)(AnyType),
           resultType = AnyType
         )
@@ -2939,7 +2939,7 @@ object Serializers {
       NewLambda.Descriptor(
         superClass = AnonFunctionXXLClass,
         interfaces = Vector.empty,
-        methodName = MethodName(applySimpleName, List(ObjectArrayType.arrayTypeRef), ObjectRef),
+        methodName = MethodName(applySimpleName, Vector(ObjectArrayType.arrayTypeRef), ObjectRef),
         paramTypes = Vector(ObjectArrayType),
         resultType = AnyType
       )
