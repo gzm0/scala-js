@@ -702,7 +702,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
           else Some(genLoadModule(sym))
 
         val staticInitializerStats =
-          reflectInit.toList ::: staticModuleInit.toList
+          reflectInit.toVector ++ staticModuleInit.toVector
         if (staticInitializerStats.nonEmpty) {
           List(genStaticConstructorWithStats(
               jswkn.StaticInitializerName,
@@ -737,15 +737,15 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
                 ClassKind.Class,
                 None,
                 Some(js.ClassIdent(jswkn.ObjectClass)),
-                Nil,
+                Vector.empty,
                 None,
                 None,
-                fields = Nil,
+                fields = Vector.empty,
                 methods = forwarders,
                 jsConstructor = None,
-                jsMethodProps = Nil,
-                jsNativeMembers = Nil,
-                topLevelExportDefs = Nil
+                jsMethodProps = Vector.empty,
+                jsNativeMembers = Vector.empty,
+                topLevelExportDefs = Vector.empty
               )(js.OptimizerHints.empty)
               generatedStaticForwarderClasses += sym -> forwardersClassDef
             }
@@ -959,10 +959,10 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
         implicit val pos = origJsClass.pos
         val parent = js.ClassIdent(jswkn.ObjectClass)
         js.ClassDef(origJsClass.name, origJsClass.originalName,
-            ClassKind.AbstractJSType, None, Some(parent), interfaces = Nil,
-            jsSuperClass = None, jsNativeLoadSpec = None, fields = Nil,
-            methods = origJsClass.methods, jsConstructor = None, jsMethodProps = Nil,
-            jsNativeMembers = Nil, topLevelExportDefs = Nil)(
+            ClassKind.AbstractJSType, None, Some(parent), interfaces = Vector.empty,
+            jsSuperClass = None, jsNativeLoadSpec = None, fields = Vector.empty,
+            methods = origJsClass.methods, jsConstructor = None, jsMethodProps = Vector.empty,
+            jsNativeMembers = Vector.empty, topLevelExportDefs = Vector.empty)(
             origJsClass.optimizerHints)
       }
 
@@ -1066,7 +1066,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
           js.JSMethodApply(
             js.JSGlobalRef("Object"),
             js.StringLiteral("defineProperty"),
-            List(
+            Vector(
               selfRef,
               genPrivateFieldsSymbol(),
               js.JSObjectConstr(List(
@@ -1089,7 +1089,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
             val ident =
               origJsClass.superClass.getOrElse(abort("No superclass"))
             if (args.isEmpty && ident.name == JSObjectClassName)
-              js.JSObjectConstr(Nil)
+              js.JSObjectConstr(Vector.empty)
             else
               js.JSNew(jsSuperClassRef, args)
           }
@@ -1394,7 +1394,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
           js.MemberFlags.empty.withNamespace(js.MemberNamespace.StaticConstructor),
           js.MethodIdent(name),
           NoOriginalName,
-          Nil,
+          Vector.empty,
           jstpe.VoidType,
           Some(stats))(
           OptimizerHints.empty, Unversioned)
@@ -6756,13 +6756,13 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
             NoOriginalName,
             closure.captureParams,
             jstpe.VoidType,
-            Some(js.Block(List(
+            Some(js.Block(
                 js.Block(captureFieldAssignments),
                 js.ApplyStatically(js.ApplyFlags.empty.withConstructor(true),
                     js.This()(thisType),
                     jswkn.ObjectClass,
                     js.MethodIdent(jswkn.NoArgConstructorName),
-                    Nil)(jstpe.VoidType)))))(
+                    Vector.empty)(jstpe.VoidType))))(
             js.OptimizerHints.empty, Unversioned)
       }
 
@@ -6827,9 +6827,9 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
           fields = captureFieldDefs,
           methods = ctorDef :: samMethodDef :: samBridgeMethodDefs,
           jsConstructor = None,
-          Nil,
-          Nil,
-          Nil)(
+          Vector.empty,
+          Vector.empty,
+          Vector.empty)(
           js.OptimizerHints.empty.withInline(true))
 
       generatedClasses += classDef -> pos
@@ -6940,7 +6940,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
 
       if (isJSType(sym.owner)) {
         if (!isNonNativeJSClass(sym.owner) || isExposed(sym))
-          genJSCallGeneric(sym, moduleOrGlobalScope, args = Nil, isStat = false)
+          genJSCallGeneric(sym, moduleOrGlobalScope, args = Vector.empty, isStat = false)
         else
           genApplyJSClassMethod(module, sym, arguments = Nil)
       } else {
@@ -7007,9 +7007,9 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
          */
         val className = encodeClassName(sym0.originalOwner)
         val getterSimpleName = sym0.rawname.toString()
-        val getterMethodName = MethodName(getterSimpleName, Nil, toTypeRef(sym0.tpe))
+        val getterMethodName = MethodName(getterSimpleName, Vector.empty, toTypeRef(sym0.tpe))
         val tree = {
-          js.ApplyStatic(js.ApplyFlags.empty, className, js.MethodIdent(getterMethodName), Nil)(
+          js.ApplyStatic(js.ApplyFlags.empty, className, js.MethodIdent(getterMethodName), Vector.empty)(
               toIRType(sym0.tpe))
         }
         MaybeGlobalScope.NotGlobalScope(tree)
@@ -7107,7 +7107,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
      */
     private def genJSBracketMethodApplyOrGlobalRefApply(
         receiver: MaybeGlobalScope, method: js.Tree,
-        args: List[js.TreeOrJSSpread])(
+        args: Vector[js.TreeOrJSSpread])(
         implicit pos: Position): js.Tree = {
       receiver match {
         case MaybeGlobalScope.NotGlobalScope(receiverTree) =>
@@ -7219,7 +7219,7 @@ abstract class GenJSCode[G <: Global with Singleton](val global: G)
       } else {
         val className = encodeClassName(sym.owner)
         val method = encodeStaticFieldGetterSym(sym)
-        js.ApplyStatic(js.ApplyFlags.empty, className, method, Nil)(toIRType(sym.tpe))
+        js.ApplyStatic(js.ApplyFlags.empty, className, method, Vector.empty)(toIRType(sym.tpe))
       }
     }
   }
@@ -7460,21 +7460,21 @@ private object GenJSCode {
   private val newSimpleMethodName = SimpleMethodName("new")
 
   private val ObjectArgConstructorName =
-    MethodName.constructor(List(jswkn.ObjectRef))
+    MethodName.constructor(Vector(jswkn.ObjectRef))
 
   private val thisOriginalName = OriginalName("this")
 
   private object BlockOrAlone {
-    def unapply(tree: js.Tree): Some[(List[js.Tree], js.Tree)] = tree match {
+    def unapply(tree: js.Tree): Some[(Vector[js.Tree], js.Tree)] = tree match {
       case js.Block(trees) => Some((trees.init, trees.last))
-      case _               => Some((Nil, tree))
+      case _               => Some((Vector.empty, tree))
     }
   }
 
   private object FirstInBlockOrAlone {
-    def unapply(tree: js.Tree): Some[(js.Tree, List[js.Tree])] = tree match {
+    def unapply(tree: js.Tree): Some[(js.Tree, Vector[js.Tree])] = tree match {
       case js.Block(trees) => Some((trees.head, trees.tail))
-      case _               => Some((tree, Nil))
+      case _               => Some((tree, Vector.empty))
     }
   }
 
@@ -7582,46 +7582,46 @@ private object GenJSCode {
     // scalafmt: { maxColumn = 110, align.tokens."+" = [{ code = "->" }] }
     val byClass: Map[ClassName, Map[MethodName, JavalibOpBody]] = Map(
       jswkn.BoxedIntegerClass.withSuffix("$") -> Map(
-        m("toUnsignedLong", List(I), J)       -> ArgUnaryOp(unop.UnsignedIntToLong),
-        m("divideUnsigned", List(I, I), I)    -> ArgBinaryOp(binop.Int_unsigned_/),
-        m("remainderUnsigned", List(I, I), I) -> ArgBinaryOp(binop.Int_unsigned_%),
-        m("numberOfLeadingZeros", List(I), I) -> ArgUnaryOp(unop.Int_clz)
+        m("toUnsignedLong", Vector(I), J)       -> ArgUnaryOp(unop.UnsignedIntToLong),
+        m("divideUnsigned", Vector(I, I), I)    -> ArgBinaryOp(binop.Int_unsigned_/),
+        m("remainderUnsigned", Vector(I, I), I) -> ArgBinaryOp(binop.Int_unsigned_%),
+        m("numberOfLeadingZeros", Vector(I), I) -> ArgUnaryOp(unop.Int_clz)
       ),
       jswkn.BoxedLongClass.withSuffix("$") -> Map(
-        m("divideUnsigned", List(J, J), J)    -> ArgBinaryOp(binop.Long_unsigned_/),
-        m("remainderUnsigned", List(J, J), J) -> ArgBinaryOp(binop.Long_unsigned_%),
-        m("numberOfLeadingZeros", List(J), I) -> ArgUnaryOp(unop.Long_clz)
+        m("divideUnsigned", Vector(J, J), J)    -> ArgBinaryOp(binop.Long_unsigned_/),
+        m("remainderUnsigned", Vector(J, J), J) -> ArgBinaryOp(binop.Long_unsigned_%),
+        m("numberOfLeadingZeros", Vector(J), I) -> ArgUnaryOp(unop.Long_clz)
       ),
       jswkn.BoxedFloatClass.withSuffix("$") -> Map(
-        m("floatToRawIntBits", List(F), I) -> ArgUnaryOp(unop.Float_toBits),
-        m("intBitsToFloat", List(I), F)    -> ArgUnaryOp(unop.Float_fromBits)
+        m("floatToRawIntBits", Vector(F), I) -> ArgUnaryOp(unop.Float_toBits),
+        m("intBitsToFloat", Vector(I), F)    -> ArgUnaryOp(unop.Float_fromBits)
       ),
       jswkn.BoxedDoubleClass.withSuffix("$") -> Map(
-        m("doubleToRawLongBits", List(D), J) -> ArgUnaryOp(unop.Double_toBits),
-        m("longBitsToDouble", List(J), D)    -> ArgUnaryOp(unop.Double_fromBits)
+        m("doubleToRawLongBits", Vector(D), J) -> ArgUnaryOp(unop.Double_toBits),
+        m("longBitsToDouble", Vector(J), D)    -> ArgUnaryOp(unop.Double_fromBits)
       ),
       jswkn.BoxedStringClass -> Map(
-        m("length", Nil, I)     -> ThisUnaryOp(unop.String_length),
-        m("charAt", List(I), C) -> ThisBinaryOp(binop.String_charAt)
+        m("length", Vector.empty, I) -> ThisUnaryOp(unop.String_length),
+        m("charAt", Vector(I), C)    -> ThisBinaryOp(binop.String_charAt)
       ),
       jswkn.ClassClass -> Map(
         // Unary operators
-        m("getName", Nil, T)           -> ThisUnaryOp(unop.Class_name),
-        m("isPrimitive", Nil, Z)       -> ThisUnaryOp(unop.Class_isPrimitive),
-        m("isInterface", Nil, Z)       -> ThisUnaryOp(unop.Class_isInterface),
-        m("isArray", Nil, Z)           -> ThisUnaryOp(unop.Class_isArray),
-        m("getComponentType", Nil, CC) -> ThisUnaryOp(unop.Class_componentType),
-        m("getSuperclass", Nil, CC)    -> ThisUnaryOp(unop.Class_superClass),
+        m("getName", Vector.empty, T)           -> ThisUnaryOp(unop.Class_name),
+        m("isPrimitive", Vector.empty, Z)       -> ThisUnaryOp(unop.Class_isPrimitive),
+        m("isInterface", Vector.empty, Z)       -> ThisUnaryOp(unop.Class_isInterface),
+        m("isArray", Vector.empty, Z)           -> ThisUnaryOp(unop.Class_isArray),
+        m("getComponentType", Vector.empty, CC) -> ThisUnaryOp(unop.Class_componentType),
+        m("getSuperclass", Vector.empty, CC)    -> ThisUnaryOp(unop.Class_superClass),
         // Binary operators
-        m("isInstance", List(O), Z)        -> ThisBinaryOp(binop.Class_isInstance),
-        m("isAssignableFrom", List(CC), Z) -> ThisBinaryOp(binop.Class_isAssignableFrom, checkNulls = true),
-        m("cast", List(O), O)              -> ThisBinaryOp(binop.Class_cast)
+        m("isInstance", Vector(O), Z)        -> ThisBinaryOp(binop.Class_isInstance),
+        m("isAssignableFrom", Vector(CC), Z) -> ThisBinaryOp(binop.Class_isAssignableFrom, checkNulls = true),
+        m("cast", Vector(O), O)              -> ThisBinaryOp(binop.Class_cast)
       ),
       ClassName("java.lang.System$") -> Map(
-        m("identityHashCode", List(O), I) -> ArgUnaryOp(unop.IdentityHashCode)
+        m("identityHashCode", Vector(O), I) -> ArgUnaryOp(unop.IdentityHashCode)
       ),
       ClassName("java.lang.reflect.Array$") -> Map(
-        m("newInstance", List(CC, I), O) -> ArgBinaryOp(binop.Class_newArray, checkNulls = true)
+        m("newInstance", Vector(CC, I), O) -> ArgBinaryOp(binop.Class_newArray, checkNulls = true)
       )
     )
     // scalafmt: {}

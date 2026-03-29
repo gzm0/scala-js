@@ -28,9 +28,9 @@ import org.scalajs.linker.standard.ModuleSet.ModuleID
 object Infos {
 
   private val StringArgConstructorName =
-    MethodName.constructor(List(ClassRef(BoxedStringClass)))
+    MethodName.constructor(Vector(ClassRef(BoxedStringClass)))
 
-  private val cloneMethodName = MethodName("clone", Nil, ClassRef(ObjectClass))
+  private val cloneMethodName = MethodName("clone", Vector.empty, ClassRef(ObjectClass))
 
   /* Elements of WrapAsThrowable and UnwrapFromThrowable used by the Emitter
    * In theory, these should be an implementation detail of the Emitter, and
@@ -39,7 +39,7 @@ object Infos {
    * would be annoying.
    */
   private val JavaScriptExceptionClass = ClassName("scala.scalajs.js.JavaScriptException")
-  private val AnyArgConstructorName = MethodName.constructor(List(ClassRef(ObjectClass)))
+  private val AnyArgConstructorName = MethodName.constructor(Vector(ClassRef(ObjectClass)))
 
   final case class NamespacedMethodName(
       namespace: MemberNamespace, methodName: MethodName)

@@ -1654,7 +1654,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
 private object AnalyzerRun {
   private val getSuperclassMethodName =
-    MethodName("getSuperclass", Nil, ClassRef(ClassClass))
+    MethodName("getSuperclass", Vector.empty, ClassRef(ClassClass))
 
   private class WorkTracker(implicit ec: ExecutionContext) {
 

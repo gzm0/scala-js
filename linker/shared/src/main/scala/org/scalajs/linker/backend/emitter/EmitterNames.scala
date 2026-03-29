@@ -34,21 +34,21 @@ private[emitter] object EmitterNames {
 
   // Method names
 
-  val AnyArgConstructorName = MethodName.constructor(List(ClassRef(ObjectClass)))
-  val IntArgConstructorName = MethodName.constructor(List(IntRef))
-  val StringArgConstructorName = MethodName.constructor(List(ClassRef(BoxedStringClass)))
-  val ThrowableArgConsructorName = MethodName.constructor(List(ClassRef(ThrowableClass)))
+  val AnyArgConstructorName = MethodName.constructor(Vector(ClassRef(ObjectClass)))
+  val IntArgConstructorName = MethodName.constructor(Vector(IntRef))
+  val StringArgConstructorName = MethodName.constructor(Vector(ClassRef(BoxedStringClass)))
+  val ThrowableArgConsructorName = MethodName.constructor(Vector(ClassRef(ThrowableClass)))
 
-  val cloneMethodName = MethodName("clone", Nil, ClassRef(ObjectClass))
-  val getClassMethodName = MethodName("getClass", Nil, ClassRef(ClassClass))
-  val hashCodeMethodName = MethodName("hashCode", Nil, IntRef)
-  val toStringMethodName = MethodName("toString", Nil, ClassRef(BoxedStringClass))
+  val cloneMethodName = MethodName("clone", Vector.empty, ClassRef(ObjectClass))
+  val getClassMethodName = MethodName("getClass", Vector.empty, ClassRef(ClassClass))
+  val hashCodeMethodName = MethodName("hashCode", Vector.empty, IntRef)
+  val toStringMethodName = MethodName("toString", Vector.empty, ClassRef(BoxedStringClass))
 
-  val getNameMethodName = MethodName("getName", Nil, ClassRef(BoxedStringClass))
-  val getSuperclassMethodName = MethodName("getSuperclass", Nil, ClassRef(ClassClass))
+  val getNameMethodName = MethodName("getName", Vector.empty, ClassRef(BoxedStringClass))
+  val getSuperclassMethodName = MethodName("getSuperclass", Vector.empty, ClassRef(ClassClass))
 
-  val floatToBits = MethodName("floatToBits", List(FloatRef), IntRef)
-  val floatFromBits = MethodName("floatFromBits", List(IntRef), DoubleRef) // yes, Double
-  val doubleToBits = MethodName("doubleToBits", List(DoubleRef), LongRef)
-  val doubleFromBits = MethodName("doubleFromBits", List(LongRef), DoubleRef)
+  val floatToBits = MethodName("floatToBits", Vector(FloatRef), IntRef)
+  val floatFromBits = MethodName("floatFromBits", Vector(IntRef), DoubleRef) // yes, Double
+  val doubleToBits = MethodName("doubleToBits", Vector(DoubleRef), LongRef)
+  val doubleFromBits = MethodName("doubleFromBits", Vector(LongRef), DoubleRef)
 }
