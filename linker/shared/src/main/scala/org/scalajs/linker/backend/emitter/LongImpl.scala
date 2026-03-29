@@ -20,9 +20,9 @@ private[linker] object LongImpl {
   final val RuntimeLongClass = ClassName("org.scalajs.linker.runtime.RuntimeLong")
   final val RuntimeLongModClass = ClassName("org.scalajs.linker.runtime.RuntimeLong$")
 
-  private final val TwoIntRefs = IntRef :: IntRef :: Nil
-  private final val ThreeIntRefs = IntRef :: TwoIntRefs
-  private final val FourIntRefs = IntRef :: ThreeIntRefs
+  private final val TwoIntRefs = Vector.fill(2)(IntRef)
+  private final val ThreeIntRefs = Vector.fill(3)(IntRef)
+  private final val FourIntRefs = Vector.fill(4)(IntRef)
 
   final val pack = MethodName("pack", TwoIntRefs, LongRef)
 
