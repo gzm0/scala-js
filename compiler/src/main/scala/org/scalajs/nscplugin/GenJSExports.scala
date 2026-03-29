@@ -324,7 +324,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
           None
         } else {
           val formalArgsRegistry = new FormalArgsRegistry(1, false)
-          val (List(arg), None) = formalArgsRegistry.genFormalArgs()
+          val (Vector(arg), None) = formalArgsRegistry.genFormalArgs()
 
           val body = {
             if (setters.size == 1) {
@@ -393,7 +393,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
     }
 
     def genOverloadDispatch(jsName: JSName, alts: List[Exported], tpe: jstpe.Type)(
-        implicit pos: Position): (List[js.ParamDef], Option[js.ParamDef], js.Tree) = {
+        implicit pos: Position): (Vector[js.ParamDef], Option[js.ParamDef], js.Tree) = {
       // Factor out methods with variable argument lists. Note that they can
       // only be at the end of the lists as enforced by PrepJSExports
       val (varArgMeths, normalMeths) = alts.partition(_.hasRepeatedParam)
@@ -488,7 +488,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
         methods.size == varArgMeths.size && methods.forall(varArgMeths.contains(_))
 
       // Generate a case block for each (methods, argCounts) tuple
-      val cases: List[(List[js.IntLiteral], js.Tree)] = for {
+      val cases: Vector[(Vector[js.MatchableLiteral], js.Tree)] = (for {
         (methods, argcs) <- caseDefinitions
         if methods.nonEmpty && argcs.nonEmpty && !isSameAsVarArgMethods(methods)
       } yield {
@@ -1069,7 +1069,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
         restParam
       } else {
         js.JSMethodApply(restParam, js.StringLiteral("slice"),
-            List(js.IntLiteral(fixedParamCount - minArgc)))
+            Vector(js.IntLiteral(fixedParamCount - minArgc)))
       }
     }
 

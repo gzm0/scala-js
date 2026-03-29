@@ -817,7 +817,7 @@ abstract class PrepJSInterop[G <: Global with Singleton](val global: G)
       import JSNativeLoadSpec._
 
       def makeGlobalRefNativeLoadSpec(globalRef: String,
-          path: List[String]): Global = {
+          path: Vector[String]): Global = {
         val validatedGlobalRef = if (!JSGlobalRef.isValidJSGlobalRefName(globalRef)) {
           reporter.error(pos,
               "The name of a JS global variable must be a valid JS " +
@@ -866,7 +866,7 @@ abstract class PrepJSInterop[G <: Global with Singleton](val global: G)
           val loadSpec = ownerLoadSpec match {
             case None =>
               // The owner is a JSGlobalScope
-              makeGlobalRefNativeLoadSpec(jsName, Nil)
+              makeGlobalRefNativeLoadSpec(jsName, Vector.empty)
             case Some(Global(globalRef, path)) =>
               Global(globalRef, path :+ jsName)
             case Some(Import(module, path)) =>
@@ -882,8 +882,8 @@ abstract class PrepJSInterop[G <: Global with Singleton](val global: G)
           None
         }
       } else {
-        def parsePath(pathName: String): List[String] =
-          pathName.split('.').toList
+        def parsePath(pathName: String): Vector[String] =
+          pathName.split('.').toVector
 
         def parseGlobalPath(pathName: String): Global = {
           val globalRef :: path = parsePath(pathName)
@@ -932,7 +932,7 @@ abstract class PrepJSInterop[G <: Global with Singleton](val global: G)
                 }
                 parsePath(jsInterop.defaultJSNameOf(sym))
               } else {
-                Nil
+                Vector.empty
               }
             } { pathName =>
               parsePath(pathName)
@@ -953,7 +953,7 @@ abstract class PrepJSInterop[G <: Global with Singleton](val global: G)
             /* We already emitted an error. Invent something not to cause
              * cascading errors.
              */
-            Some(JSNativeLoadSpec.Global("erroneous", Nil))
+            Some(JSNativeLoadSpec.Global("erroneous", Vector.empty))
         }
       }
     }

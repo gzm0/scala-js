@@ -101,9 +101,9 @@ object DerivedClasses {
       ParamDef(LocalIdent(fieldName.simpleName.toLocalName), NON, primType, mutable = false)
     val derivedCtor = MethodDef(
       EMF.withNamespace(MemberNamespace.Constructor),
-      MethodIdent(MethodName.constructor(List(primType.primRef))),
+      MethodIdent(MethodName.constructor(Vector(primType.primRef))),
       NON,
-      List(ctorParamDef),
+      Vector(ctorParamDef),
       VoidType,
       Some(Assign(selectField, ctorParamDef.ref))
     )(EOH, NOV)
