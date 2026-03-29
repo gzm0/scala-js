@@ -2285,7 +2285,7 @@ private class FunctionEmitter private (
   }
 
   private def genThrowArithmeticException()(implicit pos: Position): Unit = {
-    val ctorName = MethodName.constructor(List(ClassRef(BoxedStringClass)))
+    val ctorName = MethodName.constructor(Vector(ClassRef(BoxedStringClass)))
     genNewScalaClass(ArithmeticExceptionClass, ctorName) {
       fb += ctx.stringPool.getConstantStringInstr("/ by zero")
     }
