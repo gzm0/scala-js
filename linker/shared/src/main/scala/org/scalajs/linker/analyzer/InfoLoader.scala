@@ -108,12 +108,12 @@ private[analyzer] object InfoLoader {
     }
 
     private def generateInfos(classDef: ClassDef): Infos.ClassInfo = {
-      val referencedFieldClasses = generator.genReferencedFieldClasses(classDef.fields)
+      val referencedFieldClasses = generator.genReferencedFieldClasses(classDef.fields.toList)
 
-      prevMethodInfos = genMethodInfos(classDef.methods, prevMethodInfos, generator)
+      prevMethodInfos = genMethodInfos(classDef.methods.toList, prevMethodInfos, generator)
       prevJSCtorInfo = genJSCtorInfo(classDef.jsConstructor, prevJSCtorInfo, generator)
       prevJSMethodPropDefInfos =
-        genJSMethodPropDefInfos(classDef.jsMethodProps, prevJSMethodPropDefInfos, generator)
+        genJSMethodPropDefInfos(classDef.jsMethodProps.toList, prevJSMethodPropDefInfos, generator)
 
       val exportedMembers = prevJSCtorInfo.toList ::: prevJSMethodPropDefInfos
 
@@ -121,14 +121,14 @@ private[analyzer] object InfoLoader {
        * and usually quite small when they exist.
        */
       val topLevelExports = classDef.topLevelExportDefs
-        .map(generator.generateTopLevelExportInfo(classDef.name.name, _))
+        .map(generator.generateTopLevelExportInfo(classDef.name.name, _)).toList
 
       val jsNativeMembers = classDef.jsNativeMembers
         .map(m => m.name.name -> m.jsNativeLoadSpec).toMap
 
       new Infos.ClassInfo(classDef.className, classDef.kind, syntheticKind = None,
           nonExistent = false, classDef.superClass.map(_.name),
-          classDef.interfaces.map(_.name), classDef.jsNativeLoadSpec,
+          classDef.interfaces.map(_.name).toList, classDef.jsNativeLoadSpec,
           referencedFieldClasses, prevMethodInfos, jsNativeMembers, exportedMembers,
           topLevelExports)
     }

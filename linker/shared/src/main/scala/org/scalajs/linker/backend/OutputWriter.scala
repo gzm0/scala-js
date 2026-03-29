@@ -38,7 +38,7 @@ private[backend] abstract class OutputWriter(output: OutputDirectory,
   def write(moduleSet: ModuleSet)(implicit ec: ExecutionContext): Future[Report] = {
     val ioThrottler = new IOThrottler(config.maxConcurrentWrites)
 
-    def filesToRemove(seen: Set[String], reports: List[Report.Module]): Set[String] =
+    def filesToRemove(seen: Set[String], reports: Seq[Report.Module]): Set[String] =
       seen -- reports.flatMap(r => r.jsFileName :: r.sourceMapName.toList)
 
     for {

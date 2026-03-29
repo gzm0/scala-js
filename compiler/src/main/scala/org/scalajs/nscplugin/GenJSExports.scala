@@ -492,15 +492,15 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
         (methods, argcs) <- caseDefinitions
         if methods.nonEmpty && argcs.nonEmpty && !isSameAsVarArgMethods(methods)
       } yield {
-        val argcAlternatives = argcs.map(argc => js.IntLiteral(argc - minArgc))
+        val argcAlternatives = argcs.map(argc => js.IntLiteral(argc - minArgc): js.MatchableLiteral)
 
         // body of case to disambiguate methods with current count
         val maxUsableArgc = argcs.head // i.e., the *minimum* of the argcs here
         val caseBody = genOverloadDispatchSameArgc(jsName, formalArgsRegistry,
             methods, tpe, paramIndex = 0, Some(maxUsableArgc))
 
-        (argcAlternatives, caseBody)
-      }
+        (argcAlternatives.toVector, caseBody)
+      }).toVector
 
       def defaultCase = {
         if (!hasVarArg) {
@@ -729,7 +729,7 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
 
       val jsResult = genResult(sym, builtVarDefs.map(_.ref), static, inline)
 
-      js.Block(builtVarDefs :+ jsResult)
+      js.Block((builtVarDefs :+ jsResult).toVector)
     }
 
     /** Generates a Scala argument from dispatched JavaScript arguments
@@ -1036,8 +1036,8 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
       if (needsRestParam) freshLocalIdent("rest")(NoPosition).name
       else null
 
-    def genFormalArgs()(implicit pos: Position): (List[js.ParamDef], Option[js.ParamDef]) = {
-      val fixedParamDefs = fixedParamNames.toList.map { paramName =>
+    def genFormalArgs()(implicit pos: Position): (Vector[js.ParamDef], Option[js.ParamDef]) = {
+      val fixedParamDefs = fixedParamNames.toVector.map { paramName =>
         js.ParamDef(js.LocalIdent(paramName), NoOriginalName, jstpe.AnyType,
             mutable = false)
       }
@@ -1079,14 +1079,14 @@ trait GenJSExports[G <: Global with Singleton] extends SubComponent {
       js.VarRef(restParamName)(jstpe.AnyType)
     }
 
-    def genAllArgsRefsForForwarder()(implicit pos: Position): List[js.TreeOrJSSpread] = {
-      val fixedArgRefs = fixedParamNames.toList.map { paramName =>
+    def genAllArgsRefsForForwarder()(implicit pos: Position): Vector[js.TreeOrJSSpread] = {
+      val fixedArgRefs = fixedParamNames.toVector.map { paramName =>
         js.VarRef(paramName)(jstpe.AnyType)
       }
 
       if (needsRestParam) {
         val restArgRef = js.VarRef(restParamName)(jstpe.AnyType)
-        fixedArgRefs :+ js.JSSpread(restArgRef)
+        fixedArgRefs :+ (js.JSSpread(restArgRef): js.TreeOrJSSpread)
       } else {
         fixedArgRefs
       }

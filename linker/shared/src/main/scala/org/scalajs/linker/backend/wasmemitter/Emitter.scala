@@ -215,7 +215,7 @@ final class Emitter(config: Emitter.Config) {
 
     val helperID = builder.build(AnyNotNullType) {
       js.Return {
-        val (argsParamDefs, restParamDef) = builder.genJSParamDefs(params, restParam)
+        val (argsParamDefs, restParamDef) = builder.genJSParamDefs(params.toList, restParam)
         // Exported defs must be `function`s although they do not use their `this`
         js.Function(ClosureFlags.function, argsParamDefs, restParamDef, {
           js.Return(js.Apply(

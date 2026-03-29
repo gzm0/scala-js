@@ -150,9 +150,9 @@ class CustomJSHelperBuilder()(implicit ctx: WasmContext, pos: Position) {
 
     jsNativeLoadSpec match {
       case JSNativeLoadSpec.Global(globalRef, path) =>
-        genFollowPath(genGlobalRef(globalRef), path)
+        genFollowPath(genGlobalRef(globalRef), path.toList)
       case JSNativeLoadSpec.Import(module, path) =>
-        genFollowPath(js.VarRef(js.Ident("imported" + JSNameGen.genModuleName(module))), path)
+        genFollowPath(js.VarRef(js.Ident("imported" + JSNameGen.genModuleName(module))), path.toList)
       case JSNativeLoadSpec.ImportWithGlobalFallback(importSpec, _) =>
         genJSNativeLoadSpec(importSpec)
     }

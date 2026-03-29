@@ -2095,7 +2095,9 @@ object Serializers {
           }
 
           bodyStats.span(!_.isInstanceOf[JSSuperConstructorCall]) match {
-            case (beforeSuper, (superCall: JSSuperConstructorCall) :: afterSuper0) =>
+            case (beforeSuper, afterWithSuper) if afterWithSuper.nonEmpty =>
+              val superCall = afterWithSuper.head.asInstanceOf[JSSuperConstructorCall]
+              val afterSuper0 = afterWithSuper.tail
               val newFlags = flags.withNamespace(MemberNamespace.Constructor)
               val afterSuper =
                 maybeHackJSConstructorDefAfterSuper(ownerKind, afterSuper0, superCall.pos)
@@ -2339,8 +2341,8 @@ object Serializers {
         afterSuper0: Vector[Tree], superCallPos: Position): Vector[Tree] = {
       if (hacks.useBelow(18) && ownerKind == ClassKind.JSModuleClass) {
         afterSuper0 match {
-          case StoreModule() :: _ => afterSuper0
-          case _                  => StoreModule()(superCallPos) :: afterSuper0
+          case _ if afterSuper0.headOption.exists(_.isInstanceOf[StoreModule]) => afterSuper0
+          case _                  => StoreModule()(superCallPos) +: afterSuper0
         }
       } else {
         afterSuper0

@@ -241,7 +241,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
       // If the class has a super class, move it first for the benefit of Class_superClass
       val strictAncestors = clazz.superClass match {
         case Some(ClassIdent(superClass)) =>
-          superClass :: strictAncestors0.filter(_ != superClass)
+          superClass +: strictAncestors0.filter(_ != superClass)
         case None =>
           strictAncestors0
       }
@@ -969,7 +969,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
     implicit val pos: Position = Position.NoPosition
 
     val className = clazz.className
-    val jsClassCaptures = clazz.jsClassCaptures.getOrElse(Nil)
+    val jsClassCaptures: List[ParamDef] = clazz.jsClassCaptures.fold(Nil: List[ParamDef])(_.toList)
 
     /* We need to decompose the body of the constructor into 3 closures.
      * Given an IR constructor of the form
@@ -1121,7 +1121,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
 
       val jsCtorDef: js.MethodDef = {
         val JSConstructorDef(_, params, restParam, body) = ctor
-        val (paramDefs, restParamDef) = helperBuilder.genJSParamDefs(params, restParam)
+        val (paramDefs, restParamDef) = helperBuilder.genJSParamDefs(params.toList, restParam)
         val allParamRefs = (paramDefs ::: restParamDef.toList).map(_.ref)
         js.MethodDef(static = false, js.Ident("constructor"), paramDefs, restParamDef, {
           val preSuperEnv = helperBuilder.newLocalIdent("preSuperEnv")
@@ -1161,7 +1161,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
       }
 
       // Methods and properties
-      val jsMethodProps: List[js.Tree] = clazz.exportedMembers.flatMap { methodOrProp =>
+      val jsMethodProps: List[js.Tree] = clazz.exportedMembers.toList.flatMap { methodOrProp =>
         val isStatic = methodOrProp.flags.namespace.isStatic
         val jsThisUnlessStatic = if (isStatic) Nil else List(js.This())
 
@@ -1178,7 +1178,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
               Some(className),
               Some(jsClassCaptures),
               receiverType,
-              params,
+              params.toList,
               restParam,
               body,
               AnyType
@@ -1187,7 +1187,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
               fb += ctx.refFuncWithDeclaration(closureFuncID)
             }
 
-            val (argsParamDefs, restParamDef) = helperBuilder.genJSParamDefs(params, restParam)
+            val (argsParamDefs, restParamDef) = helperBuilder.genJSParamDefs(params.toList, restParam)
             val jsMethodDef = js.MethodDef(isStatic, nameRef, argsParamDefs, restParamDef, {
               js.Return(js.Apply(
                 fRef,
@@ -1256,7 +1256,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
           jsCtorDef :: jsMethodProps)
 
       // Static fields
-      val jsInitStaticFields = for {
+      val jsInitStaticFields: List[js.Tree] = (for {
         fieldDef <- clazz.fields if fieldDef.flags.namespace.isStatic
       } yield {
         // Name
@@ -1274,7 +1274,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
         val valueRef = helperBuilder.addInput(zeroOf(fieldDef.ftpe))
 
         genDefineProperty(js.VarRef(jsClassIdent), nameRef, valueRef)
-      }
+      }).toList
 
       // Complete the helper
       helperBuilder.build(AnyNotNullType) {
@@ -1425,7 +1425,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
       enclosingClassName = None,
       captureParamDefs = None,
       receiverType = None,
-      method.args,
+      method.args.toList,
       method.restParam,
       method.body,
       resultType = AnyType
@@ -1472,7 +1472,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
       Some(className),
       captureParamDefs = None,
       receiverType,
-      method.args,
+      method.args.toList,
       restParam = None,
       body,
       method.resultType

@@ -724,16 +724,16 @@ private[emitter] final class SJSGen(
 
     spec match {
       case irt.JSNativeLoadSpec.Global(globalRefName, path) =>
-        for (globalVarRef <- globalRef(globalRefName)) yield pathSelection(globalVarRef, path)
+        for (globalVarRef <- globalRef(globalRefName)) yield pathSelection(globalVarRef, path.toList)
 
       case irt.JSNativeLoadSpec.Import(module, path) =>
         val moduleValue = VarRef(externalModuleFieldIdent(module))
         path match {
-          case "default" :: rest if moduleKind == ModuleKind.CommonJSModule =>
+          case "default" +: rest if moduleKind == ModuleKind.CommonJSModule =>
             val defaultField = genCallHelper(VarField.moduleDefault, moduleValue)
-            WithGlobals(pathSelection(defaultField, rest))
+            WithGlobals(pathSelection(defaultField, rest.toList))
           case _ =>
-            WithGlobals(pathSelection(moduleValue, path))
+            WithGlobals(pathSelection(moduleValue, path.toList))
         }
 
       case irt.JSNativeLoadSpec.ImportWithGlobalFallback(importSpec, globalSpec) =>

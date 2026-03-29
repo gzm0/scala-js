@@ -208,12 +208,12 @@ trait JSEncoding[G <: Global with Singleton] extends SubComponent {
 
     val tpe = sym.tpe
 
-    val paramTypeRefs0 = tpe.params.map(p => paramOrResultTypeRef(p.tpe))
+    val paramTypeRefs0 = tpe.params.map(p => paramOrResultTypeRef(p.tpe)).toVector
 
     val hasExplicitThisParameter = isNonNativeJSClass(sym.owner)
     val paramTypeRefs =
       if (!hasExplicitThisParameter) paramTypeRefs0
-      else paramOrResultTypeRef(sym.owner.toTypeConstructor) :: paramTypeRefs0
+      else paramOrResultTypeRef(sym.owner.toTypeConstructor) +: paramTypeRefs0
 
     val name = sym.name
     val simpleName = SimpleMethodName(name.toString())
@@ -238,13 +238,13 @@ trait JSEncoding[G <: Global with Singleton] extends SubComponent {
 
     val name = sym.name
     val resultTypeRef = paramOrResultTypeRef(sym.tpe)
-    val methodName = MethodName(name.toString(), Nil, resultTypeRef)
+    val methodName = MethodName(name.toString(), Vector.empty, resultTypeRef)
     js.MethodIdent(methodName)
   }
 
   def encodeDynamicImportForwarderIdent(params: List[Symbol])(
       implicit pos: Position): js.MethodIdent = {
-    val paramTypeRefs = params.map(sym => paramOrResultTypeRef(sym.tpe))
+    val paramTypeRefs = params.map(sym => paramOrResultTypeRef(sym.tpe)).toVector
     val resultTypeRef = jstpe.ClassRef(jswkn.ObjectClass)
     val methodName =
       MethodName(dynamicImportForwarderSimpleName, paramTypeRefs, resultTypeRef)

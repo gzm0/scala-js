@@ -104,7 +104,7 @@ private[linker] object LambdaSynthesizer {
   def makeConstructorName(descriptor: NewLambda.Descriptor): MethodName = {
     val closureTypeNonNull =
       ClosureType(descriptor.paramTypes, descriptor.resultType, nullable = false)
-    MethodName.constructor(TransientTypeRef(ClosureTypeRefName)(closureTypeNonNull) :: Nil)
+    MethodName.constructor(Vector(TransientTypeRef(ClosureTypeRefName)(closureTypeNonNull)))
   }
 
   /** Computes the `ClassInfo` of a lambda class, for use by the `Analyzer`.
@@ -164,13 +164,13 @@ private[linker] object LambdaSynthesizer {
       MemberFlags.empty.withNamespace(MemberNamespace.Constructor),
       MethodIdent(makeConstructorName(descriptor)),
       NoOriginalName,
-      ctorParamDef :: Nil,
+      Vector(ctorParamDef),
       VoidType,
       Some(
         Block(
           Assign(fFieldSelect, ctorParamDef.ref),
           ApplyStatically(ApplyFlags.empty.withConstructor(true), thiz,
-              superClass, MethodIdent(NoArgConstructorName), Nil)(VoidType)
+              superClass, MethodIdent(NoArgConstructorName), Vector.empty)(VoidType)
         )
       )
     )(OptimizerHints.empty, constantVersion)
@@ -198,12 +198,12 @@ private[linker] object LambdaSynthesizer {
       interfaces = interfaces.map(ClassIdent(_)),
       jsSuperClass = None,
       jsNativeLoadSpec = None,
-      fields = List(fFieldDef),
-      methods = List(ctorDef, methodDef),
+      fields = Vector(fFieldDef),
+      methods = Vector(ctorDef, methodDef),
       jsConstructor = None,
-      jsMethodProps = Nil,
-      jsNativeMembers = Nil,
-      topLevelExportDefs = Nil
+      jsMethodProps = Vector.empty,
+      jsNativeMembers = Vector.empty,
+      topLevelExportDefs = Vector.empty
     )(OptimizerHints.empty.withInline(true))
   }
 }

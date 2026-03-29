@@ -355,7 +355,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       linkedClass.jsSuperClass.isDefined
 
     private def computeJSClassCaptureTypes(linkedClass: LinkedClass): Option[List[Type]] =
-      linkedClass.jsClassCaptures.map(_.map(_.ptpe))
+      linkedClass.jsClassCaptures.map(_.map(_.ptpe).toList)
 
     private def computeJSNativeLoadSpec(linkedClass: LinkedClass): Option[JSNativeLoadSpec] =
       linkedClass.jsNativeLoadSpec
@@ -397,11 +397,11 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       val scalaFieldNamesVersion = linkedClass.fields.collect {
         case FieldDef(_, FieldIdent(name), _, _) => Version.fromUTF8String(name.simpleName.encoded)
       }
-      Version.combine((linkedClass.version :: hasAnyJSFieldVersion :: scalaFieldNamesVersion): _*)
+      Version.combine((linkedClass.version +: hasAnyJSFieldVersion +: scalaFieldNamesVersion): _*)
     }
 
     private def computeFieldDefs(linkedClass: LinkedClass): List[AnyFieldDef] =
-      linkedClass.fields
+      linkedClass.fields.toList
 
     def testAndResetIsAlive(): Boolean = {
       val result = isAlive

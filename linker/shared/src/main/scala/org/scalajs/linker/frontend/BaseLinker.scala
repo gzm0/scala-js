@@ -145,7 +145,7 @@ private[frontend] object BaseLinker {
     // Will stay empty for most classes
     var desugaringRequirements = LinkedClass.DesugaringRequirements.Empty
 
-    val methods: List[MethodDef] = classDef.methods.iterator
+    val methods: Vector[MethodDef] = classDef.methods.iterator
       .map(m => m -> classInfo.methodInfos(m.flags.namespace)(m.methodName))
       .filter(_._2.isReachable)
       .map { case (m, info) =>
@@ -155,20 +155,20 @@ private[frontend] object BaseLinker {
           desugaringRequirements = desugaringRequirements.addMethod(m.flags.namespace, m.methodName)
         m
       }
-      .toList
+      .toVector
 
     val jsConstructor =
       if (classInfo.isAnySubclassInstantiated) classDef.jsConstructor
       else None
 
-    val jsMethodProps =
+    val jsMethodProps: Vector[JSMethodPropDef] =
       if (classInfo.isAnySubclassInstantiated) classDef.jsMethodProps
-      else Nil
+      else Vector.empty
 
     if (classInfo.anyJSMemberNeedsDesugaring)
       desugaringRequirements = desugaringRequirements.addAnyExportedMember()
 
-    val jsNativeMembers = classDef.jsNativeMembers
+    val jsNativeMembers: Vector[JSNativeMemberDef] = classDef.jsNativeMembers
       .filter(m => classInfo.jsNativeMembersUsed.contains(m.name.name))
 
     val allMethods = methods ++ syntheticMethodDefs
@@ -190,7 +190,7 @@ private[frontend] object BaseLinker {
         jsNativeMembers,
         classDef.optimizerHints,
         classDef.pos,
-        ancestors.toList,
+        ancestors.toVector,
         hasInstances = classInfo.isAnySubclassInstantiated,
         hasDirectInstances = classInfo.isInstantiated,
         hasInstanceTests = classInfo.areInstanceTestsUsed,
@@ -203,7 +203,7 @@ private[frontend] object BaseLinker {
         desugaringRequirements,
         version)
 
-    val linkedTopLevelExports = for {
+    val linkedTopLevelExports = (for {
       topLevelExport <- classDef.topLevelExportDefs
     } yield {
       val infos = analysis.topLevelExportInfos(
@@ -211,7 +211,7 @@ private[frontend] object BaseLinker {
       new LinkedTopLevelExport(classDef.className, topLevelExport,
           infos.staticDependencies.toSet, infos.externalDependencies.toSet,
           needsDesugaring = infos.needsDesugaring)
-    }
+    }).toList
 
     (linkedClass, linkedTopLevelExports)
   }

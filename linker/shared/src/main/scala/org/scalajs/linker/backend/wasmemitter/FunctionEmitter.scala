@@ -106,7 +106,7 @@ object FunctionEmitter {
   )(implicit ctx: WasmContext): Unit = {
     implicit val pos = ctor.pos
 
-    val allCtorParams = ctor.args ::: ctor.restParam.toList
+    val allCtorParams = ctor.args.toList ::: ctor.restParam.toList
     val ctorBody = ctor.body
 
     // Compute the pre-super environment
@@ -116,7 +116,7 @@ object FunctionEmitter {
 
     // Build the `preSuperStats` function
     locally {
-      val preSuperEnvStructTypeID = ctx.getClosureDataStructType(preSuperDecls.map(_.vtpe))
+      val preSuperEnvStructTypeID = ctx.getClosureDataStructType(preSuperDecls.map(_.vtpe).toList)
       val preSuperEnvType = watpe.RefType(preSuperEnvStructTypeID)
 
       val emitter = prepareEmitter(
@@ -282,9 +282,9 @@ object FunctionEmitter {
 
   private val ObjectRef = ClassRef(ObjectClass)
   private val BoxedStringRef = ClassRef(BoxedStringClass)
-  private val toStringMethodName = MethodName("toString", Nil, BoxedStringRef)
-  private val equalsMethodName = MethodName("equals", List(ObjectRef), BooleanRef)
-  private val compareToMethodName = MethodName("compareTo", List(ObjectRef), IntRef)
+  private val toStringMethodName = MethodName("toString", Vector.empty, BoxedStringRef)
+  private val equalsMethodName = MethodName("equals", Vector(ObjectRef), BooleanRef)
+  private val compareToMethodName = MethodName("compareTo", Vector(ObjectRef), IntRef)
 
   private val CharSequenceClass = ClassName("java.lang.CharSequence")
   private val ComparableClass = ClassName("java.lang.Comparable")
@@ -2821,7 +2821,7 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(ctor :: args, AnyType) { allJSArgs =>
+    genThroughCustomJSHelper(ctor :: args.toList, AnyType) { allJSArgs =>
       val jsCtor :: jsArgs = allJSArgs
       js.Return(js.New(jsCtor, jsArgs))
     }
@@ -2843,7 +2843,7 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(fun :: args, castTo) { allJSArgs =>
+    genThroughCustomJSHelper(fun :: args.toList, castTo) { allJSArgs =>
       val jsFun :: jsArgs = allJSArgs
       js.Return(js.Apply.makeProtected(jsFun, jsArgs))
     }
@@ -2854,7 +2854,7 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(receiver :: method :: args, castTo) { allJSArgs =>
+    genThroughCustomJSHelper(receiver :: method :: args.toList, castTo) { allJSArgs =>
       val jsReceiver :: jsMethod :: jsArgs = allJSArgs
       js.Return(js.Apply(js.BracketSelect.makeOptimized(jsReceiver, jsMethod), jsArgs))
     }
@@ -3013,7 +3013,7 @@ private class FunctionEmitter private (
       fb += wa.Call(genFunctionID.jsNewArray)
       AnyType
     } else {
-      genThroughCustomJSHelper(items, AnyNotNullType) { jsItems =>
+      genThroughCustomJSHelper(items.toList, AnyNotNullType) { jsItems =>
         js.Return(js.ArrayConstr(jsItems))
       }
     }
@@ -3029,7 +3029,7 @@ private class FunctionEmitter private (
       fb += wa.Call(genFunctionID.jsNewObject)
       AnyType
     } else {
-      val flatPropValues = fields.flatMap(pv => List(pv._1, pv._2))
+      val flatPropValues = fields.flatMap(pv => List(pv._1, pv._2)).toList
 
       genThroughCustomJSHelper(flatPropValues, AnyNotNullType) { jsFlatPropValues =>
         val jsPropValuesIter = jsFlatPropValues.grouped(2).map { pvList =>
@@ -3198,36 +3198,36 @@ private class FunctionEmitter private (
 
         val (dataID, offset) = base.tpe match {
           case BooleanType =>
-            ctx.constantArrayPool.addArray8(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray8(elems.toList) { (buffer, elem) =>
               buffer.put(if (elem.asInstanceOf[BooleanLiteral].value) 1.toByte else 0.toByte)
             }
           case CharType =>
-            ctx.constantArrayPool.addArray16(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray16(elems.toList) { (buffer, elem) =>
               buffer.putChar(elem.asInstanceOf[CharLiteral].value)
             }
           case ByteType =>
-            ctx.constantArrayPool.addArray8(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray8(elems.toList) { (buffer, elem) =>
               buffer.put(elem.asInstanceOf[ByteLiteral].value)
             }
           case ShortType =>
-            ctx.constantArrayPool.addArray16(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray16(elems.toList) { (buffer, elem) =>
               buffer.putShort(elem.asInstanceOf[ShortLiteral].value)
             }
           case IntType =>
-            ctx.constantArrayPool.addArray32(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray32(elems.toList) { (buffer, elem) =>
               buffer.putInt(elem.asInstanceOf[IntLiteral].value)
             }
           case LongType =>
-            ctx.constantArrayPool.addArray64(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray64(elems.toList) { (buffer, elem) =>
               buffer.putLong(elem.asInstanceOf[LongLiteral].value)
             }
           case FloatType =>
-            ctx.constantArrayPool.addArray32(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray32(elems.toList) { (buffer, elem) =>
               // Explicitly use floatToIntBits for determinism
               buffer.putInt(java.lang.Float.floatToIntBits(elem.asInstanceOf[FloatLiteral].value))
             }
           case DoubleType =>
-            ctx.constantArrayPool.addArray64(elems) { (buffer, elem) =>
+            ctx.constantArrayPool.addArray64(elems.toList) { (buffer, elem) =>
               // Explicitly use doubleToLongBits for determinism
               buffer.putLong(
                   java.lang.Double.doubleToLongBits(elem.asInstanceOf[DoubleLiteral].value))
@@ -3272,7 +3272,7 @@ private class FunctionEmitter private (
 
     val (funTypeID, typedClosureTypeID) =
       ctx.genTypedClosureStructType(tree.tpe.asInstanceOf[ClosureType])
-    val dataStructTypeID = ctx.getClosureDataStructType(tree.captureParams.map(_.ptpe))
+    val dataStructTypeID = ctx.getClosureDataStructType(tree.captureParams.map(_.ptpe).toList)
 
     // Define the function where captures are reified as a `__captureData` argument.
     val closureFuncOrigName = genClosureFuncOriginalName()
@@ -3281,8 +3281,8 @@ private class FunctionEmitter private (
       closureFuncID,
       closureFuncOrigName,
       funTypeID,
-      tree.captureParams,
-      tree.params,
+      tree.captureParams.toList,
+      tree.params.toList,
       tree.body,
       tree.resultType
     )
@@ -3307,7 +3307,7 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    val dataStructTypeID = ctx.getClosureDataStructType(captureParams.map(_.ptpe))
+    val dataStructTypeID = ctx.getClosureDataStructType(captureParams.map(_.ptpe).toList)
 
     // Define the function where captures are reified as a `__captureData` argument.
     val closureFuncOrigName = genClosureFuncOriginalName()
@@ -3316,9 +3316,9 @@ private class FunctionEmitter private (
       closureFuncID,
       closureFuncOrigName,
       enclosingClassName = None,
-      Some(captureParams),
+      Some(captureParams.toList),
       receiverType = if (flags.arrow) None else Some(watpe.RefType.anyref),
-      params,
+      params.toList,
       restParam,
       body,
       resultType = AnyType
@@ -3338,7 +3338,7 @@ private class FunctionEmitter private (
     }
 
     val helperID = builder.build(AnyNotNullType) {
-      val (argsParamDefs, restParamDef) = builder.genJSParamDefs(params, restParam)
+      val (argsParamDefs, restParamDef) = builder.genJSParamDefs(params.toList, restParam)
 
       val promisingFVarDef = if (flags.async) {
         Some(js.VarDef(builder.newLocalIdent("pf"), Some {
@@ -3487,7 +3487,7 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(superClass :: receiver :: method :: args, castTo) { allJSArgs =>
+    genThroughCustomJSHelper(superClass :: receiver :: method :: args.toList, castTo) { allJSArgs =>
       val jsSuperClass :: jsReceiver :: jsMethod :: jsArgs = allJSArgs
 
       // return superClass.prototype[method].call(receiver, ...args);

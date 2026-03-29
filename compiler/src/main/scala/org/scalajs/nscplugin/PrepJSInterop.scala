@@ -886,8 +886,8 @@ abstract class PrepJSInterop[G <: Global with Singleton](val global: G)
           pathName.split('.').toVector
 
         def parseGlobalPath(pathName: String): Global = {
-          val globalRef :: path = parsePath(pathName)
-          makeGlobalRefNativeLoadSpec(globalRef, path)
+          val parsed = parsePath(pathName)
+          makeGlobalRefNativeLoadSpec(parsed.head, parsed.tail)
         }
 
         checkAndGetJSNativeLoadingSpecAnnotOf(pos, sym) match {

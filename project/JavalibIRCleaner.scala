@@ -409,7 +409,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
     private object IntrinsicCall {
       def unapply(tree: Apply): Option[(ClassName, MethodName, Vector[Tree])] = tree match {
         case Apply(ApplyFlags.empty, LoadModule(moduleClassName), MethodIdent(methodName), args) =>
-          Some(moduleClassName, methodName, args)
+          Some((moduleClassName, methodName, args))
         case _ =>
           None
       }

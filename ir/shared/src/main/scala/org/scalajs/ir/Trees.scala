@@ -1565,7 +1565,7 @@ object Trees {
       beforeSuper: Vector[Tree], superCall: JSSuperConstructorCall, afterSuper: Vector[Tree])(
       implicit val pos: Position)
       extends IRNode {
-    val allStats: List[Tree] = beforeSuper ::: superCall :: afterSuper
+    val allStats: Vector[Tree] = beforeSuper ++ (superCall +: afterSuper)
   }
 
   sealed abstract class JSMethodPropDef extends VersionedMemberDef

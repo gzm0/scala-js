@@ -198,7 +198,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     if (!classDef.kind.isJSClass && classDef.jsSuperClass.isDefined)
       reportError("Only non-native JS types may have a jsSuperClass")
 
-    classDef.jsSuperClass.foreach(checkTree(_, Env.fromParams(classDef.jsClassCaptures.getOrElse(Nil))))
+    classDef.jsSuperClass.foreach(checkTree(_, Env.fromParams(classDef.jsClassCaptures.getOrElse(Vector.empty))))
   }
 
   private def checkJSNativeLoadSpec()(implicit ctx: ErrorContext): Unit = {
@@ -331,7 +331,7 @@ private final class ClassDefChecker(classDef: ClassDef,
 
     checkJSParamDefs(params, restParam)
 
-    val startEnv = Env.fromParams(classDef.jsClassCaptures.getOrElse(Nil) ++ params ++ restParam)
+    val startEnv = Env.fromParams(classDef.jsClassCaptures.getOrElse(Vector.empty) ++ params ++ restParam)
       .withHasNewTarget(true)
 
     val envJustBeforeSuper = checkBlockStats(body.beforeSuper, startEnv)
@@ -363,7 +363,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     checkExportedPropertyName(pName)
     checkJSParamDefs(params, restParam)
 
-    val env = Env.fromParams(classDef.jsClassCaptures.getOrElse(Nil) ++ params ++ restParam)
+    val env = Env.fromParams(classDef.jsClassCaptures.getOrElse(Vector.empty) ++ params ++ restParam)
       .withMaybeThisType(!static, instanceThisType)
 
     checkTree(body, env)
@@ -387,7 +387,7 @@ private final class ClassDefChecker(classDef: ClassDef,
 
     checkExportedPropertyName(pName)
 
-    val jsClassCaptures = classDef.jsClassCaptures.getOrElse(Nil)
+    val jsClassCaptures = classDef.jsClassCaptures.getOrElse(Vector.empty[ParamDef])
 
     getterBody.foreach { body =>
       withPerMethodState {
@@ -1252,7 +1252,7 @@ object ClassDefChecker {
       jsConstructorDef,
       exportedMembers,
       jsNativeMembers,
-      topLevelExportDefs = Nil
+      topLevelExportDefs = Vector.empty
     )(optimizerHints)
 
     check(classDef, previousPhase, logger)
@@ -1309,7 +1309,7 @@ object ClassDefChecker {
       )
     }
 
-    def fromParams(params: List[ParamDef]): Env = {
+    def fromParams(params: Seq[ParamDef]): Env = {
       val paramLocalDefs = {
         for (p @ ParamDef(ident, _, tpe, mutable) <- params)
           yield ident.name -> LocalDef(ident.name, tpe, mutable)

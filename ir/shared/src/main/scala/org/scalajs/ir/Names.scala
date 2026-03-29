@@ -379,13 +379,13 @@ object Names {
 
     def compareTo(that: MethodName): Int = {
       @tailrec
-      def compareParamTypeRefs(xs: List[TypeRef], ys: List[TypeRef]): Int = (xs, ys) match {
-        case (x :: xr, y :: yr) =>
-          val cmp = x.compareTo(y)
+      def compareParamTypeRefs(xs: Vector[TypeRef], ys: Vector[TypeRef]): Int = {
+        if (xs.isEmpty || ys.isEmpty) java.lang.Boolean.compare(xs.isEmpty, ys.isEmpty)
+        else {
+          val cmp = xs.head.compareTo(ys.head)
           if (cmp != 0) cmp
-          else compareParamTypeRefs(xr, yr)
-        case _ =>
-          java.lang.Boolean.compare(xs.isEmpty, ys.isEmpty)
+          else compareParamTypeRefs(xs.tail, ys.tail)
+        }
       }
 
       val simpleCmp = this.simpleName.compareTo(that.simpleName)

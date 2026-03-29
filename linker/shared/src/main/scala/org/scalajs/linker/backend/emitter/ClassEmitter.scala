@@ -48,7 +48,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
   private implicit val globalRefTracking: GlobalRefTracking =
     topLevelGlobalRefTracking
 
-  def buildClass(className: ClassName, isJSClass: Boolean, jsClassCaptures: Option[List[ParamDef]],
+  def buildClass(className: ClassName, isJSClass: Boolean, jsClassCaptures: Option[Vector[ParamDef]],
       hasClassInitializer: Boolean,
       superClass: Option[ClassIdent], storeJSSuperClass: List[js.Tree], useESClass: Boolean,
       members: List[js.Tree])(
@@ -131,7 +131,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
             Nil
           )
 
-          globalFunctionDef(VarField.a, className, captureParamDefs, None, body)
+          globalFunctionDef(VarField.a, className, captureParamDefs.toList, None, body)
         }
       }
     }
@@ -139,7 +139,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
 
   /** Extracts the inlineable init method, if there is one. */
   def extractInlineableInit(tree: LinkedClass)(
-      implicit globalKnowledge: GlobalKnowledge): (Option[MethodDef], List[MethodDef]) = {
+      implicit globalKnowledge: GlobalKnowledge): (Option[MethodDef], Vector[MethodDef]) = {
 
     if (globalKnowledge.hasInlineableInit(tree.className)) {
       val (constructors, otherMethods) = tree.methods.partition { m =>
@@ -230,7 +230,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
       globalKnowledge: GlobalKnowledge, pos: Position): WithGlobals[List[js.Tree]] = {
 
     val JSConstructorDef(_, params, restParam, body) = jsConstructorDef
-    val ctorFunWithGlobals = desugarToFunction(className, params, restParam, body)
+    val ctorFunWithGlobals = desugarToFunction(className, params.toList, restParam, body)
 
     if (useESClass) {
       for (fun <- ctorFunWithGlobals) yield {
@@ -326,7 +326,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
         }
         assert(initMethodDef.resultType == VoidType,
             s"Found a constructor with type ${initMethodDef.resultType} at $pos")
-        desugarToFunction(className, initMethodDef.args, initMethodBody,
+        desugarToFunction(className, initMethodDef.args.toList, initMethodBody,
             resultType = VoidType)
       }
 
@@ -512,7 +512,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
     implicit val pos = method.pos
 
     for {
-      methodFun <- desugarToFunction(className, method.args, method.body.get, method.resultType)
+      methodFun <- desugarToFunction(className, method.args.toList, method.body.get, method.resultType)
     } yield {
       val jsMethodName = genMethodIdentForDef(method.name, method.originalName)
 
@@ -538,9 +538,9 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
 
     val methodFun0WithGlobals = {
       if (namespace.isStatic) {
-        desugarToFunction(className, method.args, methodBody, method.resultType)
+        desugarToFunction(className, method.args.toList, methodBody, method.resultType)
       } else {
-        desugarToFunctionWithExplicitThis(className, method.args, methodBody,
+        desugarToFunctionWithExplicitThis(className, method.args.toList, methodBody,
             method.resultType)
       }
     }
@@ -585,7 +585,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
     assert(!namespace.isPrivate && !namespace.isConstructor)
 
     for {
-      methodFun <- desugarToFunction(className, method.args, method.restParam, method.body, AnyType)
+      methodFun <- desugarToFunction(className, method.args.toList, method.restParam, method.body, AnyType)
       propName <- genMemberNameTree(method.name)
     } yield {
       if (useESClass) {
@@ -1039,7 +1039,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
     }
   }
 
-  def genTopLevelExports(topLevelExports: List[LinkedTopLevelExport])(
+  def genTopLevelExports(topLevelExports: Vector[LinkedTopLevelExport])(
       implicit moduleContext: ModuleContext,
       globalKnowledge: GlobalKnowledge): WithGlobals[List[js.Tree]] = {
     val exportsWithGlobals = topLevelExports.map { topLevelExport =>
@@ -1060,7 +1060,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
       }
     }
 
-    WithGlobals.flatten(exportsWithGlobals)
+    WithGlobals.flatten(exportsWithGlobals.toList)
   }
 
   private def genTopLevelMethodExportDef(tree: TopLevelMethodExportDef)(
@@ -1075,7 +1075,7 @@ private[emitter] final class ClassEmitter(sjsGen: SJSGen) {
 
     implicit val pos = tree.pos
 
-    val methodDefWithGlobals = desugarToFunction(args, restParam, body, AnyType)
+    val methodDefWithGlobals = desugarToFunction(args.toList, restParam, body, AnyType)
 
     methodDefWithGlobals.flatMap { methodDef =>
       genConstValueExportDef(exportName, methodDef)

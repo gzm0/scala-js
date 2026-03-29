@@ -186,9 +186,9 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       linkedClass.fields,
       newMethods,
       interface.optimizedJSConstructorDef(),
-      interface.optimizedExportedMembers(),
+      interface.optimizedExportedMembers().toVector,
       linkedClass.jsNativeMembers,
-      newTopLevelExports
+      newTopLevelExports.toVector
     )(linkedClass.optimizerHints)(linkedClass.pos)
 
     (classDef, linkedClass.version)
@@ -1206,8 +1206,8 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       else myInterface.untrackedInstanceThisType
 
     def updateWith(linkedClass: LinkedClass): Unit = {
-      _jsClassCaptures = linkedClass.jsClassCaptures.getOrElse(Nil)
-      updateExportedMembers(linkedClass.exportedMembers)
+      _jsClassCaptures = linkedClass.jsClassCaptures.fold(Nil: List[ParamDef])(_.toList)
+      updateExportedMembers(linkedClass.exportedMembers.toList)
       updateJSConstructorDef(linkedClass.jsConstructorDef)
     }
 

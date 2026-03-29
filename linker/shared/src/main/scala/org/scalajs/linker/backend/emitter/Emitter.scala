@@ -504,7 +504,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       }
 
       // *Non* short-circuiting boolean or; always evaluate the right-hand-side
-      changed |= classCache.trackStaticLikeMethodChanges(staticLikeMethods)
+      changed |= classCache.trackStaticLikeMethodChanges(staticLikeMethods.toList)
 
       for (staticLikeMethod <- staticLikeMethods)
         main ++= staticLikeMethod
@@ -715,8 +715,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       val fullClass = {
         for {
           ctor <- ctorWithGlobals
-          memberMethods <- WithGlobals.flatten(memberMethodsWithGlobals)
-          exportedMembers <- WithGlobals.flatten(exportedMembersWithGlobals)
+          memberMethods <- WithGlobals.flatten(memberMethodsWithGlobals.toList)
+          exportedMembers <- WithGlobals.flatten(exportedMembersWithGlobals.toList)
           allMembers = ctor ::: memberMethods ::: exportedMembers
           clazz <- classEmitter.buildClass(
             className, // always safe
@@ -828,7 +828,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     private[this] var _lastInternalDependencies: Set[ModuleID] = Set.empty
 
     private[this] var _topLevelExportsCache: WithGlobals[List[js.Tree]] = WithGlobals.nil
-    private[this] var _lastTopLevelExports: List[LinkedTopLevelExport] = Nil
+    private[this] var _lastTopLevelExports: Vector[LinkedTopLevelExport] = Vector.empty
 
     private[this] var _initializersCache: WithGlobals[List[js.Tree]] = WithGlobals.nil
     private[this] var _lastInitializers: List[ModuleInitializer.Initializer] = Nil
@@ -844,7 +844,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       _lastInternalDependencies = Set.empty
 
       _topLevelExportsCache = WithGlobals.nil
-      _lastTopLevelExports = Nil
+      _lastTopLevelExports = Vector.empty
 
       _initializersCache = WithGlobals.nil
       _lastInitializers = Nil
@@ -866,7 +866,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
     }
 
-    def getOrComputeTopLevelExports(topLevelExports: List[LinkedTopLevelExport])(
+    def getOrComputeTopLevelExports(topLevelExports: Vector[LinkedTopLevelExport])(
         compute: => WithGlobals[List[js.Tree]]): (WithGlobals[List[js.Tree]], Boolean) = {
 
       _cacheUsed = true
@@ -880,8 +880,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       }
     }
 
-    private def sameTopLevelExports(tles1: List[LinkedTopLevelExport],
-        tles2: List[LinkedTopLevelExport]): Boolean = {
+    private def sameTopLevelExports(tles1: Vector[LinkedTopLevelExport],
+        tles2: Vector[LinkedTopLevelExport]): Boolean = {
       import org.scalajs.ir.Trees._
 
       /* Because of how/when we use this method, we already know that all the
@@ -1098,8 +1098,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
   private class FullClassChangeTracker extends knowledgeGuardian.KnowledgeAccessor {
     private[this] var _lastVersion: Version = Version.Unversioned
     private[this] var _lastCtor: WithGlobals[List[js.Tree]] = null
-    private[this] var _lastMemberMethods: List[WithGlobals[List[js.Tree]]] = null
-    private[this] var _lastExportedMembers: List[WithGlobals[List[js.Tree]]] = null
+    private[this] var _lastMemberMethods: Seq[WithGlobals[List[js.Tree]]] = null
+    private[this] var _lastExportedMembers: Seq[WithGlobals[List[js.Tree]]] = null
     private[this] var _trackerUsed = false
 
     override def invalidate(): Unit = {
@@ -1113,8 +1113,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     def startRun(): Unit = _trackerUsed = false
 
     def trackChanged(version: Version, ctor: WithGlobals[List[js.Tree]],
-        memberMethods: List[WithGlobals[List[js.Tree]]],
-        exportedMembers: List[WithGlobals[List[js.Tree]]]): Boolean = {
+        memberMethods: Seq[WithGlobals[List[js.Tree]]],
+        exportedMembers: Seq[WithGlobals[List[js.Tree]]]): Boolean = {
 
       _trackerUsed = true
 
@@ -1283,7 +1283,7 @@ object Emitter {
   }
 
   @tailrec
-  private def allSame(xs: List[AnyRef], ys: List[AnyRef]): Boolean = {
+  private def allSame(xs: Seq[AnyRef], ys: Seq[AnyRef]): Boolean = {
     xs.isEmpty == ys.isEmpty && {
       xs.isEmpty ||
       ((xs.head eq ys.head) && allSame(xs.tail, ys.tail))
@@ -1380,7 +1380,7 @@ object Emitter {
   }
 
   private case class ClassID(
-      kind: ClassKind, ancestors: List[ClassName], moduleContext: ModuleContext)
+      kind: ClassKind, ancestors: Vector[ClassName], moduleContext: ModuleContext)
 
   private def symbolRequirements(config: Config): SymbolRequirement = {
     import config.coreSpec.semantics._

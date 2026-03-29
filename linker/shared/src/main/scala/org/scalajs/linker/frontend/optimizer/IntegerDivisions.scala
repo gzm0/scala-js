@@ -142,8 +142,8 @@ private[optimizer] final class IntegerDivisions(useRuntimeLong: Boolean) {
       UnaryOp.Throw,
       New(
         ArithmeticExceptionClass,
-        MethodIdent(MethodName.constructor(List(ClassRef(BoxedStringClass)))),
-        List(StringLiteral("/ by zero"))
+        MethodIdent(MethodName.constructor(Vector(ClassRef(BoxedStringClass)))),
+        Vector(StringLiteral("/ by zero"))
       )
     )
   }

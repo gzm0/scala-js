@@ -108,7 +108,7 @@ object DerivedClasses {
       Some(Assign(selectField, ctorParamDef.ref))
     )(EOH, NOV)
 
-    val derivedMethods: List[MethodDef] = for {
+    val derivedMethods: Vector[MethodDef] = for {
       method <- clazz.methods if method.flags.namespace == MemberNamespace.Public
     } yield {
       MethodDef(
@@ -131,13 +131,13 @@ object DerivedClasses {
       jsSuperClass = None,
       jsNativeLoadSpec = None,
       derivedFields,
-      derivedCtor :: derivedMethods,
+      derivedCtor +: derivedMethods,
       jsConstructorDef = None,
-      exportedMembers = Nil,
-      jsNativeMembers = Nil,
+      exportedMembers = Vector.empty,
+      jsNativeMembers = Vector.empty,
       EOH,
       pos,
-      ancestors = derivedClassName :: clazz.ancestors.tail,
+      ancestors = derivedClassName +: clazz.ancestors.tail,
       hasInstances = true,
       hasDirectInstances = true,
       hasInstanceTests = true,

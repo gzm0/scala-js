@@ -3368,9 +3368,9 @@ private[optimizer] abstract class OptimizerCore(
                     case _ =>
                       val flags = ApplyFlags.empty
                       val key = Apply(flags, elemLocalDef.newReplacement,
-                          MethodIdent(TupleFirstMethodName), Nil)(AnyType)
+                          MethodIdent(TupleFirstMethodName), Vector.empty)(AnyType)
                       val value = Apply(flags, elemLocalDef.newReplacement,
-                          MethodIdent(TupleSecondMethodName), Nil)(AnyType)
+                          MethodIdent(TupleSecondMethodName), Vector.empty)(AnyType)
                       (key, value)
                   }
                 }
@@ -6398,13 +6398,13 @@ private[optimizer] object OptimizerCore {
   private val exceptionFieldName =
     FieldName(JavaScriptExceptionClass, SimpleFieldName("exception"))
 
-  private val AnyArgConstructorName = MethodName.constructor(List(ClassRef(ObjectClass)))
+  private val AnyArgConstructorName = MethodName.constructor(Vector(ClassRef(ObjectClass)))
 
-  private val TupleFirstMethodName = MethodName("_1", Nil, ClassRef(ObjectClass))
-  private val TupleSecondMethodName = MethodName("_2", Nil, ClassRef(ObjectClass))
+  private val TupleFirstMethodName = MethodName("_1", Vector.empty, ClassRef(ObjectClass))
+  private val TupleSecondMethodName = MethodName("_2", Vector.empty, ClassRef(ObjectClass))
 
   private val ClassTagApplyMethodName =
-    MethodName("apply", List(ClassRef(ClassClass)), ClassRef(ClassName("scala.reflect.ClassTag")))
+    MethodName("apply", Vector(ClassRef(ClassClass)), ClassRef(ClassName("scala.reflect.ClassTag")))
 
   def isUnsignedPowerOf2(x: Int): Boolean =
     (x & (x - 1)) == 0 && x != 0

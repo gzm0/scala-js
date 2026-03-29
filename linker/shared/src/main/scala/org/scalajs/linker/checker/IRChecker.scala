@@ -965,7 +965,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
   private class CheckedClass(
       val name: ClassName,
       val kind: ClassKind,
-      val jsClassCaptures: Option[List[ParamDef]],
+      val jsClassCaptures: Option[Vector[ParamDef]],
       val superClassName: Option[ClassName],
       val ancestors: Set[ClassName],
       val hasInstances: Boolean,
@@ -1004,7 +1004,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
       classDef.fields.collect {
         case FieldDef(flags, FieldIdent(name), _, tpe) =>
           new CheckedField(flags, name, tpe)
-      }
+      }.toList
     }
   }
 
