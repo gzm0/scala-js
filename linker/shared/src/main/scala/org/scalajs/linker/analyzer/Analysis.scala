@@ -155,7 +155,7 @@ object Analysis {
      *
      *  {{{
      *  def method__xyz(p1: T1, ..., pn: TN): R = {
-     *    this.TargetInterface::method__xyz(p1, ..., pn)
+     *    this.TargetInterface+:method__xyz(p1, ..., pn)
      *  }
      *  }}}
      */
@@ -175,7 +175,7 @@ object Analysis {
     def from: From
   }
 
-  final case class CycleInInheritanceChain(encodedClassNames: List[ClassName], from: From)
+  final case class CycleInInheritanceChain(encodedClassNames: Vector[ClassName], from: From)
       extends Error
 
   final case class MissingClass(info: ClassInfo, from: From) extends Error
@@ -194,14 +194,14 @@ object Analysis {
   final case class MissingJSNativeMember(info: ClassInfo, name: MethodName, from: From)
       extends Error
 
-  final case class ConflictingDefaultMethods(infos: List[MethodInfo], from: From) extends Error
+  final case class ConflictingDefaultMethods(infos: Vector[MethodInfo], from: From) extends Error
 
   final case class InvalidTopLevelExportInScript(info: TopLevelExportInfo) extends Error {
     def from: From = FromExports
   }
 
   final case class ConflictingTopLevelExport(moduleID: ModuleID, exportName: String,
-      infos: List[TopLevelExportInfo])
+      infos: Vector[TopLevelExportInfo])
       extends Error {
     def from: From = FromExports
   }
@@ -211,7 +211,7 @@ object Analysis {
       extends Error
 
   final case class MultiplePublicModulesWithoutModuleSupport(
-      moduleIDs: List[ModuleID])
+      moduleIDs: Vector[ModuleID])
       extends Error {
     def from: From = FromExports
   }

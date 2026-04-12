@@ -30,7 +30,7 @@ import java.lang.{Double => JDouble}
 import java.net.URI
 
 private[closure] object ClosureAstTransformer {
-  def transformScript(topLevelTrees: List[Tree], featureSet: FeatureSet,
+  def transformScript(topLevelTrees: Vector[Tree], featureSet: FeatureSet,
       relativizeBaseURI: Option[URI]): Node = {
     val transformer = new ClosureAstTransformer(featureSet, relativizeBaseURI)
     transformer.transformScript(topLevelTrees)
@@ -41,7 +41,7 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
     relativizeBaseURI: Option[URI]) {
   private val dummySourceName = new java.net.URI("virtualfile:scala.js-ir")
 
-  def transformScript(topLevelTrees: List[Tree]): Node = {
+  def transformScript(topLevelTrees: Vector[Tree]): Node = {
     val script = setNodePosition(new Node(Token.SCRIPT), NoPosition)
     for (stat <- topLevelTrees)
       script.addChildToBack(transformStat(stat)(NoPosition))
@@ -263,7 +263,7 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
         }
 
       case GetterDef(static, name, body) =>
-        val function = genFunction("", Nil, None, body)
+        val function = genFunction("", Vector(), None, body)
         name match {
           case ComputedName(nameExpr) =>
             val node = newComputedPropNode(static, nameExpr, function)
@@ -279,7 +279,7 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
         }
 
       case SetterDef(static, name, param, body) =>
-        val function = genFunction("", param :: Nil, None, body)
+        val function = genFunction("", param +: Vector(), None, body)
         name match {
           case ComputedName(nameExpr) =>
             val node = newComputedPropNode(static, nameExpr, function)
@@ -409,7 +409,7 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
     }
   }
 
-  private def genFunction(name: String, params: List[ParamDef], restParam: Option[ParamDef],
+  private def genFunction(name: String, params: Vector[ParamDef], restParam: Option[ParamDef],
       body: Tree)(
       implicit pos: Position): Node = {
     val paramList = new Node(Token.PARAM_LIST)
@@ -466,11 +466,11 @@ private class ClosureAstTransformer(featureSet: FeatureSet,
       case Block(stats) =>
         transformBlock(stats, pos)
       case tree =>
-        transformBlock(List(tree), pos)
+        transformBlock(Vector(tree), pos)
     }(pos)
   }
 
-  def transformBlock(stats: List[Tree], blockPos: Position): Node = {
+  def transformBlock(stats: Vector[Tree], blockPos: Position): Node = {
     val block = new Node(Token.BLOCK)
     for (stat <- stats)
       block.addChildToBack(transformStat(stat)(blockPos))

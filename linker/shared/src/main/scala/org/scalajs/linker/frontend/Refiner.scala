@@ -40,7 +40,7 @@ final class Refiner(config: CommonPhaseConfig, checkIR: Boolean) {
   }
 
   def refine(classDefs: Seq[(ClassDef, Version)],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       symbolRequirements: SymbolRequirement, logger: Logger)(
       implicit ec: ExecutionContext): Future[LinkingUnit] = {
 
@@ -59,7 +59,7 @@ final class Refiner(config: CommonPhaseConfig, checkIR: Boolean) {
           if analysis.classInfos.contains(classDef.className)
         } yield {
           BaseLinker.linkClassDef(classDef, version,
-              syntheticMethodDefs = Nil, analysis)
+              syntheticMethodDefs = Vector(), analysis)
         }
 
         val (linkedClassDefs, linkedTopLevelExports) = assembled.unzip
@@ -68,8 +68,8 @@ final class Refiner(config: CommonPhaseConfig, checkIR: Boolean) {
           analysis.isClassSuperClassUsed
         )
 
-        new LinkingUnit(linkedClassDefs.toList,
-            linkedTopLevelExports.flatten.toList, moduleInitializers, globalInfo)
+        new LinkingUnit(linkedClassDefs.toVector,
+            linkedTopLevelExports.flatten.toVector, moduleInitializers, globalInfo)
       }
 
       if (checkIR) {

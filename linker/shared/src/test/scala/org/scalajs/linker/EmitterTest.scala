@@ -38,7 +38,7 @@ class EmitterTest {
   @deprecated("tests deprecated APIs", since = "1.21.0")
   @Test
   def jsHeader(): AsyncResult = await {
-    val classDefs = List(
+    val classDefs = Vector(
       mainTestClassDef(consoleLog(str("Hello world!")))
     )
 
@@ -94,7 +94,7 @@ class EmitterTest {
    */
   @Test
   def linkNoSecondAttemptInEmitter(): AsyncResult = await {
-    val classDefs = List(
+    val classDefs = Vector(
       mainTestClassDef(systemOutPrintln(str("Hello world!")))
     )
 
@@ -118,7 +118,7 @@ class EmitterTest {
    */
   @Test
   def linkYesSecondAttemptInEmitter(): AsyncResult = await {
-    val classDefs = List(
+    val classDefs = Vector(
       mainTestClassDef(systemOutPrintln(JSGlobalRef("$dangerousGlobalRef")))
     )
 
@@ -151,7 +151,7 @@ class EmitterTest {
    */
   @Test
   def noInvalidatedCacheOrTopLevelTreeInSecondRun(): AsyncResult = await {
-    val classDefs = List(
+    val classDefs = Vector(
       mainTestClassDef(systemOutPrintln(str("Hello world!")))
     )
 
@@ -235,7 +235,7 @@ class EmitterTest {
 
 object EmitterTest {
   private def linkToContent(classDefs: Seq[ClassDef],
-      moduleInitializers: Seq[ModuleInitializer] = Nil,
+      moduleInitializers: Seq[ModuleInitializer] = Vector(),
       config: StandardConfig)(
       implicit ec: ExecutionContext): Future[String] = {
 

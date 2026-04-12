@@ -46,7 +46,7 @@ final class ModuleSplitter private (analyzer: ModuleAnalyzer) {
        * We have to do it here, otherwise we break the assumption, that all
        * non-abstract classes are reached through a static path.
        */
-      new ModuleSet(Nil, Nil, unit.globalInfo)
+      new ModuleSet(Vector(), Vector(), unit.globalInfo)
     } else {
       val analysis = logger.time("Module Splitter: Analyze Modules") {
         analyzer.analyze(dependencyInfo)
@@ -64,7 +64,7 @@ final class ModuleSplitter private (analyzer: ModuleAnalyzer) {
 
     // LinkedHashMap for stability of module order.
     val builders = mutable.LinkedHashMap.empty[ModuleID, ModuleBuilder]
-    val abstractClasses = List.newBuilder[LinkedClass]
+    val abstractClasses = Vector.newBuilder[LinkedClass]
 
     def getBuilder(moduleID: ModuleID): ModuleBuilder =
       builders.getOrElseUpdate(moduleID, new ModuleBuilder(moduleID))
@@ -123,7 +123,7 @@ final class ModuleSplitter private (analyzer: ModuleAnalyzer) {
       }
     }
 
-    val modules = builders.values.map(_.result()).toList
+    val modules = builders.values.map(_.result()).toVector
 
     new ModuleSet(modules, abstractClasses.result(), unit.globalInfo)
   }
@@ -170,7 +170,7 @@ final class ModuleSplitter private (analyzer: ModuleAnalyzer) {
           className
       }
 
-      add(mi.moduleID, dep :: Nil)
+      add(mi.moduleID, dep +: Vector())
     }
 
     result.toMap
@@ -185,17 +185,17 @@ object ModuleSplitter {
   def fewestModules(): ModuleSplitter =
     new ModuleSplitter(new FewestModulesAnalyzer())
 
-  def smallModulesFor(packages: List[String]): ModuleSplitter =
+  def smallModulesFor(packages: Vector[String]): ModuleSplitter =
     new ModuleSplitter(new SmallModulesForAnalyzer(packages.map(ClassName(_))))
 
   private class ModuleBuilder(id: ModuleID) {
     val internalDependencies: Builder[ModuleID, Set[ModuleID]] = Set.newBuilder
     val externalDependencies: Builder[String, Set[String]] = Set.newBuilder
-    val classDefs: Builder[LinkedClass, List[LinkedClass]] = List.newBuilder
-    val topLevelExports: Builder[LinkedTopLevelExport, List[LinkedTopLevelExport]] = List.newBuilder
+    val classDefs: Builder[LinkedClass, Vector[LinkedClass]] = Vector.newBuilder
+    val topLevelExports: Builder[LinkedTopLevelExport, Vector[LinkedTopLevelExport]] = Vector.newBuilder
 
-    val initializers: Builder[ModuleInitializer.Initializer, List[ModuleInitializer.Initializer]] =
-      List.newBuilder
+    val initializers: Builder[ModuleInitializer.Initializer, Vector[ModuleInitializer.Initializer]] =
+      Vector.newBuilder
 
     def result(): ModuleSet.Module = {
       val tles = topLevelExports.result()

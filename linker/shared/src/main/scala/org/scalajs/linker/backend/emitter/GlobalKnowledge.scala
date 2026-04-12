@@ -47,7 +47,7 @@ private[emitter] trait GlobalKnowledge {
    *  It is invalid to call this method with anything but a `Class` or
    *  `ModuleClass`.
    */
-  def getAllScalaClassFieldDefs(className: ClassName): List[AnyFieldDef]
+  def getAllScalaClassFieldDefs(className: ClassName): Vector[AnyFieldDef]
 
   /** Tests whether the specified class uses an inlineable init.
    *
@@ -70,7 +70,7 @@ private[emitter] trait GlobalKnowledge {
   def hasInstances(className: ClassName): Boolean
 
   /** Gets the types of the `jsClassCaptures` of the given class. */
-  def getJSClassCaptureTypes(className: ClassName): Option[List[Type]]
+  def getJSClassCaptureTypes(className: ClassName): Option[Vector[Type]]
 
   /** `None` for non-native JS classes/objects; `Some(spec)` for native JS
    *  classes/objects.
@@ -92,10 +92,10 @@ private[emitter] trait GlobalKnowledge {
   def getSuperClassOfJSClass(className: ClassName): ClassName
 
   /** The `FieldDef`s of a class. */
-  def getFieldDefs(className: ClassName): List[AnyFieldDef]
+  def getFieldDefs(className: ClassName): Vector[AnyFieldDef]
 
   /** The global variables that mirror a given static field. */
-  def getStaticFieldMirrors(field: FieldName): List[String]
+  def getStaticFieldMirrors(field: FieldName): Vector[String]
 
   /** The module containing this class definition.
    *
@@ -110,10 +110,10 @@ private[emitter] trait GlobalKnowledge {
    *  Each method name is associated with a set of representative classes that
    *  have an implementation for that method. That set is not ordered.
    */
-  def methodsInRepresentativeClasses(): List[(MethodName, Set[ClassName])]
+  def methodsInRepresentativeClasses(): Vector[(MethodName, Set[ClassName])]
 
   /** The public (non-static) methods of java.lang.Object. */
-  def methodsInObject(): List[MethodDef]
+  def methodsInObject(): Vector[MethodDef]
 
   /** Hijacked classes that are strict descendants of `className`. */
   def hijackedDescendants(className: ClassName): Set[ClassName]

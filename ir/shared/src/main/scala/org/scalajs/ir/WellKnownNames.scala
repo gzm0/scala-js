@@ -142,15 +142,15 @@ object WellKnownNames {
    *  This is notably the signature of constructors of module classes.
    */
   final val NoArgConstructorName: MethodName =
-    MethodName.constructor(Nil)
+    MethodName.constructor(Vector())
 
   /** Name of the static initializer method. */
   final val StaticInitializerName: MethodName =
-    MethodName(SimpleMethodName.StaticInitializer, Nil, VoidRef)
+    MethodName(SimpleMethodName.StaticInitializer, Vector(), VoidRef)
 
   /** Name of the class initializer method. */
   final val ClassInitializerName: MethodName =
-    MethodName(SimpleMethodName.ClassInitializer, Nil, VoidRef)
+    MethodName(SimpleMethodName.ClassInitializer, Vector(), VoidRef)
 
   /** ModuleID of the default module */
   final val DefaultModuleID: String = "main"

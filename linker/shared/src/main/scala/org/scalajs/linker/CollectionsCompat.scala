@@ -22,7 +22,7 @@ private[linker] object CollectionsCompat {
       // Believe it or not, this is the implementation of `retain` in 2.12.x:
 
       // scala/bug#7269 toList avoids ConcurrentModificationException
-      for ((k, v) <- self.toList) {
+      for ((k, v) <- self.toVector) {
         if (!p(k, v))
           self -= k
       }

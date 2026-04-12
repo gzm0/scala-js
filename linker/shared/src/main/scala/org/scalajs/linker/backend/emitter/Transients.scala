@@ -147,7 +147,7 @@ object Transients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$systemArraycopy")
-      out.printArgs(List(src, srcPos, dest, destPos, length))
+      out.printArgs(Vector(src, srcPos, dest, destPos, length))
     }
   }
 
@@ -173,7 +173,7 @@ object Transients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$zeroOf")
-      out.printArgs(List(runtimeClass))
+      out.printArgs(Vector(runtimeClass))
     }
   }
 
@@ -199,7 +199,7 @@ object Transients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$nativeArrayWrapper")
-      out.printArgs(List(elemClass, nativeArray))
+      out.printArgs(Vector(elemClass, nativeArray))
     }
   }
 
@@ -220,7 +220,7 @@ object Transients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$objectClassName")
-      out.printArgs(List(obj))
+      out.printArgs(Vector(obj))
     }
   }
 
@@ -260,7 +260,7 @@ object Transients {
       out.print("$array2TypedArray[")
       out.print(primRef)
       out.print(']')
-      out.printArgs(List(expr))
+      out.printArgs(Vector(expr))
     }
   }
 
@@ -286,7 +286,7 @@ object Transients {
       out.print("$typedArray2Array[")
       out.print(primRef)
       out.print(']')
-      out.printArgs(List(expr))
+      out.printArgs(Vector(expr))
     }
   }
 }

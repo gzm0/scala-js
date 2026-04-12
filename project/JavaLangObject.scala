@@ -41,26 +41,26 @@ object JavaLangObject {
       ClassKind.Class,
       None,
       None,
-      Nil,
+      Vector(),
       None,
       None,
-      fields = Nil,
-      List(
+      fields = Vector(),
+      Vector(
         /* def this() = () */
         MethodDef(
           MemberFlags.empty.withNamespace(MemberNamespace.Constructor),
           MethodIdent(NoArgConstructorName),
           NoOriginalName,
-          Nil,
+          Vector(),
           VoidType,
           Some(Skip()))(OptimizerHints.empty, Unversioned),
 
         /* def getClass(): java.lang.Class[_] = <getclass>(this) */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("getClass", Nil, ClassClassRef)),
+          MethodIdent(MethodName("getClass", Vector(), ClassClassRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           ClassType(ClassClass, nullable = true, exact = false),
           Some {
             UnaryOp(UnaryOp.GetClass, This()(ThisType))
@@ -69,9 +69,9 @@ object JavaLangObject {
         /* def hashCode(): Int = <identityHashCode>(this) */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("hashCode", Nil, IntRef)),
+          MethodIdent(MethodName("hashCode", Vector(), IntRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           IntType,
           Some {
             UnaryOp(UnaryOp.IdentityHashCode, This()(ThisType))
@@ -80,9 +80,9 @@ object JavaLangObject {
         /* def equals(that: Object): Boolean = this eq that */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("equals", List(ObjectClassRef), BooleanRef)),
+          MethodIdent(MethodName("equals", Vector(ObjectClassRef), BooleanRef)),
           NoOriginalName,
-          List(ParamDef(LocalIdent(LocalName("that")), NoOriginalName, AnyType,
+          Vector(ParamDef(LocalIdent(LocalName("that")), NoOriginalName, AnyType,
             mutable = false)),
           BooleanType,
           Some {
@@ -97,9 +97,9 @@ object JavaLangObject {
          */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("clone", Nil, ObjectClassRef)),
+          MethodIdent(MethodName("clone", Vector(), ObjectClassRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           AnyType,
           Some {
             If(IsInstanceOf(This()(ThisType), ClassType(CloneableClass, nullable = false, exact = false)), {
@@ -107,7 +107,7 @@ object JavaLangObject {
                   AsInstanceOf(This()(ThisType), ClassType(CloneableClass, nullable = true, exact = false))))
             }, {
               UnaryOp(UnaryOp.Throw, New(ClassName("java.lang.CloneNotSupportedException"),
-                MethodIdent(NoArgConstructorName), Nil))
+                MethodIdent(NoArgConstructorName), Vector()))
             })(AnyType)
           })(OptimizerHints.empty.withInline(true), Unversioned),
 
@@ -116,18 +116,18 @@ object JavaLangObject {
          */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("toString", Nil, StringClassRef)),
+          MethodIdent(MethodName("toString", Vector(), StringClassRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           ClassType(BoxedStringClass, nullable = true, exact = false),
           Some {
             BinaryOp(BinaryOp.String_+, BinaryOp(BinaryOp.String_+,
               Apply(
                 EAF,
                 Apply(EAF, This()(ThisType),
-                  MethodIdent(MethodName("getClass", Nil, ClassClassRef)), Nil)(
+                  MethodIdent(MethodName("getClass", Vector(), ClassClassRef)), Vector())(
                   ClassType(ClassClass, nullable = true, exact = false)),
-                MethodIdent(MethodName("getName", Nil, StringClassRef)), Nil)(
+                MethodIdent(MethodName("getName", Vector(), StringClassRef)), Vector())(
                 ClassType(BoxedStringClass, nullable = true, exact = false)),
               // +
               StringLiteral("@")),
@@ -135,8 +135,8 @@ object JavaLangObject {
               Apply(
                 EAF,
                 LoadModule(ClassName("java.lang.Integer$")),
-                MethodIdent(MethodName("toHexString", List(IntRef), StringClassRef)),
-                List(Apply(EAF, This()(ThisType), MethodIdent(MethodName("hashCode", Nil, IntRef)), Nil)(IntType)))(
+                MethodIdent(MethodName("toHexString", Vector(IntRef), StringClassRef)),
+                Vector(Apply(EAF, This()(ThisType), MethodIdent(MethodName("hashCode", Vector(), IntRef)), Vector())(IntType)))(
                 ClassType(BoxedStringClass, nullable = true, exact = false)))
           })(OptimizerHints.empty, Unversioned),
 
@@ -147,45 +147,45 @@ object JavaLangObject {
         /* def notify(): Unit = () */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("notify", Nil, VoidRef)),
+          MethodIdent(MethodName("notify", Vector(), VoidRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           VoidType,
           Some(Skip()))(OptimizerHints.empty, Unversioned),
 
         /* def notifyAll(): Unit = () */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("notifyAll", Nil, VoidRef)),
+          MethodIdent(MethodName("notifyAll", Vector(), VoidRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           VoidType,
           Some(Skip()))(OptimizerHints.empty, Unversioned),
 
         /* def finalize(): Unit = () */
         MethodDef(
           MemberFlags.empty,
-          MethodIdent(MethodName("finalize", Nil, VoidRef)),
+          MethodIdent(MethodName("finalize", Vector(), VoidRef)),
           NoOriginalName,
-          Nil,
+          Vector(),
           VoidType,
           Some(Skip()))(OptimizerHints.empty, Unversioned),
       ),
       jsConstructor = None,
-      jsMethodProps = List(
+      jsMethodProps = Vector(
         /* JSExport for toString(). */
         JSMethodDef(
           MemberFlags.empty,
           StringLiteral("toString"),
-          Nil, None,
+          Vector(), None,
           {
             Apply(EAF, This()(ThisType),
-                MethodIdent(MethodName("toString", Nil, StringClassRef)), Nil)(
+                MethodIdent(MethodName("toString", Vector(), StringClassRef)), Vector())(
                 ClassType(BoxedStringClass, nullable = true, exact = false))
           })(OptimizerHints.empty, Unversioned)
       ),
-      jsNativeMembers = Nil,
-      topLevelExportDefs = Nil)(OptimizerHints.empty)
+      jsNativeMembers = Vector(),
+      topLevelExportDefs = Vector())(OptimizerHints.empty)
 
     Hashers.hashClassDef(classDef)
   }

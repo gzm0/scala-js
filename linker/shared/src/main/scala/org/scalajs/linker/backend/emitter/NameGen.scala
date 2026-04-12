@@ -344,8 +344,8 @@ private[backend] object NameGen {
       "var", "void", "while", "with", "yield"
   )
 
-  private val compressedPrefixes: List[(UTF8String, String)] = {
-    List(
+  private val compressedPrefixes: Vector[(UTF8String, String)] = {
+    Vector(
       "java.lang." -> "jl_",
       "java.util." -> "ju_",
       "scala.collection.immutable." -> "sci_",

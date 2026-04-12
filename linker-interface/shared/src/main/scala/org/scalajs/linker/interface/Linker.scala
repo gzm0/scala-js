@@ -77,8 +77,8 @@ private object Linker {
       Future.successful(ByteBuffer.wrap(content(name)))
     }
 
-    def listFiles()(implicit ec: ExecutionContext): Future[List[String]] = synchronized {
-      Future.successful(content.keys.toList)
+    def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]] = synchronized {
+      Future.successful(content.keys.toVector)
     }
 
     def delete(name: String)(implicit ec: ExecutionContext): Future[Unit] = synchronized {

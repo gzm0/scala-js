@@ -49,11 +49,11 @@ class IRCheckerTest {
     val FooClass = ClassName("Foo")
     val BarClass = ClassName("Bar")
 
-    val methMethodName = m("meth", List(ClassRef(FooClass)), V)
-    val nullBarMethodName = m("nullBar", Nil, ClassRef(BarClass))
+    val methMethodName = m("meth", Vector(ClassRef(FooClass)), V)
+    val nullBarMethodName = m("nullBar", Vector(), ClassRef(BarClass))
 
     def callMethOn(receiver: Tree): Tree =
-      Apply(EAF, receiver, methMethodName, List(Null()))(VoidType)
+      Apply(EAF, receiver, methMethodName, Vector(Null()))(VoidType)
 
     val classDefs = Seq(
       // LFoo will be dropped by base linking
@@ -62,14 +62,14 @@ class IRCheckerTest {
       classDef(
         "Bar",
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor("Bar"),
 
           /* This method is called, but unreachable because there are no
            * instances of `Bar`. It will therefore not make `Foo` reachable.
            */
           MethodDef(EMF, methMethodName, NON,
-              List(paramDef("foo", ClassType("Foo", nullable = true, exact = false))), VoidType,
+              Vector(paramDef("foo", ClassType("Foo", nullable = true, exact = false))), VoidType,
               Some(Skip()))(
               EOH, UNV)
         )
@@ -78,15 +78,15 @@ class IRCheckerTest {
       classDef(
         MainTestClassName,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(MainTestClassName),
           MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic),
-              nullBarMethodName, NON, Nil, ClassType("Bar", nullable = true, exact = false),
+              nullBarMethodName, NON, Vector(), ClassType("Bar", nullable = true, exact = false),
               Some(Null()))(
               EOH, UNV),
           mainMethodDef(Block(
             callMethOn(ApplyStatic(EAF, MainTestClassName,
-                nullBarMethodName, Nil)(ClassType("Bar", nullable = true, exact = false))),
+                nullBarMethodName, Vector())(ClassType("Bar", nullable = true, exact = false))),
             callMethOn(Null()),
             callMethOn(UnaryOp(UnaryOp.Throw, Null()))
           ))
@@ -104,49 +104,49 @@ class IRCheckerTest {
     val C = ClassName("C")
     val D = ClassName("D")
 
-    val fooMethodName = m("foo", List(ClassRef(B)), V)
+    val fooMethodName = m("foo", Vector(ClassRef(B)), V)
 
-    val results = for (receiverClassName <- List(A, B, C, D)) yield {
+    val results = for (receiverClassName <- Vector(A, B, C, D)) yield {
       val receiverClassRef = ClassRef(receiverClassName)
       val receiverType = ClassType(receiverClassName, nullable = true, exact = false)
 
-      val testMethodName = m("test", List(receiverClassRef, ClassRef(C), ClassRef(D)), V)
+      val testMethodName = m("test", Vector(receiverClassRef, ClassRef(C), ClassRef(D)), V)
 
-      val newD = New(D, NoArgConstructorName, Nil)
+      val newD = New(D, NoArgConstructorName, Vector())
 
       val classDefs = Seq(
         classDef(
           "A",
           kind = ClassKind.Interface,
-          interfaces = Nil,
-          methods = List(
+          interfaces = Vector(),
+          methods = Vector(
             MethodDef(EMF, fooMethodName, NON,
-                List(paramDef("x", ClassType(B, nullable = true, exact = false))), VoidType,
+                Vector(paramDef("x", ClassType(B, nullable = true, exact = false))), VoidType,
                 Some(Skip()))(
                 EOH, UNV)
           )
         ),
-        classDef("B", kind = ClassKind.Interface, interfaces = List("A")),
+        classDef("B", kind = ClassKind.Interface, interfaces = Vector("A")),
         classDef(
           "C",
           kind = ClassKind.Class,
           superClass = Some(ObjectClass),
-          interfaces = List("A"),
-          methods = List(trivialCtor("C"))
+          interfaces = Vector("A"),
+          methods = Vector(trivialCtor("C"))
         ),
 
         classDef(
           "D",
           kind = ClassKind.Class,
           superClass = Some("C"),
-          interfaces = List("B"),
-          methods = List(
+          interfaces = Vector("B"),
+          methods = Vector(
             trivialCtor("D", "C"),
             MethodDef(
               EMF.withNamespace(MemberNamespace.PublicStatic),
               testMethodName,
               NON,
-              List(
+              Vector(
                 paramDef("x", receiverType),
                 paramDef("c", ClassType(C, nullable = true, exact = false)),
                 paramDef("d", ClassType(D, nullable = true, exact = false))
@@ -154,16 +154,16 @@ class IRCheckerTest {
               VoidType,
               Some(Block(
                 Apply(EAF, VarRef("x")(receiverType), fooMethodName,
-                    List(VarRef("c")(ClassType(C, nullable = true, exact = false))))(VoidType),
+                    Vector(VarRef("c")(ClassType(C, nullable = true, exact = false))))(VoidType),
                 Apply(EAF, VarRef("x")(receiverType), fooMethodName,
-                    List(VarRef("d")(ClassType(D, nullable = true, exact = false))))(VoidType)
+                    Vector(VarRef("d")(ClassType(D, nullable = true, exact = false))))(VoidType)
               ))
             )(EOH, UNV)
           )
         ),
 
         mainTestClassDef(
-          ApplyStatic(EAF, D, testMethodName, List(newD, newD, newD))(VoidType)
+          ApplyStatic(EAF, D, testMethodName, Vector(newD, newD, newD))(VoidType)
         )
       )
 
@@ -214,11 +214,11 @@ class IRCheckerTest {
         kind = ClassKind.JSClass,
         superClass = Some(JSObjectLikeClass),
         jsConstructor = Some(
-          JSConstructorDef(JSCtorFlags, Nil, None,
+          JSConstructorDef(JSCtorFlags, Vector(), None,
               JSConstructorBody(
-                Nil,
-                JSSuperConstructorCall(Nil),
-                Nil
+                Vector(),
+                JSSuperConstructorCall(Vector()),
+                Vector()
               ))(EOH, UNV)
         )
       ),
@@ -244,11 +244,11 @@ class IRCheckerTest {
         kind = ClassKind.JSClass,
         superClass = Some(JSObjectLikeClass),
         jsConstructor = Some(
-          JSConstructorDef(JSCtorFlags, Nil, None,
+          JSConstructorDef(JSCtorFlags, Vector(), None,
               JSConstructorBody(
-                Nil,
-                JSSuperConstructorCall(Nil),
-                VarDef("x", NON, IntType, mutable = false, int(5)) :: Nil
+                Vector(),
+                JSSuperConstructorCall(Vector()),
+                VarDef("x", NON, IntType, mutable = false, int(5)) +: Vector()
               ))(EOH, UNV)
         )
       ),
@@ -269,7 +269,7 @@ class IRCheckerTest {
     import UnaryOp._
 
     // List of ops that take non-nullable reference types as argument
-    val ops = List(
+    val ops = Vector(
       Class_name,
       Class_isPrimitive,
       Class_isInterface,
@@ -317,7 +317,7 @@ class IRCheckerTest {
       mainTestClassDef(
         Assign(
           ArraySelect(
-            ArrayValue(ArrayTypeRef.of(ClassRef("Foo")), Nil),
+            ArrayValue(ArrayTypeRef.of(ClassRef("Foo")), Vector()),
             int(1)
           )(ClassType("Foo", nullable = true, exact = false)),
           int(1) // not a Foo, but OK.
@@ -334,7 +334,7 @@ class IRCheckerTest {
       mainTestClassDef(
         Assign(
           ArraySelect(
-            ArrayValue(ArrayTypeRef.of(IntRef), Nil),
+            ArrayValue(ArrayTypeRef.of(IntRef), Vector()),
             int(1)
           )(IntType),
           str("foo")
@@ -355,19 +355,19 @@ class IRCheckerTest {
       classDef(
         "Foo",
         superClass = Some(ObjectClass),
-        fields = List(FieldDef(EMF, FieldName("Foo", "fooFld"), NON, IntType))
+        fields = Vector(FieldDef(EMF, FieldName("Foo", "fooFld"), NON, IntType))
       ),
       classDef(
         "Bar",
         superClass = Some(if (parent) "Foo" else ObjectClass),
-        methods = List(
+        methods = Vector(
           MethodDef(
               EMF.withNamespace(MemberNamespace.Constructor),
-              NoArgConstructorName, NON, Nil, VoidType,
+              NoArgConstructorName, NON, Vector(), VoidType,
               Some(ctorBodyUnderTest))(EOH, UNV)
         )
       ),
-      mainTestClassDef(New("Bar", NoArgConstructorName, Nil))
+      mainTestClassDef(New("Bar", NoArgConstructorName, Vector()))
     )
   }
 
@@ -395,9 +395,9 @@ class IRCheckerTest {
     val ComparableType = ClassType(ComparableClass, nullable = false, exact = false)
 
     val descriptor = NewLambda.Descriptor(
-        ObjectClass, List(ComparableClass), m("compareTo", List(O), I), List(AnyType), IntType)
+        ObjectClass, Vector(ComparableClass), m("compareTo", Vector(O), I), Vector(AnyType), IntType)
     val closure =
-      Closure(ClosureFlags.typed, Nil, List(paramDef("that", AnyType)), None, IntType, int(0), Nil)
+      Closure(ClosureFlags.typed, Vector(), Vector(paramDef("that", AnyType)), None, IntType, int(0), Vector())
 
     val allowedTypeMsg = "a supertype of one of java.lang.Object!, java.lang.Comparable!"
 
@@ -446,11 +446,11 @@ class IRCheckerTest {
   @Test
   def badRecordSelect(): AsyncResult = await {
     val recordValue = RecordValue(
-        RecordType(List(
+        RecordType(Vector(
           RecordType.Field("i", NON, IntType, false),
           RecordType.Field("s", NON, StringType, false)
         )),
-        List(int(1), str("foo")))
+        Vector(int(1), str("foo")))
 
     val classDefs = Seq(
       mainTestClassDef(Block(
@@ -471,10 +471,10 @@ class IRCheckerTest {
   def badRecordValue(): AsyncResult = await {
     val classDefs = Seq(
       mainTestClassDef(Block(
-        RecordValue(RecordType(Nil), List(int(1))),
+        RecordValue(RecordType(Vector()), Vector(int(1))),
         RecordValue(
-          RecordType(List(RecordType.Field("i", NON, IntType, false))),
-          List(str("foo"))
+          RecordType(Vector(RecordType.Field("i", NON, IntType, false))),
+          Vector(str("foo"))
         )
       ))
     )
@@ -530,14 +530,14 @@ object IRCheckerTest {
   }
 
   def testLinkNoIRError(classDefs: Seq[ClassDef],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       postOptimizer: Boolean = false)(
       implicit ec: ExecutionContext): Future[Unit] = {
     link(classDefs, moduleInitializers, new ScalaConsoleLogger(Level.Error), postOptimizer)
   }
 
   def testLinkIRErrors(classDefs: Seq[ClassDef],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       postOptimizer: Boolean = false)(
       implicit ec: ExecutionContext): Future[LogLines] = {
 
@@ -550,7 +550,7 @@ object IRCheckerTest {
   }
 
   private def link(classDefs: Seq[ClassDef],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       logger: Logger, postOptimizer: Boolean)(
       implicit ec: ExecutionContext): Future[Unit] = {
     val config = StandardConfig()

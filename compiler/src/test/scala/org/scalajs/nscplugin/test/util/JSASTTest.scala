@@ -33,7 +33,7 @@ abstract class JSASTTest extends DirectTest {
       Some(ident.name.simpleName.nameString)
   }
 
-  class JSAST(val clDefs: List[js.ClassDef]) {
+  class JSAST(val clDefs: Vector[js.ClassDef]) {
     type Pat = PartialFunction[js.IRNode, Unit]
 
     class PFTraverser(pf: Pat) extends ir.Traversers.Traverser {
@@ -162,7 +162,7 @@ abstract class JSASTTest extends DirectTest {
     generatedClassDefs = Some(buffer)
     try {
       body
-      new JSAST(buffer.toList)
+      new JSAST(buffer.toVector)
     } finally {
       generatedClassDefs = None
     }

@@ -66,12 +66,12 @@ object TypeTransformer {
    *  @see
    *    https://webassembly.github.io/spec/core/syntax/types.html#result-types
    */
-  def transformResultType(tpe: Type)(implicit ctx: WasmContext): List[watpe.Type] = {
+  def transformResultType(tpe: Type)(implicit ctx: WasmContext): Vector[watpe.Type] = {
     tpe match {
-      case VoidType           => Nil
-      case NothingType        => Nil
+      case VoidType           => Vector()
+      case NothingType        => Vector()
       case RecordType(fields) => fields.flatMap(f => transformResultType(f.tpe))
-      case _                  => List(transformSingleType(tpe))
+      case _                  => Vector(transformSingleType(tpe))
     }
   }
 

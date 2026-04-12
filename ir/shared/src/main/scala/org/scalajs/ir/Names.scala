@@ -234,7 +234,7 @@ object Names {
     protected def stringPrefix: String = "FieldName"
 
     def nameString: String =
-      className.nameString + "::" + simpleName.nameString
+      className.nameString + "+:" + simpleName.nameString
 
     override def toString(): String =
       "FieldName<" + nameString + ">"
@@ -346,7 +346,7 @@ object Names {
 
   /** The full name of a method, including its simple name and its signature. */
   final class MethodName private (val simpleName: SimpleMethodName,
-      val paramTypeRefs: List[TypeRef], val resultTypeRef: TypeRef,
+      val paramTypeRefs: Vector[TypeRef], val resultTypeRef: TypeRef,
       val isReflectiveProxy: Boolean)
       extends Comparable[MethodName] {
 
@@ -379,8 +379,8 @@ object Names {
 
     def compareTo(that: MethodName): Int = {
       @tailrec
-      def compareParamTypeRefs(xs: List[TypeRef], ys: List[TypeRef]): Int = (xs, ys) match {
-        case (x :: xr, y :: yr) =>
+      def compareParamTypeRefs(xs: Vector[TypeRef], ys: Vector[TypeRef]): Int = (xs, ys) match {
+        case (x +: xr, y +: yr) =>
           val cmp = x.compareTo(y)
           if (cmp != 0) cmp
           else compareParamTypeRefs(xr, yr)
@@ -472,7 +472,7 @@ object Names {
   }
 
   object MethodName {
-    def apply(simpleName: SimpleMethodName, paramTypeRefs: List[TypeRef],
+    def apply(simpleName: SimpleMethodName, paramTypeRefs: Vector[TypeRef],
         resultTypeRef: TypeRef, isReflectiveProxy: Boolean): MethodName = {
       if ((simpleName.isConstructor || simpleName.isStaticInitializer ||
             simpleName.isClassInitializer) && resultTypeRef != VoidRef) {
@@ -497,23 +497,23 @@ object Names {
 
     // Convenience constructors
 
-    def apply(simpleName: SimpleMethodName, paramTypeRefs: List[TypeRef],
+    def apply(simpleName: SimpleMethodName, paramTypeRefs: Vector[TypeRef],
         resultTypeRef: TypeRef): MethodName = {
       apply(simpleName, paramTypeRefs, resultTypeRef, isReflectiveProxy = false)
     }
 
-    def apply(simpleName: String, paramTypeRefs: List[TypeRef],
+    def apply(simpleName: String, paramTypeRefs: Vector[TypeRef],
         resultTypeRef: TypeRef): MethodName = {
       apply(SimpleMethodName(simpleName), paramTypeRefs, resultTypeRef)
     }
 
-    def constructor(paramTypeRefs: List[TypeRef]): MethodName = {
+    def constructor(paramTypeRefs: Vector[TypeRef]): MethodName = {
       new MethodName(SimpleMethodName.Constructor, paramTypeRefs, VoidRef,
           isReflectiveProxy = false)
     }
 
     def reflectiveProxy(simpleName: SimpleMethodName,
-        paramTypeRefs: List[TypeRef]): MethodName = {
+        paramTypeRefs: Vector[TypeRef]): MethodName = {
       /* It is fine to use WellKnownNames here because nothing in `Names`
        * nor `Types` ever creates a reflective proxy name. So this code path
        * is not reached during their initialization.
@@ -523,7 +523,7 @@ object Names {
     }
 
     def reflectiveProxy(simpleName: String,
-        paramTypeRefs: List[TypeRef]): MethodName = {
+        paramTypeRefs: Vector[TypeRef]): MethodName = {
       reflectiveProxy(SimpleMethodName(simpleName), paramTypeRefs)
     }
   }

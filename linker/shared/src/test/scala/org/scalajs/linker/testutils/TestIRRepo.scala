@@ -22,7 +22,7 @@ object TestIRRepo {
 
   val minilib: Future[Seq[IRFile]] = loadGlobal(StdlibHolder.minilib)
   val javalib: Future[Seq[IRFile]] = loadGlobal(StdlibHolder.javalib)
-  val empty: Future[Seq[IRFile]] = Future.successful(Nil)
+  val empty: Future[Seq[IRFile]] = Future.successful(Vector())
 
   private def loadGlobal(stdlibPath: String): Future[Seq[IRFile]] = {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -37,10 +37,10 @@ object TestIRRepo {
    *  `Future` completes before moving on to the next iteration.
    */
   def sequentiallyForEachPreviousLib[A](f: (String, Seq[IRFile]) => Future[A])(
-      implicit ec: ExecutionContext): Future[List[A]] = {
+      implicit ec: ExecutionContext): Future[Vector[A]] = {
 
     // sort for determinism
-    val sortedPreviousLibs = StdlibHolder.previousLibs.toList.sortBy(_._1)
+    val sortedPreviousLibs = StdlibHolder.previousLibs.toVector.sortBy(_._1)
 
     sequentialFutureTraverse(sortedPreviousLibs) { case (version, path) =>
       Platform.loadJar(path).flatMap { files =>
@@ -56,17 +56,17 @@ object TestIRRepo {
   /** Like `Future.traverse`, but waits until each `Future` has completed
    *  before starting the next one.
    */
-  private def sequentialFutureTraverse[A, B](items: List[A])(f: A => Future[B])(
-      implicit ec: ExecutionContext): Future[List[B]] = {
+  private def sequentialFutureTraverse[A, B](items: Vector[A])(f: A => Future[B])(
+      implicit ec: ExecutionContext): Future[Vector[B]] = {
     items match {
-      case Nil =>
-        Future.successful(Nil)
-      case head :: tail =>
+      case Vector() =>
+        Future.successful(Vector())
+      case head +: tail =>
         for {
           headResult <- f(head)
           tailResult <- sequentialFutureTraverse(tail)(f)
         } yield {
-          headResult :: tailResult
+          headResult +: tailResult
         }
     }
   }

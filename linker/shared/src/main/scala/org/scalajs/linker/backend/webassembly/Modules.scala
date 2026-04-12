@@ -56,9 +56,9 @@ object Modules {
       id: FunctionID,
       originalName: OriginalName,
       typeID: TypeID,
-      params: List[Local],
-      results: List[Type],
-      locals: List[Local],
+      params: Vector[Local],
+      results: Vector[Type],
+      locals: Vector[Local],
       body: Expr,
       pos: Position
   )
@@ -97,7 +97,7 @@ object Modules {
   }
 
   /** A WebAssembly `elem` definition. */
-  final case class Element(tpe: Type, init: List[Expr], mode: Element.Mode)
+  final case class Element(tpe: Type, init: Vector[Expr], mode: Element.Mode)
 
   object Element {
     sealed abstract class Mode
@@ -124,14 +124,14 @@ object Modules {
    *  [[https://webassembly.github.io/gc/core/binary/modules.html#sections]]
    */
   final class Module(
-      val types: List[RecType],
-      val imports: List[Import],
-      val funcs: List[Function],
-      val tags: List[Tag],
-      val globals: List[Global],
-      val exports: List[Export],
+      val types: Vector[RecType],
+      val imports: Vector[Import],
+      val funcs: Vector[Function],
+      val tags: Vector[Tag],
+      val globals: Vector[Global],
+      val exports: Vector[Export],
       val start: Option[FunctionID],
-      val elems: List[Element],
-      val datas: List[Data]
+      val elems: Vector[Element],
+      val datas: Vector[Data]
   )
 }

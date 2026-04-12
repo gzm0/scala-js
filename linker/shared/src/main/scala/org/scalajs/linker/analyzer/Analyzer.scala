@@ -77,7 +77,7 @@ final class Analyzer(config: CommonPhaseConfig, initial: Boolean,
       .andThen { case _ => infoLoader.cleanAfterRun() }
   }
 
-  private def reportErrors(errors: List[Error], logger: Logger): Unit = {
+  private def reportErrors(errors: Vector[Error], logger: Logger): Unit = {
     require(errors.nonEmpty)
 
     val maxDisplayErrors = {
@@ -140,7 +140,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
   private[this] val _errors = new GrowingList[Error]
 
-  override def errors: List[Error] = _errors.get()
+  override def errors: Vector[Error] = _errors.get()
 
   private val fromAnalyzer = FromCore("analyzer")
 
@@ -214,12 +214,12 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     if (isNoModule) {
       // Check there is only a single module.
       val publicModuleIDs = (
-        _topLevelExportInfos.keys.map(_._1).toList ++
+        _topLevelExportInfos.keys.map(_._1).toVector ++
           moduleInitializers.map(i => ModuleID(i.moduleID))
       ).distinct
 
       if (publicModuleIDs.size > 1)
-        _errors ::= MultiplePublicModulesWithoutModuleSupport(publicModuleIDs)
+        _errors +:= MultiplePublicModulesWithoutModuleSupport(publicModuleIDs)
     }
 
     // Reach additional data, based on reflection methods used
@@ -322,7 +322,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
      */
     if (isClassSuperClassUsed) {
       implicit val from = fromAnalyzer
-      for (classInfo <- _classInfos.values.filter(_.isDataAccessed).toList) {
+      for (classInfo <- _classInfos.values.filter(_.isDataAccessed).toVector) {
         @tailrec
         def loop(classInfo: ClassInfo): Unit = {
           classInfo.accessData()
@@ -422,7 +422,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
           info
 
         case Right(cyclePath) =>
-          _errors ::= CycleInInheritanceChain(cyclePath, fromAnalyzer)
+          _errors +:= CycleInInheritanceChain(cyclePath, fromAnalyzer)
           InheritanceCycle
       }
 
@@ -452,7 +452,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
      *  If there are multiple cycles in the ancestry, an arbitrary one is returned.
      */
     private def loadParentChain(curClass: ClassName,
-        info: Infos.ClassInfo): Future[Either[List[ClassInfo], List[ClassName]]] = {
+        info: Infos.ClassInfo): Future[Either[Vector[ClassInfo], Vector[ClassName]]] = {
 
       val parents = ensureParentsLoading(info)
 
@@ -463,18 +463,18 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         case None =>
           // There is no cycle. We can safely wait until all parents are loaded.
           Future.traverse(parents)(_.result).map { loadedParents =>
-            Left(loadedParents.asInstanceOf[List[ClassInfo]])
+            Left(loadedParents.asInstanceOf[Vector[ClassInfo]])
           }
       }
     }
 
-    private def checkParentChain(curClass: ClassName, parents: List[LoadingClass],
+    private def checkParentChain(curClass: ClassName, parents: Vector[LoadingClass],
         knownDescendants: Set[ClassName]): Future[Option[CycleInfo]] = {
       val newKnowDescendants = knownDescendants + curClass
       val parentResults = Future.traverse(parents) { loading =>
         val nextClass = loading.className
         if (knownDescendants.contains(nextClass)) {
-          Future.successful(Some(CycleInfo(Nil, nextClass)))
+          Future.successful(Some(CycleInfo(Vector(), nextClass)))
         } else {
           loading.info.flatMap { info =>
             val parents = ensureParentsLoading(info)
@@ -494,14 +494,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       case CycleInfo(_, null) => cycle
 
       case CycleInfo(c, root) if root == curClass =>
-        CycleInfo(curClass :: c, null)
+        CycleInfo(curClass +: c, null)
 
       case CycleInfo(c, root) =>
-        CycleInfo(curClass :: c, root)
+        CycleInfo(curClass +: c, root)
     }
 
-    private def ensureParentsLoading(info: Infos.ClassInfo): List[LoadingClass] = {
-      val parentNames = info.superClass.toList ++ info.interfaces
+    private def ensureParentsLoading(info: Infos.ClassInfo): Vector[LoadingClass] = {
+      val parentNames = info.superClass.toVector ++ info.interfaces
       parentNames.map(parentName => ensureLoading(parentName, syntheticKind = None))
     }
   }
@@ -515,7 +515,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       val result: Future[LoadingResult]
   )
 
-  private case class CycleInfo(cycle: List[ClassName], root: ClassName)
+  private case class CycleInfo(cycle: Vector[ClassName], root: ClassName)
 
   private sealed trait ModuleUnit {
     def addStaticDependency(clazz: ClassName): Unit
@@ -526,11 +526,11 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
   private class ClassInfo(
       val data: Infos.ClassInfo,
       unvalidatedSuperClass: Option[ClassInfo],
-      unvalidatedInterfaces: List[ClassInfo])
+      unvalidatedInterfaces: Vector[ClassInfo])
       extends Analysis.ClassInfo with LoadingResult with ModuleUnit {
 
     private[this] val _linkedFrom = new GrowingList[From]
-    def linkedFrom: List[From] = _linkedFrom.get()
+    def linkedFrom: Vector[From] = _linkedFrom.get()
 
     val className = data.className
     val kind = data.kind
@@ -552,27 +552,27 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     val superClass: Option[ClassInfo] =
       validateSuperClass(unvalidatedSuperClass)
 
-    val interfaces: List[ClassInfo] =
+    val interfaces: Vector[ClassInfo] =
       validateInterfaces(unvalidatedInterfaces)
 
     /** Ancestors of this class or interface.
      *
      *  This always includes this class and `java.lang.Object`.
      */
-    val ancestors: List[ClassInfo] = {
+    val ancestors: Vector[ClassInfo] = {
       if (className == ObjectClass) {
-        this :: Nil
+        this +: Vector()
       } else {
-        val parents = superClass.getOrElse(objectClassInfo) :: interfaces
+        val parents = superClass.getOrElse(objectClassInfo) +: interfaces
         this +: parents.flatMap(_.ancestors).distinct
       }
     }
 
     def link()(implicit from: From): Unit = {
       if (nonExistent)
-        _errors ::= MissingClass(this, from)
+        _errors +:= MissingClass(this, from)
 
-      _linkedFrom ::= from
+      _linkedFrom +:= from
     }
 
     private[this] def validateSuperClass(superClass: Option[ClassInfo]): Option[ClassInfo] = {
@@ -587,7 +587,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         case ClassKind.Class | ClassKind.ModuleClass | ClassKind.HijackedClass =>
           val superCl = superClass.get // checked by ClassDef checker.
           if (superCl.kind != ClassKind.Class) {
-            _errors ::= InvalidSuperClass(superCl, this, from)
+            _errors +:= InvalidSuperClass(superCl, this, from)
             Some(objectClassInfo)
           } else {
             superClass
@@ -610,7 +610,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
             case ClassKind.JSClass | ClassKind.NativeJSClass =>
               superClass // ok
             case _ =>
-              _errors ::= InvalidSuperClass(superCl, this, from)
+              _errors +:= InvalidSuperClass(superCl, this, from)
               None
           }
 
@@ -622,7 +622,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
             case _ if superCl eq objectClassInfo =>
               superClass // ok
             case _ =>
-              _errors ::= InvalidSuperClass(superCl, this, from)
+              _errors +:= InvalidSuperClass(superCl, this, from)
               Some(objectClassInfo)
           }
 
@@ -634,14 +634,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
               case _ if superCl eq objectClassInfo =>
                 superClass // ok
               case _ =>
-                _errors ::= InvalidSuperClass(superCl, this, from)
+                _errors +:= InvalidSuperClass(superCl, this, from)
                 None
             }
           }
       }
     }
 
-    private[this] def validateInterfaces(interfaces: List[ClassInfo]): List[ClassInfo] = {
+    private[this] def validateInterfaces(interfaces: Vector[ClassInfo]): Vector[ClassInfo] = {
       def from = FromClass(this)
 
       val validSuperIntfKind = kind match {
@@ -659,7 +659,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
           // Remove it but do not report an additional error message
           false
         } else if (superIntf.kind != validSuperIntfKind) {
-          _errors ::= InvalidImplementedInterface(superIntf, this, from)
+          _errors +:= InvalidImplementedInterface(superIntf, this, from)
           false
         } else {
           true
@@ -715,12 +715,12 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       addStaticDependency(ObjectClass)
 
     private[this] val _instantiatedFrom = new GrowingList[From]
-    def instantiatedFrom: List[From] = _instantiatedFrom.get()
+    def instantiatedFrom: Vector[From] = _instantiatedFrom.get()
 
     private[this] val _dispatchCalledFrom: mutable.Map[MethodName, GrowingList[From]] =
       emptyThreadSafeMap
 
-    def dispatchCalledFrom(methodName: MethodName): Option[List[From]] =
+    def dispatchCalledFrom(methodName: MethodName): Option[Vector[From]] =
       _dispatchCalledFrom.get(methodName).map(_.get())
 
     /** Methods that have been called on this interface.
@@ -866,7 +866,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
          * We use fromAnalyzer because we don't have any From here (we
          * shouldn't, since lookup methods are not supposed to produce errors).
          */
-        _errors ::= ConflictingDefaultMethods(notShadowed, fromAnalyzer)
+        _errors +:= ConflictingDefaultMethods(notShadowed, fromAnalyzer)
       }
 
       notShadowed.headOption
@@ -879,7 +879,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         val targetOwner = target.owner
 
         val syntheticInfo = makeSyntheticMethodInfo(
-            methodsCalledStatically = List(
+            methodsCalledStatically = Vector(
                 targetOwner.className -> NamespacedMethodName(MemberNamespace.Public, methodName)))
         new MethodInfo(this, MemberNamespace.Public, methodName, syntheticInfo,
             syntheticKind = MethodSyntheticKind.DefaultBridge(targetOwner.className))
@@ -914,26 +914,26 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
        */
 
       @tailrec
-      def findFirstNonEmptyCandidates(ancestors: List[ClassInfo]): List[MethodInfo] = {
+      def findFirstNonEmptyCandidates(ancestors: Vector[ClassInfo]): Vector[MethodInfo] = {
         ancestors match {
-          case ancestor :: nextAncestors =>
+          case ancestor +: nextAncestors =>
             val candidates = ancestor.findProxyCandidates(proxyName)
             if (candidates.isEmpty)
               findFirstNonEmptyCandidates(nextAncestors)
             else
               candidates
-          case Nil =>
-            Nil
+          case Vector() =>
+            Vector()
         }
       }
 
       val candidates = findFirstNonEmptyCandidates(ancestorsInReflectiveTargetOrder)
 
       candidates match {
-        case Nil =>
+        case Vector() =>
           ()
 
-        case onlyCandidate :: Nil =>
+        case onlyCandidate +: Vector() =>
           // Fast path that does not require workTracker.track
           createReflProxy(proxyName, onlyCandidate.methodName).reach(this)
 
@@ -948,8 +948,10 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       }
     }
 
-    private lazy val ancestorsInReflectiveTargetOrder: List[ClassInfo] = {
-      val b = new mutable.ListBuffer[ClassInfo]
+    private lazy val ancestorsInReflectiveTargetOrder: Vector[ClassInfo] = {
+      val b = Vector.newBuilder[ClassInfo]
+
+      b ++= ancestors.filter(_.isInterface)
 
       @tailrec
       def addSuperClasses(superClass: ClassInfo): Unit = {
@@ -961,14 +963,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       }
       addSuperClasses(this)
 
-      b.prependToList(ancestors.filter(_.isInterface))
+      b.result()
     }
 
-    private def findProxyCandidates(proxyName: MethodName): List[MethodInfo] =
-      proxyCandidates.getOrElse(proxyName, Nil)
+    private def findProxyCandidates(proxyName: MethodName): Vector[MethodInfo] =
+      proxyCandidates.getOrElse(proxyName, Vector())
 
     private lazy val proxyCandidates = {
-      val result = mutable.Map.empty[MethodName, List[MethodInfo]]
+      val result = mutable.Map.empty[MethodName, Vector[MethodInfo]]
       val iter = publicMethodInfos.valuesIterator
       while (iter.hasNext) {
         val m = iter.next()
@@ -979,14 +981,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         if (include) {
           val proxyName =
             MethodName.reflectiveProxy(m.methodName.simpleName, m.methodName.paramTypeRefs)
-          val prev = result.getOrElse(proxyName, Nil)
-          result.update(proxyName, m :: prev)
+          val prev = result.getOrElse(proxyName, Vector())
+          result.update(proxyName, m +: prev)
         }
       }
       result
     }
 
-    private def computeMostSpecificProxyMatch(candidates: List[MethodInfo])(
+    private def computeMostSpecificProxyMatch(candidates: Vector[MethodInfo])(
         implicit from: From): Future[MethodInfo] = {
 
       /* From the JavaDoc of java.lang.Class.getMethod:
@@ -1030,7 +1032,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
          * #5143 We take the minimum by result type ref for stability.
          */
         remainingCandidates match {
-          case onlyRemaining :: Nil =>
+          case onlyRemaining +: Vector() =>
             onlyRemaining // fast path
           case _ =>
             remainingCandidates.minBy(_.methodName.resultTypeRef)
@@ -1085,7 +1087,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       publicMethodInfos.getOrElseUpdate(proxyName, {
         val syntheticInfo = makeSyntheticMethodInfo(
-            methodsCalled = List(this.className -> targetName))
+            methodsCalled = Vector(this.className -> targetName))
         new MethodInfo(this, MemberNamespace.Public, proxyName, syntheticInfo,
             syntheticKind = MethodSyntheticKind.ReflectiveProxy(targetName))
       })
@@ -1125,14 +1127,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         info.reach()
 
         _topLevelExportInfos.put(key, info).foreach { other =>
-          _errors ::= ConflictingTopLevelExport(tle.moduleID, tle.exportName, List(info, other))
+          _errors +:= ConflictingTopLevelExport(tle.moduleID, tle.exportName, Vector(info, other))
         }
       }
     }
 
     def accessModule()(implicit from: From): Unit = {
       if (!isAnyModuleClass) {
-        _errors ::= NotAModule(this, from)
+        _errors +:= NotAModule(this, from)
       } else if (!isModuleAccessed.getAndSet(true)) {
         instantiated() // TODO: Shouldn't we always add the from?
         if (isScalaClass)
@@ -1141,7 +1143,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     }
 
     def instantiated()(implicit from: From): Unit = {
-      _instantiatedFrom ::= from
+      _instantiatedFrom +:= from
 
       if (!(isScalaClass || isJSClass || isNativeJSClass)) {
         /* Ignore.
@@ -1170,7 +1172,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
           val allMethodsCalledLogs = for (ancestor <- ancestors) yield {
             ancestor.subclassInstantiated()
-            ancestor._instantiatedSubclasses ::= this
+            ancestor._instantiatedSubclasses +:= this
             ancestor -> ancestor.methodsCalledLog.get()
           }
 
@@ -1204,7 +1206,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     }
 
     private def subclassInstantiated()(implicit from: From): Unit = {
-      _instantiatedFrom ::= from
+      _instantiatedFrom +:= from
 
       if (!_isAnySubclassInstantiated.getAndSet(true)) {
         if (!isInterface) {
@@ -1247,11 +1249,11 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       val froms = _dispatchCalledFrom.getOrElseUpdate(methodName, new GrowingList)
 
-      if (froms.addIfNil(from)) {
+      if (froms.addIfVector()(from)) {
         // New call.
         val fromDispatch = FromDispatch(this, methodName)
 
-        methodsCalledLog ::= methodName
+        methodsCalledLog +:= methodName
         val subclasses = _instantiatedSubclasses.get()
         for (subclass <- subclasses)
           subclass.callMethodResolved(methodName)(fromDispatch)
@@ -1267,7 +1269,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
         }
       } else {
         // Already called before; add the new from
-        froms ::= from
+        froms +:= from
       }
     }
 
@@ -1307,7 +1309,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       if (_jsNativeMembersUsed.put(name, ()).isEmpty) {
         maybeJSNativeLoadSpec match {
           case None =>
-            _errors ::= MissingJSNativeMember(this, name, from)
+            _errors +:= MissingJSNativeMember(this, name, from)
           case Some(jsNativeLoadSpec) =>
             validateLoadSpec(jsNativeLoadSpec, Some(name))
         }
@@ -1335,7 +1337,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
       if (isNoModule) {
         jsNativeLoadSpec match {
           case JSNativeLoadSpec.Import(module, _) =>
-            _errors ::= ImportWithoutModuleSupport(module, this, jsNativeMember, from)
+            _errors +:= ImportWithoutModuleSupport(module, this, jsNativeMember, from)
           case _ =>
         }
       }
@@ -1360,10 +1362,10 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     def isReachable: Boolean = _isReachable.get()
 
     private[this] val _calledFrom = new GrowingList[From]
-    def calledFrom: List[From] = _calledFrom.get()
+    def calledFrom: Vector[From] = _calledFrom.get()
 
     private[this] val _instantiatedSubclasses = new GrowingList[ClassInfo]
-    def instantiatedSubclasses: List[ClassInfo] = _instantiatedSubclasses.get()
+    def instantiatedSubclasses: Vector[ClassInfo] = _instantiatedSubclasses.get()
 
     def isReflectiveProxy: Boolean =
       methodName.isReflectiveProxy
@@ -1385,7 +1387,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     def reachStatic()(implicit from: From): Unit = {
       checkConcrete()
 
-      _calledFrom ::= from
+      _calledFrom +:= from
       if (!_isReachable.getAndSet(true)) {
         _isAbstractReachable.set(true)
         doReach()
@@ -1397,7 +1399,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       if (!_isAbstractReachable.getAndSet(true)) {
         checkExistent()
-        _calledFrom ::= from
+        _calledFrom +:= from
       }
     }
 
@@ -1411,8 +1413,8 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       checkConcrete()
 
-      _calledFrom ::= from
-      _instantiatedSubclasses ::= inClass
+      _calledFrom +:= from
+      _instantiatedSubclasses +:= inClass
 
       if (!_isReachable.getAndSet(true)) {
         _isAbstractReachable.set(true)
@@ -1422,12 +1424,12 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
     private def checkExistent()(implicit from: From) = {
       if (nonExistent)
-        _errors ::= MissingMethod(this, from)
+        _errors +:= MissingMethod(this, from)
     }
 
     private def checkConcrete()(implicit from: From) = {
       if (nonExistent || isAbstract)
-        _errors ::= MissingMethod(this, from)
+        _errors +:= MissingMethod(this, from)
     }
 
     private[this] def doReach(): Unit =
@@ -1440,7 +1442,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     val exportName: String = data.exportName
 
     if (isNoModule && !ir.Trees.JSGlobalRef.isValidJSGlobalRefName(exportName)) {
-      _errors ::= InvalidTopLevelExportInScript(this)
+      _errors +:= InvalidTopLevelExportInScript(this)
     }
 
     private[this] val _staticDependencies: mutable.Map[ClassName, Unit] = emptyThreadSafeMap
@@ -1504,7 +1506,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
           if ((flags & ReachabilityInfoInClass.FlagDynamicallyReferenced) != 0) {
             if (isNoModule)
-              _errors ::= DynamicImportWithoutModuleSupport(from)
+              _errors +:= DynamicImportWithoutModuleSupport(from)
             else
               moduleUnit.addDynamicDependency(className)
           }
@@ -1566,27 +1568,27 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       if ((globalFlags & ReachabilityInfo.FlagAccessedNewTarget) != 0 &&
           config.coreSpec.esFeatures.esVersion < ESVersion.ES2015) {
-        _errors ::= NewTargetWithoutES2015Support(from)
+        _errors +:= NewTargetWithoutES2015Support(from)
       }
 
       if ((globalFlags & ReachabilityInfo.FlagAccessedImportMeta) != 0 &&
           config.coreSpec.moduleKind != ModuleKind.ESModule) {
-        _errors ::= ImportMetaWithoutESModule(from)
+        _errors +:= ImportMetaWithoutESModule(from)
       }
 
       if ((globalFlags & ReachabilityInfo.FlagUsedExponentOperator) != 0 &&
           config.coreSpec.esFeatures.esVersion < ESVersion.ES2016) {
-        _errors ::= ExponentOperatorWithoutES2016Support(from)
+        _errors +:= ExponentOperatorWithoutES2016Support(from)
       }
 
       if ((globalFlags & ReachabilityInfo.FlagUsedAsync) != 0 &&
           config.coreSpec.esFeatures.esVersion < ESVersion.ES2017) {
-        _errors ::= AsyncWithoutES2017Support(from)
+        _errors +:= AsyncWithoutES2017Support(from)
       }
 
       if ((globalFlags & ReachabilityInfo.FlagUsedOrphanAwait) != 0 &&
           !config.coreSpec.targetIsWebAssembly) {
-        _errors ::= OrphanAwaitWithoutWebAssembly(from)
+        _errors +:= OrphanAwaitWithoutWebAssembly(from)
       }
 
       if ((globalFlags & ReachabilityInfo.FlagUsedClassSuperClass) != 0) {
@@ -1597,7 +1599,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     if (data.referencedLinkTimeProperties.nonEmpty) {
       for ((name, tpe) <- data.referencedLinkTimeProperties) {
         if (!linkTimeProperties.get(name).exists(_.tpe == tpe)) {
-          _errors ::= InvalidLinkTimeProperty(name, tpe, from)
+          _errors +:= InvalidLinkTimeProperty(name, tpe, from)
         }
       }
     }
@@ -1632,14 +1634,14 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
     }
 
     new Infos.ClassInfo(className, ClassKind.Class, syntheticKind = None, nonExistent = true,
-        superClass = superClass, interfaces = Nil, jsNativeLoadSpec = None,
+        superClass = superClass, interfaces = Vector(), jsNativeLoadSpec = None,
         referencedFieldClasses = Map.empty, methods = methods,
-        jsNativeMembers = Map.empty, jsMethodProps = Nil, topLevelExports = Nil)
+        jsNativeMembers = Map.empty, jsMethodProps = Vector(), topLevelExports = Vector())
   }
 
   private def makeSyntheticMethodInfo(
-      methodsCalled: List[(ClassName, MethodName)] = Nil,
-      methodsCalledStatically: List[(ClassName, NamespacedMethodName)] = Nil
+      methodsCalled: Vector[(ClassName, MethodName)] = Vector(),
+      methodsCalledStatically: Vector[(ClassName, NamespacedMethodName)] = Vector()
   ): Infos.MethodInfo = {
     val reachabilityInfoBuilder = new Infos.ReachabilityInfoBuilder(ir.Version.Unversioned)
 
@@ -1654,7 +1656,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
 private object AnalyzerRun {
   private val getSuperclassMethodName =
-    MethodName("getSuperclass", Nil, ClassRef(ClassClass))
+    MethodName("getSuperclass", Vector(), ClassRef(ClassClass))
 
   private class WorkTracker(implicit ec: ExecutionContext) {
 
@@ -1662,7 +1664,7 @@ private object AnalyzerRun {
      *  `allowComplete()` gets called.
      */
     private val pending = new AtomicInteger(1)
-    private val failures = new AtomicReference[List[Throwable]](Nil)
+    private val failures = new AtomicReference[Vector[Throwable]](Vector())
     private val promise = Promise[Unit]()
 
     def track(fut: Future[Unit]): Unit = {
@@ -1680,7 +1682,7 @@ private object AnalyzerRun {
     @tailrec
     private def addFailure(t: Throwable): Unit = {
       val prev = failures.get()
-      if (!failures.compareAndSet(prev, t :: prev))
+      if (!failures.compareAndSet(prev, t +: prev))
         addFailure(t)
     }
 
@@ -1695,9 +1697,9 @@ private object AnalyzerRun {
 
     private def complete(): Unit = {
       failures.get() match {
-        case Nil =>
+        case Vector() =>
           promise.success(())
-        case firstFailure :: moreFailures =>
+        case firstFailure +: moreFailures =>
           /* The same `Throwable` can be propagated to several tracked Futures.
            * Since t.addSuppressed(t) is not allowed, we filter out duplicates.
            */
@@ -1719,10 +1721,10 @@ private object AnalyzerRun {
   }
 
   private final class GrowingList[A] {
-    private val list = new AtomicReference[List[A]](Nil)
-    def ::=(item: A): Unit = list.updateAndGet(item :: _)
-    def get(): List[A] = list.get()
-    def addIfNil(item: A): Boolean = list.compareAndSet(Nil, item :: Nil)
-    def clear(): Unit = list.set(Nil)
+    private val list = new AtomicReference[Vector[A]](Vector())
+    def +:=(item: A): Unit = list.updateAndGet(item +: _)
+    def get(): Vector[A] = list.get()
+    def addIfVector()(item: A): Boolean = list.compareAndSet(Vector(), item +: Vector())
+    def clear(): Unit = list.set(Vector())
   }
 }

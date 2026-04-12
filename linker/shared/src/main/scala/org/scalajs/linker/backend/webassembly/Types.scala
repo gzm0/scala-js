@@ -153,13 +153,13 @@ object Types {
   }
 
   /** A WebAssembly `rectype`. */
-  final case class RecType(subTypes: List[SubType])
+  final case class RecType(subTypes: Vector[SubType])
 
   object RecType {
 
     /** Builds a `rectype` with a single `subtype`. */
     def apply(singleSubType: SubType): RecType =
-      RecType(singleSubType :: Nil)
+      RecType(singleSubType +: Vector())
   }
 
   /** A WebAssembly `subtype` with an associated name.
@@ -187,14 +187,14 @@ object Types {
   sealed abstract class CompositeType
 
   /** A WebAssembly `functype`. */
-  final case class FunctionType(params: List[Type], results: List[Type]) extends CompositeType
+  final case class FunctionType(params: Vector[Type], results: Vector[Type]) extends CompositeType
 
   object FunctionType {
-    val NilToNil: FunctionType = FunctionType(Nil, Nil)
+    val NilToNil: FunctionType = FunctionType(Vector(), Vector())
   }
 
   /** A WebAssembly `structtype` with associated field names. */
-  final case class StructType(fields: List[StructField]) extends CompositeType
+  final case class StructType(fields: Vector[StructField]) extends CompositeType
 
   /** A member of a `StructType`, with a field name and a WebAssembly `fieldtype`. */
   final case class StructField(id: FieldID, originalName: OriginalName, fieldType: FieldType)

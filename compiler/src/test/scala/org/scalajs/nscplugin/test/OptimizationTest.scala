@@ -461,7 +461,7 @@ class OptimizationTest extends JSASTTest {
     """.hasNot("`new Object`") {
       case js.JSNew(_, _) =>
     }.has("object literal") {
-      case js.JSObjectConstr(Nil) =>
+      case js.JSObjectConstr(Vector()) =>
     }
 
     """
@@ -484,7 +484,7 @@ class OptimizationTest extends JSASTTest {
     """.hasNot("`new Object`") {
       case js.JSNew(_, _) =>
     }.has("object literal") {
-      case js.JSObjectConstr(Nil) =>
+      case js.JSObjectConstr(Vector()) =>
     }
   }
 

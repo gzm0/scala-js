@@ -45,7 +45,7 @@ object NodeIRContainer {
           throw new IllegalArgumentException("Illegal classpath entry: " + entry)
 
         case Failure(js.JavaScriptException(e: js.Error)) if isNotFound(e) =>
-          Future.successful(Nil)
+          Future.successful(Vector())
 
         case Failure(t) =>
           throw t
@@ -82,13 +82,13 @@ object NodeIRContainer {
       extends IRContainerImpl(path, NodeIRFile.dateToVersion(version)) {
     import NodeFS._
 
-    def sjsirFiles(implicit ec: ExecutionContext): Future[List[IRFile]] = {
+    def sjsirFiles(implicit ec: ExecutionContext): Future[Vector[IRFile]] = {
       for {
         arr <- cbFuture[Uint8Array](readFile(path, _))
         zip <- JSZip.loadAsync(arr).toFuture
         files <- loadFromZip(zip)
       } yield {
-        files.toList
+        files.toVector
       }
     }
 

@@ -27,7 +27,7 @@ import WasmContext._
 
 object Preprocessor {
   def preprocess(coreSpec: CoreSpec, coreLib: CoreWasmLib,
-      classes: List[LinkedClass], tles: List[LinkedTopLevelExport]): WasmContext = {
+      classes: Vector[LinkedClass], tles: Vector[LinkedTopLevelExport]): WasmContext = {
     val staticFieldMirrors = computeStaticFieldMirrors(tles)
     val privateJSFields = computePrivateJSFields(classes)
 
@@ -63,22 +63,22 @@ object Preprocessor {
     val classInfos = classInfosBuilder.toMap
 
     // sort for stability
-    val reflectiveProxyIDs = definedReflectiveProxyNames.toList.sorted.zipWithIndex.toMap
+    val reflectiveProxyIDs = definedReflectiveProxyNames.toVector.sorted.zipWithIndex.toMap
 
     new WasmContext(coreSpec, coreLib, classInfos, reflectiveProxyIDs,
         privateJSFields, itableBucketCount)
   }
 
   private def computeStaticFieldMirrors(
-      tles: List[LinkedTopLevelExport]): Map[ClassName, Map[FieldName, List[String]]] = {
+      tles: Vector[LinkedTopLevelExport]): Map[ClassName, Map[FieldName, Vector[String]]] = {
 
-    var result = Map.empty[ClassName, Map[FieldName, List[String]]]
+    var result = Map.empty[ClassName, Map[FieldName, Vector[String]]]
     for (tle <- tles) {
       tle.tree match {
         case TopLevelFieldExportDef(_, exportName, FieldIdent(fieldName)) =>
           val className = tle.owningClass
           val mirrors = result.getOrElse(className, Map.empty)
-          val newExportNames = exportName :: mirrors.getOrElse(fieldName, Nil)
+          val newExportNames = exportName +: mirrors.getOrElse(fieldName, Vector())
           val newMirrors = mirrors.updated(fieldName, newExportNames)
           result = result.updated(className, newMirrors)
 
@@ -89,7 +89,7 @@ object Preprocessor {
   }
 
   private def computePrivateJSFields(
-      classes: List[LinkedClass]): Map[FieldName, String] = {
+      classes: Vector[LinkedClass]): Map[FieldName, String] = {
 
     val result = mutable.AnyRefMap.empty[FieldName, String]
 
@@ -107,7 +107,7 @@ object Preprocessor {
   }
 
   private def computeSpecialInstanceTypes(
-      classes: List[LinkedClass]): Map[ClassName, Int] = {
+      classes: Vector[LinkedClass]): Map[ClassName, Int] = {
 
     val result = mutable.AnyRefMap.empty[ClassName, Int]
 
@@ -134,7 +134,7 @@ object Preprocessor {
 
   private def preprocess(
       clazz: LinkedClass,
-      staticFieldMirrors: Map[FieldName, List[String]],
+      staticFieldMirrors: Map[FieldName, Vector[String]],
       specialInstanceTypes: Int,
       methodsCalledDynamically0: Set[MethodName],
       itableIdx: Int,
@@ -143,19 +143,19 @@ object Preprocessor {
     val className = clazz.className
     val kind = clazz.kind
 
-    val allFieldDefs: List[FieldDef] = {
+    val allFieldDefs: Vector[FieldDef] = {
       if (kind.isClass) {
         val inheritedFields =
-          superClass.fold[List[FieldDef]](Nil)(_.allFieldDefs)
+          superClass.fold[Vector[FieldDef]](Vector())(_.allFieldDefs)
         val myFieldDefs = clazz.fields.collect {
           case fd: FieldDef if !fd.flags.namespace.isStatic =>
             fd
           case fd: JSFieldDef =>
             throw new AssertionError(s"Illegal $fd in Scala class $className")
         }
-        inheritedFields ::: myFieldDefs
+        inheritedFields ++ myFieldDefs
       } else {
-        Nil
+        Vector()
       }
     }
 
@@ -196,14 +196,14 @@ object Preprocessor {
       }
     }
 
-    val tableEntries: List[MethodName] = {
-      val methodsCalledDynamically: List[MethodName] =
-        if (clazz.hasInstances) methodsCalledDynamically0.toList
-        else Nil
+    val tableEntries: Vector[MethodName] = {
+      val methodsCalledDynamically: Vector[MethodName] =
+        if (clazz.hasInstances) methodsCalledDynamically0.toVector
+        else Vector()
 
       kind match {
         case ClassKind.Class | ClassKind.ModuleClass | ClassKind.HijackedClass =>
-          val superTableEntries = superClass.fold[List[MethodName]](Nil)(_.tableEntries)
+          val superTableEntries = superClass.fold[Vector[MethodName]](Vector())(_.tableEntries)
           val superTableEntrySet = superTableEntries.toSet
 
           /* When computing the table entries to add for this class, exclude
@@ -213,13 +213,13 @@ object Preprocessor {
             .filter(!superTableEntrySet.contains(_))
             .sorted // for stability
 
-          superTableEntries ::: newTableEntries
+          superTableEntries ++ newTableEntries
 
         case ClassKind.Interface =>
           methodsCalledDynamically.sorted // for stability
 
         case _ =>
-          Nil
+          Vector()
       }
     }
 
@@ -249,8 +249,8 @@ object Preprocessor {
    *  TODO Arguably this is a job for the `Analyzer`.
    */
   private object AbstractMethodCallCollector {
-    def collectAbstractMethodCalls(classes: List[LinkedClass],
-        tles: List[LinkedTopLevelExport]): Map[ClassName, Set[MethodName]] = {
+    def collectAbstractMethodCalls(classes: Vector[LinkedClass],
+        tles: Vector[LinkedTopLevelExport]): Map[ClassName, Set[MethodName]] = {
 
       val collector = new AbstractMethodCallCollector
       for (clazz <- classes)
@@ -394,7 +394,7 @@ object Preprocessor {
    *    [[https://www.researchgate.net/publication/2438441_Efficient_Type_Inclusion_Tests]]
    */
   private def computeItableBuckets(
-      allClasses: List[LinkedClass]): (Int, Map[ClassName, Int]) = {
+      allClasses: Vector[LinkedClass]): (Int, Map[ClassName, Int]) = {
 
     /* Since we only have to assign itable indices to interfaces with
      * instances, we can filter out all parts of the hierarchy that are not
@@ -465,7 +465,7 @@ object Preprocessor {
     // Phase 1: Assign buckets to spine types
     for (clazz <- classes.reverseIterator) {
       val className = clazz.className
-      val parents = (clazz.superClass.toList ::: clazz.interfaces.toList).map(_.name)
+      val parents = (clazz.superClass.toVector ++ clazz.interfaces.toVector).map(_.name)
 
       joinsOf.get(className) match {
         case Some(joins) =>

@@ -33,7 +33,7 @@ import SpecialNames._
 
 /** Derives `CharacterBox` and `LongBox` from `jl.Character` and `jl.Long`. */
 object DerivedClasses {
-  def deriveClasses(classes: List[LinkedClass]): List[LinkedClass] = {
+  def deriveClasses(classes: Vector[LinkedClass]): Vector[LinkedClass] = {
     classes.collect {
       case clazz if clazz.className == BoxedCharacterClass || clazz.className == BoxedLongClass =>
         deriveBoxClass(clazz)
@@ -91,7 +91,7 @@ object DerivedClasses {
     val fieldName = FieldName(derivedClassName, valueFieldSimpleName)
     val fieldIdent = FieldIdent(fieldName)
 
-    val derivedFields: List[FieldDef] = List(
+    val derivedFields: Vector[FieldDef] = Vector(
       FieldDef(EMF, fieldIdent, NON, primType)
     )
 
@@ -101,14 +101,14 @@ object DerivedClasses {
       ParamDef(LocalIdent(fieldName.simpleName.toLocalName), NON, primType, mutable = false)
     val derivedCtor = MethodDef(
       EMF.withNamespace(MemberNamespace.Constructor),
-      MethodIdent(MethodName.constructor(List(primType.primRef))),
+      MethodIdent(MethodName.constructor(Vector(primType.primRef))),
       NON,
-      List(ctorParamDef),
+      Vector(ctorParamDef),
       VoidType,
       Some(Assign(selectField, ctorParamDef.ref))
     )(EOH, NOV)
 
-    val derivedMethods: List[MethodDef] = for {
+    val derivedMethods: Vector[MethodDef] = for {
       method <- clazz.methods if method.flags.namespace == MemberNamespace.Public
     } yield {
       MethodDef(
@@ -131,13 +131,13 @@ object DerivedClasses {
       jsSuperClass = None,
       jsNativeLoadSpec = None,
       derivedFields,
-      derivedCtor :: derivedMethods,
+      derivedCtor +: derivedMethods,
       jsConstructorDef = None,
-      exportedMembers = Nil,
-      jsNativeMembers = Nil,
+      exportedMembers = Vector(),
+      jsNativeMembers = Vector(),
       EOH,
       pos,
-      ancestors = derivedClassName :: clazz.ancestors.tail,
+      ancestors = derivedClassName +: clazz.ancestors.tail,
       hasInstances = true,
       hasDirectInstances = true,
       hasInstanceTests = true,

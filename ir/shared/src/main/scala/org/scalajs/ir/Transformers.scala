@@ -28,7 +28,7 @@ object Transformers {
       }
     }
 
-    final def transformTrees(trees: List[Tree]): List[Tree] =
+    final def transformTrees(trees: Vector[Tree]): Vector[Tree] =
       trees.map(transform(_))
 
     final def transformTreeOpt(treeOpt: Option[Tree]): Option[Tree] =

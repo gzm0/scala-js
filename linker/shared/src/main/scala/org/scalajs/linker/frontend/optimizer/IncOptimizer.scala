@@ -75,7 +75,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     multiple(
       cond(!targetIsWebAssembly && !esFeatures.allowBigIntsForLongs) {
         // Required by the intrinsics manipulating Longs
-        callStaticMethods(LongImpl.RuntimeLongClass, LongImpl.AllIntrinsicMethods.toList)
+        callStaticMethods(LongImpl.RuntimeLongClass, LongImpl.AllIntrinsicMethods.toVector)
       },
       cond(targetIsWebAssembly) {
         // Required by the intrinsic CharacterCodePointToString
@@ -109,7 +109,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   }
 
   /** Update the incremental analyzer with a new run. */
-  def update(unit: LinkingUnit, logger: Logger): List[(ClassDef, Version)] = {
+  def update(unit: LinkingUnit, logger: Logger): Vector[(ClassDef, Version)] = {
     batchMode = objectClass == null
     logger.debug(s"Optimizer: Batch mode: $batchMode")
 
@@ -134,13 +134,13 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     for {
       linkedClass <- unit.classDefs
     } yield {
-      val topLevelExports = groupedTopLevelExports.getOrElse(linkedClass.className, Nil)
+      val topLevelExports = groupedTopLevelExports.getOrElse(linkedClass.className, Vector())
       optimizedClass(linkedClass, topLevelExports)
     }
   }
 
   private def optimizedClass(linkedClass: LinkedClass,
-      tles: List[LinkedTopLevelExport]): (ClassDef, Version) = {
+      tles: Vector[LinkedTopLevelExport]): (ClassDef, Version) = {
     val className = linkedClass.className
     val interface = getInterface(className)
 
@@ -202,7 +202,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     topLevelExports.updateWith(unit.topLevelExports)
   }
 
-  private def updateAndTagClasses(linkedClasses: List[LinkedClass]): Unit = {
+  private def updateAndTagClasses(linkedClasses: Vector[LinkedClass]): Unit = {
     val neededInterfaces = new ConcurrentHashMap[ClassName, LinkedClass]
     val neededClasses = new ConcurrentHashMap[ClassName, LinkedClass]
     for (linkedClass <- linkedClasses) {
@@ -532,11 +532,11 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     }
 
     /** Parent chain from this to Object. */
-    val parentChain: List[Class] =
-      this :: superClass.fold[List[Class]](Nil)(_.parentChain)
+    val parentChain: Vector[Class] =
+      this +: superClass.fold[Vector[Class]](Vector())(_.parentChain)
 
     /** Reverse parent chain from Object to this. */
-    val reverseParentChain: List[Class] =
+    val reverseParentChain: Vector[Class] =
       parentChain.reverse
 
     var interfaces: Set[InterfaceType] = linkedClass.ancestors.map(getInterface).toSet
@@ -555,7 +555,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       elidableConstructorsInfo != ElidableConstructorsInfo.NotElidable // initial educated guess
     private val hasElidableConstructorsAskers = new ConcurrentHashMap[Processable, Unit]
 
-    var fields: List[AnyFieldDef] = linkedClass.fields
+    var fields: Vector[AnyFieldDef] = linkedClass.fields
     var fieldsRead: Set[FieldName] = linkedClass.fieldsRead
     var tryNewInlineable: Option[OptimizerCore.InlineableClassStructure] = None
 
@@ -820,7 +820,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
               // fast path
               InlineableFieldBodies.Empty
             } else {
-              val finalFieldBodies = interpretConstructor(ctor, initFieldBodies.toMap, Nil)
+              val finalFieldBodies = interpretConstructor(ctor, initFieldBodies.toMap, Vector())
               new InlineableFieldBodies(finalFieldBodies)
             }
         }
@@ -845,7 +845,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     }
 
     /** UPDATE PASS ONLY, used by `computeInlineableFieldBodies` and `updateTryNewInlineable`. */
-    private def computeAllInstanceFieldDefs(): List[FieldDef] = {
+    private def computeAllInstanceFieldDefs(): Vector[FieldDef] = {
       for {
         parent <- reverseParentChain
         anyField <- parent.fields
@@ -938,14 +938,14 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
         case Select(This(), _) =>
           true
 
-        case Apply(_, LoadModule(className), MethodIdent(methodName), Nil)
+        case Apply(_, LoadModule(className), MethodIdent(methodName), Vector())
             if !methodName.isReflectiveProxy =>
           // For a getter-like call, we need the method to actually be a getter.
           dependenciesBuilder += className
           getterDependenciesBuilder += ((className, methodName))
           true
 
-        case Apply(_, This(), MethodIdent(methodName), Nil)
+        case Apply(_, This(), MethodIdent(methodName), Vector())
             if !methodName.isReflectiveProxy =>
           getterDependenciesBuilder += ((className, methodName))
           true
@@ -962,7 +962,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
         case Assign(Select(This(), _), rhs) => isTriviallySideEffectFree(rhs)
 
         // Mixin constructor -- test whether its body is entirely empty
-        case ApplyStatically(flags, This(), className, methodName, Nil)
+        case ApplyStatically(flags, This(), className, methodName, Vector())
             if !flags.isPrivate && !classes.containsKey(className) =>
           // Since className is not in classes, it must be a default method call.
           val container =
@@ -1012,7 +1012,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     /** UPDATE PASS ONLY. */
     private def interpretConstructor(impl: MethodImpl,
         fieldBodies: Map[FieldName, FieldBody],
-        paramBodies: List[Option[FieldBody]]): Map[FieldName, FieldBody] = {
+        paramBodies: Vector[Option[FieldBody]]): Map[FieldName, FieldBody] = {
 
       /* This method performs a kind of abstract intepretation of the given
        * given constructor `impl`. It *assumes* that the enclosing class ends
@@ -1059,12 +1059,12 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
           case Select(This(), FieldIdent(fieldName)) =>
             fieldBodies.get(fieldName)
 
-          case Apply(_, receiver @ LoadModule(moduleClassName), MethodIdent(methodName), Nil)
+          case Apply(_, receiver @ LoadModule(moduleClassName), MethodIdent(methodName), Vector())
               if !methodName.isReflectiveProxy =>
             val moduleBody = FieldBody.LoadModule(moduleClassName, receiver.pos)
             Some(FieldBody.ModuleGetter(moduleBody, methodName, tree.tpe, tree.pos))
 
-          case Apply(_, This(), MethodIdent(methodName), Nil)
+          case Apply(_, This(), MethodIdent(methodName), Vector())
               if !methodName.isReflectiveProxy =>
             interpretSelfGetter(methodName, fieldBodies)
 
@@ -1099,7 +1099,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
             }
 
           // Mixin constructor -- assume it is empty
-          case ApplyStatically(flags, This(), className, methodName, Nil)
+          case ApplyStatically(flags, This(), className, methodName, Vector())
               if !flags.isPrivate && !classes.containsKey(className) =>
             fieldBodies
 
@@ -1174,7 +1174,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
   }
 
   private sealed abstract class JSMethodContainer {
-    def untrackedJSClassCaptures: List[ParamDef]
+    def untrackedJSClassCaptures: Vector[ParamDef]
     def untrackedThisType(namespace: MemberNamespace): Type
   }
 
@@ -1188,7 +1188,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     private[this] val exportedMembers = mutable.ArrayBuffer.empty[JSMethodImpl]
     private[this] var jsConstructorDef: Option[JSCtorImpl] = None
-    private[this] var _jsClassCaptures: List[ParamDef] = Nil
+    private[this] var _jsClassCaptures: Vector[ParamDef] = Vector()
 
     updateWith(linkedClass)
 
@@ -1199,20 +1199,20 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
      *  convenience for the optimizer's environment: Any real change of usage
      *  also necessarily changes the body of the method.
      */
-    def untrackedJSClassCaptures: List[ParamDef] = _jsClassCaptures
+    def untrackedJSClassCaptures: Vector[ParamDef] = _jsClassCaptures
 
     def untrackedThisType(namespace: MemberNamespace): Type =
       if (namespace.isStatic) VoidType
       else myInterface.untrackedInstanceThisType
 
     def updateWith(linkedClass: LinkedClass): Unit = {
-      _jsClassCaptures = linkedClass.jsClassCaptures.getOrElse(Nil)
+      _jsClassCaptures = linkedClass.jsClassCaptures.getOrElse(Vector())
       updateExportedMembers(linkedClass.exportedMembers)
       updateJSConstructorDef(linkedClass.jsConstructorDef)
     }
 
     private def updateExportedMembers(
-        newExportedMembers: List[JSMethodPropDef]): Unit = {
+        newExportedMembers: Vector[JSMethodPropDef]): Unit = {
       val newLen = newExportedMembers.length
       val oldLen = exportedMembers.length
 
@@ -1248,8 +1248,8 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       }
     }
 
-    def optimizedExportedMembers(): List[JSMethodPropDef] =
-      exportedMembers.map(_.optimizedDef).toList
+    def optimizedExportedMembers(): Vector[JSMethodPropDef] =
+      exportedMembers.map(_.optimizedDef).toVector
 
     def optimizedJSConstructorDef(): Option[JSConstructorDef] =
       jsConstructorDef.map(_.optimizedDef)
@@ -1259,12 +1259,12 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     private[this] var methods = Map.empty[(String, String), (JSMethodImpl, Position)]
 
-    val untrackedJSClassCaptures: List[ParamDef] = Nil
+    val untrackedJSClassCaptures: Vector[ParamDef] = Vector()
     def untrackedThisType(namespace: MemberNamespace): Type = VoidType
 
     override def toString(): String = "<top-level>"
 
-    def updateWith(topLevelExports: List[LinkedTopLevelExport]): Unit = {
+    def updateWith(topLevelExports: Vector[LinkedTopLevelExport]): Unit = {
       val newMethods = topLevelExports.map(_.tree).collect {
         case m: TopLevelMethodExportDef =>
           val key = (m.moduleID, m.topLevelExportName)
@@ -1317,7 +1317,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     private val fieldsReadAskers = new ConcurrentHashMap[Processable, Unit]
     private val isJSTypeAskers = new ConcurrentHashMap[Processable, Unit]
 
-    private var _ancestors: List[ClassName] = linkedClass.ancestors
+    private var _ancestors: Vector[ClassName] = linkedClass.ancestors
 
     private val _instantiatedSubclasses = new ConcurrentHashMap[Class, Unit]
 
@@ -1368,7 +1368,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     /** PROCESS PASS ONLY. */
     def askDynamicCallTargets(methodName: MethodName,
-        asker: Processable): List[MethodImpl] = {
+        asker: Processable): Vector[MethodImpl] = {
       dynamicCallers
         .computeIfAbsent(methodName, _ => new ConcurrentHashMap())
         .put(asker, ())
@@ -1376,7 +1376,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
       val res = mutable.Set.empty[MethodImpl]
       _instantiatedSubclasses.forEachKey(Long.MaxValue, _.lookupMethod(methodName).foreach(res += _))
-      res.toList
+      res.toVector
     }
 
     /** PROCESS PASS ONLY. */
@@ -1408,7 +1408,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       _instantiatedSubclasses.remove(x)
 
     /** PROCESS PASS ONLY. */
-    def askAncestors(asker: Processable): List[ClassName] = {
+    def askAncestors(asker: Processable): Vector[ClassName] = {
       ancestorsAskers.put(asker, ())
       asker.registerTo(this)
       _ancestors
@@ -1451,7 +1451,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
     def staticLike(namespace: MemberNamespace): StaticLikeNamespace =
       staticLikes(namespace.ordinal)
 
-    def optimizedExportedMembers(): List[JSMethodPropDef] =
+    def optimizedExportedMembers(): Vector[JSMethodPropDef] =
       jsMethodContainer.optimizedExportedMembers()
 
     def optimizedJSConstructorDef(): Option[JSConstructorDef] =
@@ -1720,7 +1720,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       }
 
       val (newParams, newBody) = new Optimizer(this, Some(this), this.toString()).optimize(
-          owner.untrackedThisType, params, jsClassCaptures = Nil,
+          owner.untrackedThisType, params, jsClassCaptures = Vector(),
           resultType, body, isNoArgCtor = name.name == NoArgConstructorName)
 
       MethodDef(static, name, originalName,
@@ -1745,7 +1745,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
           val thisType = owner.untrackedThisType(flags.namespace)
 
           val (newParamsAndRest, newBody) = new Optimizer(this, None, this.toString()).optimize(
-              thisType, params ++ restParam.toList, owner.untrackedJSClassCaptures,
+              thisType, params ++ restParam.toVector, owner.untrackedJSClassCaptures,
               AnyType, body, isNoArgCtor = false)
 
           val (newParams, newRestParam) =
@@ -1761,14 +1761,14 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
           val newGetterBody = getterBody.map { body =>
             val (_, newBody) = new Optimizer(this, None, "get " + this.toString()).optimize(
-                thisType, Nil, jsClassCaptures, AnyType, body, isNoArgCtor = false)
+                thisType, Vector(), jsClassCaptures, AnyType, body, isNoArgCtor = false)
             newBody
           }
 
           val newSetterArgAndBody = setterArgAndBody.map { case (param, body) =>
-            val (List(newParam), newBody) = new Optimizer(
+            val (Vector(newParam), newBody) = new Optimizer(
                 this, None, "set " + this.toString()).optimize(
-                thisType, List(param), jsClassCaptures, AnyType, body,
+                thisType, Vector(param), jsClassCaptures, AnyType, body,
                 isNoArgCtor = false)
             (newParam, newBody)
           }
@@ -1794,7 +1794,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       val thisType = owner.untrackedThisType(flags.namespace)
 
       val (newParamsAndRest, newRawBody) = new Optimizer(this, None, this.toString()).optimize(
-          thisType, params ++ restParam.toList, owner.untrackedJSClassCaptures, AnyType,
+          thisType, params ++ restParam.toVector, owner.untrackedJSClassCaptures, AnyType,
           Block(body.allStats)(body.pos), isNoArgCtor = false)
 
       val (newParams, newRestParam) =
@@ -1803,10 +1803,10 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
       val bodyStats = newRawBody match {
         case Block(stats) => stats
-        case stat         => List(stat)
+        case stat         => Vector(stat)
       }
 
-      val (beforeSuper, superCall :: afterSuper) =
+      val (beforeSuper, superCall +: afterSuper) =
         bodyStats.span(!_.isInstanceOf[JSSuperConstructorCall])
 
       val newBody = JSConstructorBody(beforeSuper,
@@ -1833,7 +1833,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
 
     /** Look up the targets of a dynamic call to an instance method. */
     protected def dynamicCall(intfName: ClassName,
-        methodName: MethodName): List[MethodID] = {
+        methodName: MethodName): Vector[MethodID] = {
       getInterface(intfName).askDynamicCallTargets(methodName, asker)
     }
 
@@ -1843,7 +1843,7 @@ final class IncOptimizer private[optimizer] (config: CommonPhaseConfig, collOps:
       getInterface(className).askStaticCallTarget(namespace, methodName, asker)
     }
 
-    protected def getAncestorsOf(intfName: ClassName): List[ClassName] =
+    protected def getAncestorsOf(intfName: ClassName): Vector[ClassName] =
       getInterface(intfName).askAncestors(asker)
 
     protected def hasElidableConstructors(className: ClassName): Boolean =

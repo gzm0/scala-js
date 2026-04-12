@@ -58,7 +58,7 @@ abstract class OutputDirectoryImpl extends OutputDirectory {
       implicit ec: ExecutionContext): Future[ByteBuffer]
 
   /** Lists all the files in the directory. */
-  def listFiles()(implicit ec: ExecutionContext): Future[List[String]]
+  def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]]
 
   /** Deletes the given file. Fails if it does not exist. */
   def delete(name: String)(implicit ec: ExecutionContext): Future[Unit]

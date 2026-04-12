@@ -42,16 +42,16 @@ class LibraryReachabilityTest {
 
     val classDefs = Seq(
       classDef("A", superClass = Some(ObjectClass),
-          methods = List(
+          methods = Vector(
             trivialCtor("A"),
-            MethodDef(EMF, m("test", Nil, V), NON, Nil, VoidType,
+            MethodDef(EMF, m("test", Vector(), V), NON, Vector(), VoidType,
                 Some(Block(
-                  Apply(EAF, systemMod, m("getProperty", List(T), T), List(emptyStr))(StringType),
-                  Apply(EAF, systemMod, m("getProperty", List(T, T), T), List(emptyStr, emptyStr))(
+                  Apply(EAF, systemMod, m("getProperty", Vector(T), T), Vector(emptyStr))(StringType),
+                  Apply(EAF, systemMod, m("getProperty", Vector(T, T), T), Vector(emptyStr, emptyStr))(
                       StringType),
-                  Apply(EAF, systemMod, m("setProperty", List(T, T), T), List(emptyStr, emptyStr))(
+                  Apply(EAF, systemMod, m("setProperty", Vector(T, T), T), Vector(emptyStr, emptyStr))(
                       StringType),
-                  Apply(EAF, systemMod, m("clearProperty", List(T), T), List(emptyStr))(StringType)
+                  Apply(EAF, systemMod, m("clearProperty", Vector(T), T), Vector(emptyStr))(StringType)
                 )))(EOH, UNV)
           ))
     )
@@ -59,7 +59,7 @@ class LibraryReachabilityTest {
     for {
       analysis <- computeAnalysis(classDefs,
           reqsFactory.instantiateClass("A", NoArgConstructorName) ++
-          reqsFactory.callMethod("A", m("test", Nil, V)))
+          reqsFactory.callMethod("A", m("test", Vector(), V)))
     } yield {
       val juPropertiesClass = analysis.classInfos("java.util.Properties")
       assertFalse(juPropertiesClass.isAnySubclassInstantiated)
@@ -71,15 +71,15 @@ class LibraryReachabilityTest {
   @Test
   def jmBigNumbersNotInstantiatedWhenUsingStringFormat(): AsyncResult = await {
     val StringType = ClassType(BoxedStringClass, nullable = true, exact = false)
-    val formatMethod = m("format", List(T, ArrayTypeRef(O, 1)), T)
+    val formatMethod = m("format", Vector(T, ArrayTypeRef(O, 1)), T)
 
     val classDefs = Seq(
       classDef("A", superClass = Some(ObjectClass),
-          methods = List(
+          methods = Vector(
             trivialCtor("A"),
-            MethodDef(EMF, m("test", Nil, V), NON, Nil, VoidType,
+            MethodDef(EMF, m("test", Vector(), V), NON, Vector(), VoidType,
                 Some(Block(
-                  ApplyStatic(EAF, BoxedStringClass, formatMethod, List(str("hello %d"), int(42)))(
+                  ApplyStatic(EAF, BoxedStringClass, formatMethod, Vector(str("hello %d"), int(42)))(
                       StringType)
                 )))(EOH, UNV)
           ))
@@ -88,7 +88,7 @@ class LibraryReachabilityTest {
     for {
       analysis <- computeAnalysis(classDefs,
           reqsFactory.instantiateClass("A", NoArgConstructorName) ++
-          reqsFactory.callMethod("A", m("test", Nil, V)))
+          reqsFactory.callMethod("A", m("test", Vector(), V)))
     } yield {
       val jmBigIntegerClass = analysis.classInfos("java.math.BigInteger")
       assertFalse(jmBigIntegerClass.isAnySubclassInstantiated)
@@ -108,7 +108,7 @@ object LibraryReachabilityTest {
 
   def computeAnalysis(classDefs: Seq[ClassDef],
       symbolRequirements: SymbolRequirement = reqsFactory.none(),
-      moduleInitializers: Seq[ModuleInitializer] = Nil,
+      moduleInitializers: Seq[ModuleInitializer] = Vector(),
       config: StandardConfig = StandardConfig())(
       implicit ec: ExecutionContext): Future[Analysis] = {
     for {

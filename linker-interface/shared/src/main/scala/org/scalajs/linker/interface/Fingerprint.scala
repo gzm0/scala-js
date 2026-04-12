@@ -63,12 +63,12 @@ private[interface] object Fingerprint {
     }
   }
 
-  implicit def listFingerprint[T: Fingerprint]: Fingerprint[List[T]] = {
-    new Fingerprint[List[T]] {
-      override def fingerprint(list: List[T]): String = {
+  implicit def listFingerprint[T: Fingerprint]: Fingerprint[Vector[T]] = {
+    new Fingerprint[Vector[T]] {
+      override def fingerprint(list: Vector[T]): String = {
         list
           .map(implicitly[Fingerprint[T]].fingerprint)
-          .mkString("List(", ",", ")")
+          .mkString("Vector(", ",", ")")
       }
     }
   }

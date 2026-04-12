@@ -34,14 +34,14 @@ import org.scalajs.linker.interface.ModuleInitializer
  *  are no public modules.
  */
 final class ModuleSet private[linker] (
-    val modules: List[ModuleSet.Module],
+    val modules: Vector[ModuleSet.Module],
 
     /** Abstract classes may not have any definitions, but are still required
      *  for proper code generation.
      *
      *  For example, a native JS class that is needed for its load spec.
      */
-    val abstractClasses: List[LinkedClass],
+    val abstractClasses: Vector[LinkedClass],
 
     val globalInfo: LinkedGlobalInfo
 ) {
@@ -73,8 +73,8 @@ object ModuleSet {
       val internalDependencies: Set[ModuleID],
       val externalDependencies: Set[String],
       val public: Boolean,
-      val classDefs: List[LinkedClass],
-      val topLevelExports: List[LinkedTopLevelExport],
+      val classDefs: Vector[LinkedClass],
+      val topLevelExports: Vector[LinkedTopLevelExport],
       val initializers: Seq[ModuleInitializer.Initializer]
   ) {
     require(public || topLevelExports.isEmpty,

@@ -142,8 +142,8 @@ private[optimizer] final class IntegerDivisions(useRuntimeLong: Boolean) {
       UnaryOp.Throw,
       New(
         ArithmeticExceptionClass,
-        MethodIdent(MethodName.constructor(List(ClassRef(BoxedStringClass)))),
-        List(StringLiteral("/ by zero"))
+        MethodIdent(MethodName.constructor(Vector(ClassRef(BoxedStringClass)))),
+        Vector(StringLiteral("/ by zero"))
       )
     )
   }
@@ -526,7 +526,7 @@ private[optimizer] object IntegerDivisions {
       val multiplyFullResult = if (useRuntimeLong) {
         // RuntimeLong.multiplyFull(x, y)
         ApplyStatic(ApplyFlags.empty, LongImpl.RuntimeLongClass,
-            MethodIdent(LongImpl.multiplyFull), List(IntLiteral(x), y))(
+            MethodIdent(LongImpl.multiplyFull), Vector(IntLiteral(x), y))(
             ClassType(LongImpl.RuntimeLongClass, nullable = true, exact = false))
       } else {
         // x.toLong * y.toLong

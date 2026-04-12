@@ -116,21 +116,21 @@ private[emitter] final class JSGen(val config: Emitter.Config) {
    *  ES 2015 but `function`s in ES 5.1 semantics. In other words, it must not
    *  be used to compile `ir.Trees.Closure`s.
    */
-  def genArrowFunction(args: List[ParamDef], restParam: Option[ParamDef], body: Tree)(
+  def genArrowFunction(args: Vector[ParamDef], restParam: Option[ParamDef], body: Tree)(
       implicit pos: Position): Function = {
     val closureFlags =
       ClosureFlags.function.withArrow(esFeatures.esVersion >= ESVersion.ES2015)
     Function(closureFlags, args, restParam, body)
   }
 
-  def genDefineProperty(obj: Tree, prop: Tree, descriptor: List[(String, Tree)])(
+  def genDefineProperty(obj: Tree, prop: Tree, descriptor: Vector[(String, Tree)])(
       implicit tracking: GlobalRefTracking, pos: Position): WithGlobals[Tree] = {
     val descriptorTree =
       ObjectConstr(descriptor.map(x => StringLiteral(x._1) -> x._2))
 
     globalRef("Object").map { objRef =>
       Apply(genIdentBracketSelect(objRef, "defineProperty"),
-          List(obj, prop, descriptorTree))
+          Vector(obj, prop, descriptorTree))
     }
   }
 
@@ -151,7 +151,7 @@ private[emitter] final class JSGen(val config: Emitter.Config) {
     }
   }
 
-  def genIIFE(captures: List[(ParamDef, Tree)], body: Tree)(
+  def genIIFE(captures: Vector[(ParamDef, Tree)], body: Tree)(
       implicit pos: Position): Tree = {
     val (params, args) = captures.unzip
     Apply(genArrowFunction(params, None, body), args)

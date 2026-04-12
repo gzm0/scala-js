@@ -30,7 +30,7 @@ final class CapturingLogger extends Logger {
   def trace(t: => Throwable): Unit =
     lines += new LogLine(Level.Error, t.toString())
 
-  def allLogLines: LogLines = new LogLines(lines.toList)
+  def allLogLines: LogLines = new LogLines(lines.toVector)
 }
 
 object CapturingLogger {
@@ -45,7 +45,7 @@ object CapturingLogger {
       s"[$level] $message"
   }
 
-  final class LogLines(lines: List[LogLine]) {
+  final class LogLines(lines: Vector[LogLine]) {
     def contains(messagePart: String): Boolean =
       lines.exists(_.contains(messagePart))
 

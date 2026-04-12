@@ -47,9 +47,9 @@ object FunctionEmitter {
       functionID: wanme.FunctionID,
       originalName: OriginalName,
       enclosingClassName: Option[ClassName],
-      captureParamDefs: Option[List[ParamDef]],
+      captureParamDefs: Option[Vector[ParamDef]],
       receiverType: Option[watpe.Type],
-      paramDefs: List[ParamDef],
+      paramDefs: Vector[ParamDef],
       restParam: Option[ParamDef],
       body: Tree,
       resultType: Type
@@ -63,7 +63,7 @@ object FunctionEmitter {
       preSuperVarDefs = None,
       hasNewTarget = false,
       receiverType,
-      paramDefs ::: restParam.toList,
+      paramDefs ++ restParam.toVector,
       transformResultType(resultType)
     )
     emitter.genBody(body, resultType)
@@ -74,8 +74,8 @@ object FunctionEmitter {
       functionID: wanme.FunctionID,
       originalName: OriginalName,
       funTypeID: wanme.TypeID,
-      captureParamDefs: List[ParamDef],
-      paramDefs: List[ParamDef],
+      captureParamDefs: Vector[ParamDef],
+      paramDefs: Vector[ParamDef],
       body: Tree,
       resultType: Type
   )(implicit ctx: WasmContext, pos: Position): Unit = {
@@ -101,12 +101,12 @@ object FunctionEmitter {
       superArgsFunctionID: wanme.FunctionID,
       postSuperStatsFunctionID: wanme.FunctionID,
       enclosingClassName: ClassName,
-      jsClassCaptures: List[ParamDef],
+      jsClassCaptures: Vector[ParamDef],
       ctor: JSConstructorDef
   )(implicit ctx: WasmContext): Unit = {
     implicit val pos = ctor.pos
 
-    val allCtorParams = ctor.args ::: ctor.restParam.toList
+    val allCtorParams = ctor.args ++ ctor.restParam.toVector
     val ctorBody = ctor.body
 
     // Compute the pre-super environment
@@ -129,7 +129,7 @@ object FunctionEmitter {
         hasNewTarget = true,
         receiverType = None,
         allCtorParams,
-        List(preSuperEnvType)
+        Vector(preSuperEnvType)
       )
 
       emitter.returnWithNPEScope() {
@@ -160,7 +160,7 @@ object FunctionEmitter {
         hasNewTarget = true,
         receiverType = None,
         allCtorParams,
-        List(watpe.RefType.anyref) // a js.Array
+        Vector(watpe.RefType.anyref) // a js.Array
       )
       emitter.genBody(JSArrayConstr(ctorBody.superCall.args), AnyType)
       emitter.fb.buildAndAddToModule()
@@ -178,7 +178,7 @@ object FunctionEmitter {
         hasNewTarget = true,
         receiverType = Some(watpe.RefType.anyref),
         allCtorParams,
-        List(watpe.RefType.anyref)
+        Vector(watpe.RefType.anyref)
       )
       emitter.genBody(Block(ctorBody.afterSuper), AnyType)
       emitter.fb.buildAndAddToModule()
@@ -189,19 +189,19 @@ object FunctionEmitter {
       functionID: wanme.FunctionID,
       originalName: OriginalName,
       enclosingClassName: Option[ClassName],
-      captureParamDefs: Option[List[ParamDef]],
+      captureParamDefs: Option[Vector[ParamDef]],
       captureDataAsRefStruct: Boolean,
-      preSuperVarDefs: Option[List[VarDef]],
+      preSuperVarDefs: Option[Vector[VarDef]],
       hasNewTarget: Boolean,
       receiverType: Option[watpe.Type],
-      paramDefs: List[ParamDef],
-      resultTypes: List[watpe.Type]
+      paramDefs: Vector[ParamDef],
+      resultTypes: Vector[watpe.Type]
   )(implicit ctx: WasmContext, pos: Position): FunctionEmitter = {
     val fb = new FunctionBuilder(ctx.moduleBuilder, functionID, originalName, pos)
 
     def addCaptureLikeParamListAndMakeEnv(
         captureParamName: String,
-        captureLikes: List[(LocalName, Type)]
+        captureLikes: Vector[(LocalName, Type)]
     ): Env = {
       val dataStructTypeID = ctx.getClosureDataStructType(captureLikes.map(_._2))
 
@@ -216,7 +216,7 @@ object FunctionEmitter {
         fb.addParam(captureParamName, watpe.RefType(dataStructTypeID))
       }
 
-      val env: List[(LocalName, VarStorage)] = for {
+      val env: Vector[(LocalName, VarStorage)] = for {
         ((name, _), idx) <- captureLikes.zipWithIndex
       } yield {
         val storage = VarStorage.StructField(
@@ -282,9 +282,9 @@ object FunctionEmitter {
 
   private val ObjectRef = ClassRef(ObjectClass)
   private val BoxedStringRef = ClassRef(BoxedStringClass)
-  private val toStringMethodName = MethodName("toString", Nil, BoxedStringRef)
-  private val equalsMethodName = MethodName("equals", List(ObjectRef), BooleanRef)
-  private val compareToMethodName = MethodName("compareTo", List(ObjectRef), IntRef)
+  private val toStringMethodName = MethodName("toString", Vector(), BoxedStringRef)
+  private val equalsMethodName = MethodName("equals", Vector(ObjectRef), BooleanRef)
+  private val compareToMethodName = MethodName("compareTo", Vector(ObjectRef), IntRef)
 
   private val CharSequenceClass = ClassName("java.lang.CharSequence")
   private val ComparableClass = ClassName("java.lang.Comparable")
@@ -358,7 +358,7 @@ private class FunctionEmitter private (
    *  If the `npeLabel` is not actually requested while generated `body`, the
    *  surrounding code is skipped.
    */
-  private def withNPEScope[A](resultType: List[watpe.Type])(body: => A): A = {
+  private def withNPEScope[A](resultType: Vector[watpe.Type])(body: => A): A = {
     if (semantics.nullPointers == CheckedBehavior.Unchecked) {
       body
     } else {
@@ -373,10 +373,10 @@ private class FunctionEmitter private (
         val noNPELabel = fb.genLabel()
 
         // Go back and open the two blocks
-        val blockType = fb.sigToBlockType(watpe.FunctionType(Nil, resultType))
+        val blockType = fb.sigToBlockType(watpe.FunctionType(Vector(), resultType))
         fb.insertAll(
           startIndex,
-          List(
+          Vector(
             wa.Block(blockType, Some(noNPELabel)),
             wa.Block(wa.BlockType.ValueType(), Some(npeLabel))
           )
@@ -780,7 +780,7 @@ private class FunctionEmitter private (
 
         // Update top-level export mirrors
         val classInfo = ctx.getClassInfo(fieldName.className)
-        val mirrors = classInfo.staticFieldMirrors.getOrElse(fieldName, Nil)
+        val mirrors = classInfo.staticFieldMirrors.getOrElse(fieldName, Vector())
         for (exportedName <- mirrors) {
           fb += wa.GlobalGet(globalID)
           fb += wa.Call(genFunctionID.forTopLevelExportSetter(exportedName))
@@ -847,8 +847,8 @@ private class FunctionEmitter private (
         fb += wa.Call(genFunctionID.forPrivateJSFieldSetter(field.name))
 
       case JSSelect(qualifier, item) =>
-        genThroughCustomJSHelper(List(qualifier, item, rhs), VoidType) { allJSArgs =>
-          val List(jsQualifier, jsItem, jsRhs) = allJSArgs
+        genThroughCustomJSHelper(Vector(qualifier, item, rhs), VoidType) { allJSArgs =>
+          val Vector(jsQualifier, jsItem, jsRhs) = allJSArgs
           js.Assign(js.BracketSelect.makeOptimized(jsQualifier, jsItem), jsRhs)
         }
 
@@ -1090,7 +1090,7 @@ private class FunctionEmitter private (
       val resultType = transformResultType(tree.tpe)
 
       fb.block(resultType) { labelDone =>
-        def pushArgs(argsLocals: List[wanme.LocalID]): Unit =
+        def pushArgs(argsLocals: Vector[wanme.LocalID]): Unit =
           argsLocals.foreach(argLocal => fb += wa.LocalGet(argLocal))
 
         /* First try the case where the value is one of our objects.
@@ -1115,7 +1115,7 @@ private class FunctionEmitter private (
              * the stack instead of going through a local. We will still need a
              * local for the table-based dispatch, though.
              */
-            Nil
+            Vector()
           } else {
             /* When there are arguments, we need to store them in temporary
              * variables. This is not required for correctness of the evaluation
@@ -1126,7 +1126,7 @@ private class FunctionEmitter private (
             val receiverLocal = addSyntheticLocal(watpe.RefType.any)
 
             fb += wa.LocalSet(receiverLocal)
-            val argsLocals: List[wanme.LocalID] = {
+            val argsLocals: Vector[wanme.LocalID] = {
               for ((arg, typeRef) <- args.zip(methodName.paramTypeRefs)) yield {
                 val tpe = ctx.inferTypeFromTypeRef(typeRef)
                 genTree(arg, tpe)
@@ -1190,11 +1190,11 @@ private class FunctionEmitter private (
           fb += wa.Call(genFunctionID.jsValueType)
           fb += wa.LocalTee(jsValueTypeLocal)
 
-          fb.switch(Sig(List(watpe.Int32), Nil), Sig(Nil, List(watpe.Int32))) { () =>
+          fb.switch(Sig(Vector(watpe.Int32), Vector()), Sig(Vector(), Vector(watpe.Int32))) { () =>
             // scrutinee is already on the stack
           }(
             // case JSValueTypeFalse | JSValueTypeTrue =>
-            List(JSValueTypeFalse, JSValueTypeTrue) -> { () =>
+            Vector(JSValueTypeFalse, JSValueTypeTrue) -> { () =>
               /* The jsValueTypeLocal is the boolean value, thanks to the chosen encoding.
                * This trick avoids an additional unbox.
                */
@@ -1203,7 +1203,7 @@ private class FunctionEmitter private (
               genHijackedClassCall(BoxedBooleanClass)
             },
             // case JSValueTypeString =>
-            List(JSValueTypeString) -> { () =>
+            Vector(JSValueTypeString) -> { () =>
               fb += wa.LocalGet(receiverLocal)
               fb += wa.ExternConvertAny
               pushArgs(argsLocals)
@@ -1400,7 +1400,7 @@ private class FunctionEmitter private (
     }
   }
 
-  private def genArgs(args: List[Tree], methodName: MethodName): Unit = {
+  private def genArgs(args: Vector[Tree], methodName: MethodName): Unit = {
     for ((arg, paramTypeRef) <- args.zip(methodName.paramTypeRefs)) {
       val paramType = ctx.inferTypeFromTypeRef(paramTypeRef)
       genTree(arg, paramType)
@@ -1663,7 +1663,7 @@ private class FunctionEmitter private (
         val jsExceptionType = watpe.RefType(genTypeID.JSExceptionStruct)
 
         val anyRefToNonNullThrowable =
-          Sig(List(watpe.RefType.anyref), List(nonNullThrowableType))
+          Sig(Vector(watpe.RefType.anyref), Vector(nonNullThrowableType))
         fb.block(anyRefToNonNullThrowable) { doneLabel =>
           // if expr.isInstanceOf[Throwable], then br $done
           fb += wa.BrOnCast(doneLabel, watpe.RefType.anyref, nonNullThrowableType)
@@ -1689,7 +1689,7 @@ private class FunctionEmitter private (
 
       case UnwrapFromThrowable =>
         val nonNullThrowableToAnyRef =
-          Sig(List(watpe.RefType(genTypeID.ThrowableStruct)), List(watpe.RefType.anyref))
+          Sig(Vector(watpe.RefType(genTypeID.ThrowableStruct)), Vector(watpe.RefType.anyref))
         fb.block(nonNullThrowableToAnyRef) { doneLabel =>
           // if !expr.isInstanceOf[js.JavaScriptException], then br $done
           fb += wa.BrOnCastFail(
@@ -2285,7 +2285,7 @@ private class FunctionEmitter private (
   }
 
   private def genThrowArithmeticException()(implicit pos: Position): Unit = {
-    val ctorName = MethodName.constructor(List(ClassRef(BoxedStringClass)))
+    val ctorName = MethodName.constructor(Vector(ClassRef(BoxedStringClass)))
     genNewScalaClass(ArithmeticExceptionClass, ctorName) {
       fb += ctx.stringPool.getConstantStringInstr("/ by zero")
     }
@@ -2364,8 +2364,8 @@ private class FunctionEmitter private (
              */
             import watpe.RefType.anyref
 
-            fb.block(Sig(List(anyref), List(watpe.Int32))) { doneLabel =>
-              fb.block(Sig(List(anyref), List(anyref))) { notARefArrayLabel =>
+            fb.block(Sig(Vector(anyref), Vector(watpe.Int32))) { doneLabel =>
+              fb.block(Sig(Vector(anyref), Vector(anyref))) { notARefArrayLabel =>
                 // Try and cast to the generic representation first
                 val refArrayStructTypeID = genTypeID.forArrayClass(arrayTypeRef)
                 fb += wa.BrOnCastFail(
@@ -2526,7 +2526,7 @@ private class FunctionEmitter private (
 
       case StringType =>
         fb += wa.ExternConvertAny
-        val sig = watpe.FunctionType(List(watpe.RefType.externref), List(watpe.RefType.extern))
+        val sig = watpe.FunctionType(Vector(watpe.RefType.externref), Vector(watpe.RefType.extern))
         fb.block(sig) { nonNullLabel =>
           fb += wa.BrOnNonNull(nonNullLabel)
           fb += ctx.stringPool.getConstantStringInstr("")
@@ -2541,8 +2541,8 @@ private class FunctionEmitter private (
         val fieldName = FieldName(boxClass, SpecialNames.valueFieldSimpleName)
         val resultType = transformPrimType(targetTpe)
 
-        fb.block(Sig(List(watpe.RefType.anyref), List(resultType))) { doneLabel =>
-          fb.block(Sig(List(watpe.RefType.anyref), Nil)) { isNullLabel =>
+        fb.block(Sig(Vector(watpe.RefType.anyref), Vector(resultType))) { doneLabel =>
+          fb.block(Sig(Vector(watpe.RefType.anyref), Vector())) { isNullLabel =>
             fb += wa.BrOnNull(isNullLabel)
             val structTypeID = genTypeID.forClass(boxClass)
             fb += wa.RefCast(watpe.RefType(structTypeID))
@@ -2704,7 +2704,7 @@ private class FunctionEmitter private (
          * enclosing block) and the `br` *inside* the `try_table` works.
          */
         fb.tryTable(watpe.RefType.externref)(
-          List(wa.CatchClause.Catch(genTagID.exception, catchLabel))
+          Vector(wa.CatchClause.Catch(genTagID.exception, catchLabel))
         ) {
           withNPEScope(resultType) {
             genTree(block, expectedType)
@@ -2735,7 +2735,7 @@ private class FunctionEmitter private (
     expectedType
   }
 
-  final def genBlockStats(stats: List[Tree])(inner: => Unit): Unit = {
+  final def genBlockStats(stats: Vector[Tree])(inner: => Unit): Unit = {
     val savedEnv = currentEnv
 
     def buildStorage(origName: UTF8String, vtpe: Type): VarStorage.NonStructStorage = vtpe match {
@@ -2821,8 +2821,8 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(ctor :: args, AnyType) { allJSArgs =>
-      val jsCtor :: jsArgs = allJSArgs
+    genThroughCustomJSHelper(ctor +: args, AnyType) { allJSArgs =>
+      val jsCtor +: jsArgs = allJSArgs
       js.Return(js.New(jsCtor, jsArgs))
     }
   }
@@ -2832,8 +2832,8 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(List(qualifier, item), castTo) { allJSArgs =>
-      val List(jsQualifier, jsItem) = allJSArgs
+    genThroughCustomJSHelper(Vector(qualifier, item), castTo) { allJSArgs =>
+      val Vector(jsQualifier, jsItem) = allJSArgs
       js.Return(js.BracketSelect.makeOptimized(jsQualifier, jsItem))
     }
   }
@@ -2843,8 +2843,8 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(fun :: args, castTo) { allJSArgs =>
-      val jsFun :: jsArgs = allJSArgs
+    genThroughCustomJSHelper(fun +: args, castTo) { allJSArgs =>
+      val jsFun +: jsArgs = allJSArgs
       js.Return(js.Apply.makeProtected(jsFun, jsArgs))
     }
   }
@@ -2854,8 +2854,8 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(receiver :: method :: args, castTo) { allJSArgs =>
-      val jsReceiver :: jsMethod :: jsArgs = allJSArgs
+    genThroughCustomJSHelper(receiver +: method +: args, castTo) { allJSArgs =>
+      val jsReceiver +: jsMethod +: jsArgs = allJSArgs
       js.Return(js.Apply(js.BracketSelect.makeOptimized(jsReceiver, jsMethod), jsArgs))
     }
   }
@@ -2871,8 +2871,8 @@ private class FunctionEmitter private (
      * - the output of Scala.js is given to a bundler that really wants to see
      *    constant strings in import(...) calls.
      */
-    genThroughCustomJSHelper(List(arg), AnyType) { allJSArgs =>
-      val List(jsArg) = allJSArgs
+    genThroughCustomJSHelper(Vector(arg), AnyType) { allJSArgs =>
+      val Vector(jsArg) = allJSArgs
       js.Return(js.ImportCall(jsArg))
     }
   }
@@ -2947,8 +2947,8 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(List(lhs), castTo) { allJSArgs =>
-      val List(jsLhs) = allJSArgs
+    genThroughCustomJSHelper(Vector(lhs), castTo) { allJSArgs =>
+      val Vector(jsLhs) = allJSArgs
 
       val protectedLhs = if (op == JSUnaryOp.typeof && lhs.isInstanceOf[JSGlobalRef]) {
         /* #3822 We protect the argument so that it throws a ReferenceError
@@ -2996,8 +2996,8 @@ private class FunctionEmitter private (
       case _ =>
         implicit val pos = tree.pos
 
-        genThroughCustomJSHelper(List(lhs, rhs), castTo) { allJSArgs =>
-          val List(jsLhs, jsRhs) = allJSArgs
+        genThroughCustomJSHelper(Vector(lhs, rhs), castTo) { allJSArgs =>
+          val Vector(jsLhs, jsRhs) = allJSArgs
           js.Return(js.BinaryOp(op, jsLhs, jsRhs))
         }
     }
@@ -3029,18 +3029,18 @@ private class FunctionEmitter private (
       fb += wa.Call(genFunctionID.jsNewObject)
       AnyType
     } else {
-      val flatPropValues = fields.flatMap(pv => List(pv._1, pv._2))
+      val flatPropValues = fields.flatMap(pv => Vector(pv._1, pv._2))
 
       genThroughCustomJSHelper(flatPropValues, AnyNotNullType) { jsFlatPropValues =>
         val jsPropValuesIter = jsFlatPropValues.grouped(2).map { pvList =>
-          val List(jsPropTree, jsValue) = pvList
+          val Vector(jsPropTree, jsValue) = pvList
           val jsProp: js.PropertyName = jsPropTree match {
             case jsPropTree: js.StringLiteral => jsPropTree
             case _                            => js.ComputedName(jsPropTree)
           }
           jsProp -> jsValue
         }
-        js.Return(js.ObjectConstr(jsPropValuesIter.toList))
+        js.Return(js.ObjectConstr(jsPropValuesIter.toVector))
       }
     }
   }
@@ -3343,7 +3343,7 @@ private class FunctionEmitter private (
       val promisingFVarDef = if (flags.async) {
         Some(js.VarDef(builder.newLocalIdent("pf"), Some {
           js.Apply(
-              js.DotSelect(builder.genGlobalRef("WebAssembly"), js.Ident("promising")), List(fRef))
+              js.DotSelect(builder.genGlobalRef("WebAssembly"), js.Ident("promising")), Vector(fRef))
         }))
       } else {
         None
@@ -3353,10 +3353,10 @@ private class FunctionEmitter private (
         js.Function(flags.withAsync(false), argsParamDefs, restParamDef, {
           js.Return(js.Apply(
             promisingFVarDef.fold(fRef)(_.ref),
-            dataRef ::
-            (if (flags.arrow) Nil else List(js.This())) :::
-            argsParamDefs.map(_.ref) :::
-            restParamDef.map(_.ref).toList
+            Vector(dataRef) ++
+            (if (flags.arrow) Vector() else Vector(js.This())) ++
+            argsParamDefs.map(_.ref) ++
+            restParamDef.map(_.ref).toVector
           ))
         })
       }
@@ -3487,8 +3487,8 @@ private class FunctionEmitter private (
 
     implicit val pos = tree.pos
 
-    genThroughCustomJSHelper(superClass :: receiver :: method :: args, castTo) { allJSArgs =>
-      val jsSuperClass :: jsReceiver :: jsMethod :: jsArgs = allJSArgs
+    genThroughCustomJSHelper(superClass +: receiver +: method +: args, castTo) { allJSArgs =>
+      val jsSuperClass +: jsReceiver +: jsMethod +: jsArgs = allJSArgs
 
       // return superClass.prototype[method].call(receiver, ...args);
       js.Return(
@@ -3500,7 +3500,7 @@ private class FunctionEmitter private (
             ),
             js.Ident("call")
           ),
-          jsReceiver :: jsArgs
+          jsReceiver +: jsArgs
         )
       )
     }
@@ -3705,9 +3705,9 @@ private class FunctionEmitter private (
    *
    *  @see [[CustomJSHelperBuilder]]
    */
-  private def genThroughCustomJSHelper(args: List[TreeOrJSSpread],
+  private def genThroughCustomJSHelper(args: Vector[TreeOrJSSpread],
       resultType: Type)(
-      makeJSHelperBody: List[js.Tree] => js.Tree)(
+      makeJSHelperBody: Vector[js.Tree] => js.Tree)(
       implicit pos: Position): Type = {
 
     val boundaryResultType = ensureCastableThroughJSWasmBoundary(resultType)
@@ -3951,7 +3951,7 @@ private class FunctionEmitter private (
      */
     private var currentUnwindingStackDepth: Int = 0
 
-    private var enclosingTryFinallyStack: List[TryFinallyEntry] = Nil
+    private var enclosingTryFinallyStack: Vector[TryFinallyEntry] = Vector()
 
     private var enclosingLabeledBlocks: Map[LabelName, LabeledEntry] = Map.empty
 
@@ -3960,7 +3960,7 @@ private class FunctionEmitter private (
 
     private def enterTryFinally(entry: TryFinallyEntry)(body: => Unit): Unit = {
       assert(entry.depth == currentUnwindingStackDepth)
-      enclosingTryFinallyStack ::= entry
+      enclosingTryFinallyStack +:= entry
       currentUnwindingStackDepth += 1
       try {
         body
@@ -4071,7 +4071,7 @@ private class FunctionEmitter private (
        */
       sealed case class CrossInfo(
           destinationTag: Int,
-          resultLocals: List[wanme.LocalID],
+          resultLocals: Vector[wanme.LocalID],
           crossLabel: wanme.LabelID
       )
     }
@@ -4086,7 +4086,7 @@ private class FunctionEmitter private (
       markPosition(tree)
 
       // Manual wa.Block here because we have a specific `label`
-      fb += wa.Block(fb.sigToBlockType(Sig(Nil, ty)), Some(entry.regularWasmLabel))
+      fb += wa.Block(fb.sigToBlockType(Sig(Vector(), ty)), Some(entry.regularWasmLabel))
 
       /* Remember the position in the instruction stream, in case we need to
        * come back and insert the wa.Block for the cross handling.
@@ -4169,7 +4169,7 @@ private class FunctionEmitter private (
            */
           val instrsBlockBeginIndex = fb.markCurrentInstructionIndex()
 
-          fb.tryTable()(List(wa.CatchClause.CatchAllRef(catchLabel))) {
+          fb.tryTable()(Vector(wa.CatchClause.CatchAllRef(catchLabel))) {
             // try block
             enterTryFinally(entry) {
               withNPEScope(resultType) {
@@ -4232,7 +4232,7 @@ private class FunctionEmitter private (
           /* If the `exnref` is non-null, rethrow it.
            * Otherwise, stay within the `$done` block.
            */
-          fb.block(Sig(List(watpe.RefType.exnref), Nil)) { exnrefIsNullLabel =>
+          fb.block(Sig(Vector(watpe.RefType.exnref), Vector())) { exnrefIsNullLabel =>
             fb += wa.BrOnNull(exnrefIsNullLabel)
             fb += wa.ThrowRef
           }
@@ -4244,7 +4244,7 @@ private class FunctionEmitter private (
 
           // The order does not matter here because they will be "re-sorted" by emitBRTable
           val possibleTargetEntries =
-            enclosingLabeledBlocks.valuesIterator.filter(_.wasCrossUsed).toList
+            enclosingLabeledBlocks.valuesIterator.filter(_.wasCrossUsed).toVector
 
           val nextTryFinallyEntry = innermostTryFinally // note that we're out of ourselves already
             .filter(nextTry => possibleTargetEntries.exists(nextTry.isInside(_)))
@@ -4253,7 +4253,7 @@ private class FunctionEmitter private (
            * are outside of the next try..finally in line go to the latter;
            * for other `Labeled`'s, we go to their cross label.
            */
-          val brTableDests: List[(Int, wanme.LabelID)] = possibleTargetEntries.map { targetEntry =>
+          val brTableDests: Vector[(Int, wanme.LabelID)] = possibleTargetEntries.map { targetEntry =>
             val LabeledEntry.CrossInfo(destinationTag, _, crossLabel) =
               targetEntry.requireCrossInfo()
             val label = nextTryFinallyEntry.filter(_.isInside(targetEntry)) match {
@@ -4285,14 +4285,14 @@ private class FunctionEmitter private (
       expectedType
     }
 
-    private def emitBRTable(dests: List[(Int, wanme.LabelID)],
+    private def emitBRTable(dests: Vector[(Int, wanme.LabelID)],
         defaultLabel: wanme.LabelID): Unit = {
       dests match {
-        case Nil =>
+        case Vector() =>
           fb += wa.Drop
           fb += wa.Br(defaultLabel)
 
-        case (singleDestValue, singleDestLabel) :: Nil =>
+        case (singleDestValue, singleDestLabel) +: Vector() =>
           /* Common case (as far as getting here in the first place is concerned):
            * All the `Return`s that cross the current `TryFinally` have the same
            * target destination (namely the enclosing `def` in the original program).
@@ -4302,12 +4302,12 @@ private class FunctionEmitter private (
           fb += wa.BrIf(singleDestLabel)
           fb += wa.Br(defaultLabel)
 
-        case _ :: _ =>
+        case _ +: _ =>
           // `max` is safe here because the list is non-empty
           val table = Array.fill(dests.map(_._1).max + 1)(defaultLabel)
           for (dest <- dests)
             table(dest._1) = dest._2
-          fb += wa.BrTable(table.toList, defaultLabel)
+          fb += wa.BrTable(table.toVector, defaultLabel)
       }
     }
 

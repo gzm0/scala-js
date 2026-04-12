@@ -235,7 +235,7 @@ object Types {
    *  null <: CT
    *  }}}
    */
-  final case class ClosureType(paramTypes: List[Type], resultType: Type,
+  final case class ClosureType(paramTypes: Vector[Type], resultType: Type,
       nullable: Boolean)
       extends Type {
     def toNonNullable: ClosureType =
@@ -257,7 +257,7 @@ object Types {
    *  Record types are not subtypes of `any`. As such, they can never be passed
    *  to JavaScript.
    */
-  final case class RecordType(fields: List[RecordType.Field]) extends Type {
+  final case class RecordType(fields: Vector[RecordType.Field]) extends Type {
     def findField(name: SimpleFieldName): RecordType.Field =
       fields.find(_.name == name).get
 

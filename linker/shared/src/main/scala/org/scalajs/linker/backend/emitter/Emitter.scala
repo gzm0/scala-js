@@ -65,7 +65,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
     val classEmitter: ClassEmitter = new ClassEmitter(sjsGen)
 
-    val everyFileStart: List[js.Tree] = {
+    val everyFileStart: Vector[js.Tree] = {
       // This prePrint does not count in the statistics
       prePrinter.prePrint(sjsGen.declarePrototypeVar, 0)
     }
@@ -102,7 +102,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       case ModuleKind.NoModule =>
         assert(moduleSet.modules.size <= 1)
         val topLevelVars = moduleSet.modules
-          .headOption.toList
+          .headOption.toVector
           .flatMap(_.topLevelExports)
           .map(_.exportName)
 
@@ -121,7 +121,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
         new Result(header, body, footer, topLevelVars, globalRefs)
 
       case ModuleKind.ESModule | ModuleKind.CommonJSModule =>
-        new Result(config.jsHeader, body, "", Nil, globalRefs)
+        new Result(config.jsHeader, body, "", Vector(), globalRefs)
     }
 
     for (compressor <- state.nameCompressor) {
@@ -139,7 +139,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
   }
 
   private def emitInternal(moduleSet: ModuleSet,
-      logger: Logger): WithGlobals[Map[ModuleID, (List[js.Tree], Boolean)]] = {
+      logger: Logger): WithGlobals[Map[ModuleID, (Vector[js.Tree], Boolean)]] = {
     // Reset caching stats.
     statsClassesReused = 0
     statsClassesInvalidated = 0
@@ -175,13 +175,13 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     }
   }
 
-  private def prePrint(trees: List[js.Tree], indent: Int): List[js.Tree] = {
+  private def prePrint(trees: Vector[js.Tree], indent: Int): Vector[js.Tree] = {
     statsPrePrints += 1
     prePrinter.prePrint(trees, indent)
   }
 
-  private def prePrint(tree: js.Tree, indent: Int): List[js.Tree] =
-    prePrint(tree :: Nil, indent)
+  private def prePrint(tree: js.Tree, indent: Int): Vector[js.Tree] =
+    prePrint(tree +: Vector(), indent)
 
   /** Emits all JavaScript code avoiding clashes with global refs.
    *
@@ -192,7 +192,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
   @tailrec
   private def emitAvoidGlobalClash(moduleSet: ModuleSet,
       logger: Logger, secondAttempt: Boolean): WithGlobals[Map[ModuleID,
-      (List[js.Tree], Boolean)]] = {
+      (Vector[js.Tree], Boolean)]] = {
     val result = emitOnce(moduleSet, logger)
 
     val mentionedDangerousGlobalRefs =
@@ -204,9 +204,9 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       assert(!secondAttempt,
           "Uh oh! The second attempt gave a different set of dangerous " +
           "global refs than the first one.\n" +
-          "Before:" + state.lastMentionedDangerousGlobalRefs.toList.sorted.mkString(
+          "Before:" + state.lastMentionedDangerousGlobalRefs.toVector.sorted.mkString(
               "\n  ", "\n  ", "\n") +
-          "After:" + mentionedDangerousGlobalRefs.toList.sorted.mkString("\n  ", "\n  ", ""))
+          "After:" + mentionedDangerousGlobalRefs.toVector.sorted.mkString("\n  ", "\n  ", ""))
 
       // !!! This log message is tested in EmitterTest
       logger.debug(
@@ -219,7 +219,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
   }
 
   private def emitOnce(moduleSet: ModuleSet,
-      logger: Logger): WithGlobals[Map[ModuleID, (List[js.Tree], Boolean)]] = {
+      logger: Logger): WithGlobals[Map[ModuleID, (Vector[js.Tree], Boolean)]] = {
     // Genreate classes first so we can measure time separately.
     val generatedClasses = logger.time("Emitter: Generate Classes") {
       moduleSet.modules.map { module =>
@@ -268,7 +268,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
         }
 
         val moduleInitializers = extractChangedAndWithGlobals {
-          val initializers = module.initializers.toList
+          val initializers = module.initializers.toVector
           moduleCache.getOrComputeInitializers(initializers) {
             WithGlobals.list(initializers.map { initializer =>
               classEmitter.genModuleInitializer(initializer)(
@@ -294,7 +294,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
          * requires consistency between the Analyzer and the Emitter. As such,
          * it is crucial that we verify it.
          */
-        val defTrees: List[js.Tree] = (
+        val defTrees: Vector[js.Tree] = (
           /* The declaration of the `$p` variable that temporarily holds
            * prototypes.
            */
@@ -341,7 +341,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
             /* Module initializers, which by spec run at the end. */
             moduleInitializers.iterator
-        ).toList
+        ).toVector
 
         // Make sure that there is at least one non-import definition.
         assert(!defTrees.isEmpty, {
@@ -352,7 +352,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
         /* Add module imports, which depend on nothing, at the front.
          * All classes potentially depend on them.
          */
-        val allTrees = moduleImports ::: defTrees
+        val allTrees = moduleImports ++ defTrees
 
         classIter.foreach { genClass =>
           trackedGlobalRefs = unionPreserveEmpty(trackedGlobalRefs, genClass.trackedGlobalRefs)
@@ -365,7 +365,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     WithGlobals(moduleTrees.toMap, trackedGlobalRefs)
   }
 
-  private def genModuleImports(module: ModuleSet.Module): WithGlobals[List[js.Tree]] = {
+  private def genModuleImports(module: ModuleSet.Module): WithGlobals[Vector[js.Tree]] = {
     implicit val pos = Position.NoPosition
 
     def importParts = (
@@ -378,7 +378,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
           sjsGen.varGen.internalModuleFieldIdent(x) -> config.internalModulePattern(x)
         }
       )
-    ).toList.sortBy(_._1.name)
+    ).toVector.sortBy(_._1.name)
 
     moduleKind match {
       case ModuleKind.NoModule =>
@@ -394,7 +394,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       case ModuleKind.CommonJSModule =>
         val imports = importParts.map { case (ident, moduleName) =>
           for (requireRef <- jsGen.globalRef("require")) yield {
-            val rhs = js.Apply(requireRef, List(js.StringLiteral(moduleName)))
+            val rhs = js.Apply(requireRef, Vector(js.StringLiteral(moduleName)))
             jsGen.genLet(ident, mutable = false, rhs)
           }
         }
@@ -473,7 +473,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
     // Main part
 
-    val main = List.newBuilder[js.Tree]
+    val main = Vector.newBuilder[js.Tree]
 
     // Symbols for private JS fields
     if (isJSClass) {
@@ -584,7 +584,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
             .map(prePrint(_, 1))
         })
       } else {
-        Nil
+        Vector()
       }
 
       // JS constructor
@@ -717,7 +717,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
           ctor <- ctorWithGlobals
           memberMethods <- WithGlobals.flatten(memberMethodsWithGlobals)
           exportedMembers <- WithGlobals.flatten(exportedMembersWithGlobals)
-          allMembers = ctor ::: memberMethods ::: exportedMembers
+          allMembers = ctor ++ memberMethods ++ exportedMembers
           clazz <- classEmitter.buildClass(
             className, // always safe
             isJSClass, // always safe
@@ -785,7 +785,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     // Static fields
 
     val staticFields = if (kind.isJSType) {
-      Nil
+      Vector()
     } else {
       extractWithGlobals(classTreeCache.staticFields.getOrElseUpdate {
         classEmitter.genCreateStaticFieldsOfScalaClass(className)(moduleContext, classCache)
@@ -803,7 +803,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
         prePrint(tree, 0)
       }
     } else {
-      Nil
+      Vector()
     }
 
     // Build the result
@@ -823,15 +823,15 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
   private final class ModuleCache extends knowledgeGuardian.KnowledgeAccessor {
     private[this] var _cacheUsed: Boolean = false
 
-    private[this] var _importsCache: WithGlobals[List[js.Tree]] = WithGlobals.nil
+    private[this] var _importsCache: WithGlobals[Vector[js.Tree]] = WithGlobals.nil
     private[this] var _lastExternalDependencies: Set[String] = Set.empty
     private[this] var _lastInternalDependencies: Set[ModuleID] = Set.empty
 
-    private[this] var _topLevelExportsCache: WithGlobals[List[js.Tree]] = WithGlobals.nil
-    private[this] var _lastTopLevelExports: List[LinkedTopLevelExport] = Nil
+    private[this] var _topLevelExportsCache: WithGlobals[Vector[js.Tree]] = WithGlobals.nil
+    private[this] var _lastTopLevelExports: Vector[LinkedTopLevelExport] = Vector()
 
-    private[this] var _initializersCache: WithGlobals[List[js.Tree]] = WithGlobals.nil
-    private[this] var _lastInitializers: List[ModuleInitializer.Initializer] = Nil
+    private[this] var _initializersCache: WithGlobals[Vector[js.Tree]] = WithGlobals.nil
+    private[this] var _lastInitializers: Vector[ModuleInitializer.Initializer] = Vector()
 
     override def invalidate(): Unit = {
       super.invalidate()
@@ -844,14 +844,14 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       _lastInternalDependencies = Set.empty
 
       _topLevelExportsCache = WithGlobals.nil
-      _lastTopLevelExports = Nil
+      _lastTopLevelExports = Vector()
 
       _initializersCache = WithGlobals.nil
-      _lastInitializers = Nil
+      _lastInitializers = Vector()
     }
 
     def getOrComputeImports(externalDependencies: Set[String], internalDependencies: Set[ModuleID])(
-        compute: => WithGlobals[List[js.Tree]]): (WithGlobals[List[js.Tree]], Boolean) = {
+        compute: => WithGlobals[Vector[js.Tree]]): (WithGlobals[Vector[js.Tree]], Boolean) = {
 
       _cacheUsed = true
 
@@ -866,8 +866,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
     }
 
-    def getOrComputeTopLevelExports(topLevelExports: List[LinkedTopLevelExport])(
-        compute: => WithGlobals[List[js.Tree]]): (WithGlobals[List[js.Tree]], Boolean) = {
+    def getOrComputeTopLevelExports(topLevelExports: Vector[LinkedTopLevelExport])(
+        compute: => WithGlobals[Vector[js.Tree]]): (WithGlobals[Vector[js.Tree]], Boolean) = {
 
       _cacheUsed = true
 
@@ -880,8 +880,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       }
     }
 
-    private def sameTopLevelExports(tles1: List[LinkedTopLevelExport],
-        tles2: List[LinkedTopLevelExport]): Boolean = {
+    private def sameTopLevelExports(tles1: Vector[LinkedTopLevelExport],
+        tles2: Vector[LinkedTopLevelExport]): Boolean = {
       import org.scalajs.ir.Trees._
 
       /* Because of how/when we use this method, we already know that all the
@@ -911,8 +911,8 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
       }
     }
 
-    def getOrComputeInitializers(initializers: List[ModuleInitializer.Initializer])(
-        compute: => WithGlobals[List[js.Tree]]): (WithGlobals[List[js.Tree]], Boolean) = {
+    def getOrComputeInitializers(initializers: Vector[ModuleInitializer.Initializer])(
+        compute: => WithGlobals[Vector[js.Tree]]): (WithGlobals[Vector[js.Tree]], Boolean) = {
 
       _cacheUsed = true
 
@@ -948,7 +948,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
     private[this] val _exportedMembersCache = mutable.Map.empty[Int, MethodCache]
 
-    private[this] var _staticLikeMethodsTracker: Option[List[List[js.Tree]]] = None
+    private[this] var _staticLikeMethodsTracker: Option[Vector[Vector[js.Tree]]] = None
     private[this] var _fullClassChangeTracker: Option[FullClassChangeTracker] = None
 
     override def invalidate(): Unit = {
@@ -1023,7 +1023,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
      *
      *  Returns `true` iff there were changes since the last run.
      */
-    def trackStaticLikeMethodChanges(staticLikeMethods: List[List[js.Tree]]): Boolean = {
+    def trackStaticLikeMethodChanges(staticLikeMethods: Vector[Vector[js.Tree]]): Boolean = {
       if (_staticLikeMethodsTracker.exists(allSame(_, staticLikeMethods))) {
         false
       } else {
@@ -1060,7 +1060,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
   }
 
   private final class MethodCache extends knowledgeGuardian.KnowledgeAccessor {
-    private[this] var _tree: WithGlobals[List[js.Tree]] = null
+    private[this] var _tree: WithGlobals[Vector[js.Tree]] = null
     private[this] var _lastVersion: Version = Version.Unversioned
     private[this] var _cacheUsed = false
 
@@ -1073,7 +1073,7 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
     def startRun(): Unit = _cacheUsed = false
 
     def getOrElseUpdate(version: Version,
-        v: => WithGlobals[List[js.Tree]]): (WithGlobals[List[js.Tree]], Boolean) = {
+        v: => WithGlobals[Vector[js.Tree]]): (WithGlobals[Vector[js.Tree]], Boolean) = {
       _cacheUsed = true
       if (_tree == null || !_lastVersion.sameVersion(version)) {
         invalidate()
@@ -1097,9 +1097,9 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
   private class FullClassChangeTracker extends knowledgeGuardian.KnowledgeAccessor {
     private[this] var _lastVersion: Version = Version.Unversioned
-    private[this] var _lastCtor: WithGlobals[List[js.Tree]] = null
-    private[this] var _lastMemberMethods: List[WithGlobals[List[js.Tree]]] = null
-    private[this] var _lastExportedMembers: List[WithGlobals[List[js.Tree]]] = null
+    private[this] var _lastCtor: WithGlobals[Vector[js.Tree]] = null
+    private[this] var _lastMemberMethods: Vector[WithGlobals[Vector[js.Tree]]] = null
+    private[this] var _lastExportedMembers: Vector[WithGlobals[Vector[js.Tree]]] = null
     private[this] var _trackerUsed = false
 
     override def invalidate(): Unit = {
@@ -1112,9 +1112,9 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
     def startRun(): Unit = _trackerUsed = false
 
-    def trackChanged(version: Version, ctor: WithGlobals[List[js.Tree]],
-        memberMethods: List[WithGlobals[List[js.Tree]]],
-        exportedMembers: List[WithGlobals[List[js.Tree]]]): Boolean = {
+    def trackChanged(version: Version, ctor: WithGlobals[Vector[js.Tree]],
+        memberMethods: Vector[WithGlobals[Vector[js.Tree]]],
+        exportedMembers: Vector[WithGlobals[Vector[js.Tree]]]): Boolean = {
 
       _trackerUsed = true
 
@@ -1148,9 +1148,9 @@ final class Emitter(config: Emitter.Config, prePrinter: Emitter.PrePrinter) {
 
   private class CoreJSLibCache extends knowledgeGuardian.KnowledgeAccessor {
     private[this] var _lastModuleContext: ModuleContext = _
-    private[this] var _lib: WithGlobals[CoreJSLib.Lib[List[js.Tree]]] = _
+    private[this] var _lib: WithGlobals[CoreJSLib.Lib[Vector[js.Tree]]] = _
 
-    def build(moduleContext: ModuleContext): WithGlobals[CoreJSLib.Lib[List[js.Tree]]] = {
+    def build(moduleContext: ModuleContext): WithGlobals[CoreJSLib.Lib[Vector[js.Tree]]] = {
       if (_lib == null || _lastModuleContext != moduleContext) {
         _lib = CoreJSLib.build(sjsGen, prePrint(_, 0), moduleContext, this)
         _lastModuleContext = moduleContext
@@ -1170,9 +1170,9 @@ object Emitter {
   /** Result of an emitter run. */
   final class Result private[Emitter] (
       val header: String,
-      val body: Map[ModuleID, (List[js.Tree], Boolean)],
+      val body: Map[ModuleID, (Vector[js.Tree], Boolean)],
       val footer: String,
-      val topLevelVarDecls: List[String],
+      val topLevelVarDecls: Vector[String],
       val globalRefs: Set[String]
   )
 
@@ -1240,33 +1240,33 @@ object Emitter {
   }
 
   sealed trait PrePrinter {
-    private[Emitter] def prePrint(trees: List[js.Tree], indent: Int): List[js.Tree]
+    private[Emitter] def prePrint(trees: Vector[js.Tree], indent: Int): Vector[js.Tree]
   }
 
   object PrePrinter {
     object Off extends PrePrinter {
-      private[Emitter] def prePrint(trees: List[js.Tree], indent: Int): List[js.Tree] = trees
+      private[Emitter] def prePrint(trees: Vector[js.Tree], indent: Int): Vector[js.Tree] = trees
     }
 
     object WithoutSourceMap extends PrePrinter {
-      private[Emitter] def prePrint(trees: List[js.Tree], indent: Int): List[js.PrintedTree] = {
+      private[Emitter] def prePrint(trees: Vector[js.Tree], indent: Int): Vector[js.PrintedTree] = {
         if (trees.isEmpty) {
-          Nil // Fast path
+          Vector() // Fast path
         } else {
           val jsCodeWriter = new ByteArrayWriter()
           val printer = new Printers.JSTreePrinter(jsCodeWriter, indent)
 
           trees.foreach(printer.printStat(_))
 
-          js.PrintedTree(jsCodeWriter.toByteArray(), SourceMapWriter.Fragment.Empty) :: Nil
+          js.PrintedTree(jsCodeWriter.toByteArray(), SourceMapWriter.Fragment.Empty) +: Vector()
         }
       }
     }
 
     final class WithSourceMap(fragmentIndex: SourceMapWriter.Index) extends PrePrinter {
-      private[Emitter] def prePrint(trees: List[js.Tree], indent: Int): List[js.PrintedTree] = {
+      private[Emitter] def prePrint(trees: Vector[js.Tree], indent: Int): Vector[js.PrintedTree] = {
         if (trees.isEmpty) {
-          Nil // Fast path
+          Vector() // Fast path
         } else {
           val jsCodeWriter = new ByteArrayWriter()
           val smFragmentBuilder = new SourceMapWriter.FragmentBuilder(fragmentIndex)
@@ -1276,14 +1276,14 @@ object Emitter {
           trees.foreach(printer.printStat(_))
           smFragmentBuilder.complete()
 
-          js.PrintedTree(jsCodeWriter.toByteArray(), smFragmentBuilder.result()) :: Nil
+          js.PrintedTree(jsCodeWriter.toByteArray(), smFragmentBuilder.result()) +: Vector()
         }
       }
     }
   }
 
   @tailrec
-  private def allSame(xs: List[AnyRef], ys: List[AnyRef]): Boolean = {
+  private def allSame(xs: Vector[AnyRef], ys: Vector[AnyRef]): Boolean = {
     xs.isEmpty == ys.isEmpty && {
       xs.isEmpty ||
       ((xs.head eq ys.head) && allSame(xs.tail, ys.tail))
@@ -1333,20 +1333,20 @@ object Emitter {
   }
 
   private final class DesugaredClassCache {
-    val privateJSFields = new OneTimeCache[WithGlobals[List[js.Tree]]]
-    val storeJSSuperClass = new OneTimeCache[WithGlobals[List[js.Tree]]]
-    val instanceTests = new OneTimeCache[WithGlobals[List[js.Tree]]]
-    val typeData = new InputEqualityCache[Boolean, WithGlobals[List[js.Tree]]]
-    val moduleAccessor = new OneTimeCache[WithGlobals[List[js.Tree]]]
-    val staticInitialization = new OneTimeCache[List[js.Tree]]
-    val staticFields = new OneTimeCache[WithGlobals[List[js.Tree]]]
+    val privateJSFields = new OneTimeCache[WithGlobals[Vector[js.Tree]]]
+    val storeJSSuperClass = new OneTimeCache[WithGlobals[Vector[js.Tree]]]
+    val instanceTests = new OneTimeCache[WithGlobals[Vector[js.Tree]]]
+    val typeData = new InputEqualityCache[Boolean, WithGlobals[Vector[js.Tree]]]
+    val moduleAccessor = new OneTimeCache[WithGlobals[Vector[js.Tree]]]
+    val staticInitialization = new OneTimeCache[Vector[js.Tree]]
+    val staticFields = new OneTimeCache[WithGlobals[Vector[js.Tree]]]
   }
 
   private final class GeneratedClass(
       val className: ClassName,
-      val main: List[js.Tree],
-      val staticFields: List[js.Tree],
-      val staticInitialization: List[js.Tree],
+      val main: Vector[js.Tree],
+      val staticFields: Vector[js.Tree],
+      val staticInitialization: Vector[js.Tree],
       val trackedGlobalRefs: Set[String],
       val changed: Boolean
   )
@@ -1380,7 +1380,7 @@ object Emitter {
   }
 
   private case class ClassID(
-      kind: ClassKind, ancestors: List[ClassName], moduleContext: ModuleContext)
+      kind: ClassKind, ancestors: Vector[ClassName], moduleContext: ModuleContext)
 
   private def symbolRequirements(config: Config): SymbolRequirement = {
     import config.coreSpec.semantics._
@@ -1440,7 +1440,7 @@ object Emitter {
       callMethod(BoxedStringClass, hashCodeMethodName),
 
       cond(!config.coreSpec.esFeatures.allowBigIntsForLongs) {
-        callStaticMethods(LongImpl.RuntimeLongClass, LongImpl.OperatorMethods.toList)
+        callStaticMethods(LongImpl.RuntimeLongClass, LongImpl.OperatorMethods.toVector)
       },
 
       cond(config.coreSpec.esFeatures.esVersion < ESVersion.ES2015) {

@@ -61,9 +61,9 @@ object PathOutputDirectory {
     def readFull(name: String)(implicit ec: ExecutionContext): Future[ByteBuffer] =
       withChannel(getPath(name), StandardOpenOption.READ)(readFromChannel(_))
 
-    def listFiles()(implicit ec: ExecutionContext): Future[List[String]] = Future {
+    def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]] = Future {
       blocking {
-        val builder = List.newBuilder[String]
+        val builder = Vector.newBuilder[String]
         Files.list(directory).forEachOrdered { entry =>
           builder += directory.relativize(entry).toString()
         }

@@ -137,7 +137,7 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config) extends Linke
     }
   }
 
-  private def buildChunk(topLevelTrees: List[js.Tree]): JSChunk = {
+  private def buildChunk(topLevelTrees: Vector[js.Tree]): JSChunk = {
     val root = ClosureAstTransformer.transformScript(topLevelTrees,
         languageMode.toFeatureSet(), config.relativizeSourceMapBase)
 
@@ -172,7 +172,7 @@ final class ClosureLinkerBackend(config: LinkerBackendImpl.Config) extends Linke
    *
    *  This is necessary to avoid name clashes with renamed properties (#2491).
    */
-  private def makeExternsForExports(topLevelVarDeclarations: List[String],
+  private def makeExternsForExports(topLevelVarDeclarations: Vector[String],
       sjsModule: ModuleSet.Module): String = {
     import org.scalajs.ir.Trees._
     import org.scalajs.linker.backend.javascript.Trees.Ident.isValidJSIdentifierName

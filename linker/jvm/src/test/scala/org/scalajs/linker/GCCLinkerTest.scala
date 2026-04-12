@@ -33,7 +33,7 @@ class GCCLinkerTest {
     /* Check a degenerate case where there are not public modules at all.
      * See the special check on ModuleSplitter for details.
      */
-    testLink(Nil, Nil, config = StandardConfig().withClosureCompiler(true))
+    testLink(Vector(), Vector(), config = StandardConfig().withClosureCompiler(true))
   }
 
   @deprecated("tests deprecated APIs", since = "1.21.0")

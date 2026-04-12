@@ -45,7 +45,7 @@ private[modulesplitter] object SmallestModulesAnalyzer {
     def moduleForClass(className: ClassName): Option[ModuleID] =
       moduleIndex(className).map(moduleIndexToID)
 
-    protected def emitModule(moduleIndex: Int, classNames: List[ClassName]): Unit = {
+    protected def emitModule(moduleIndex: Int, classNames: Vector[ClassName]): Unit = {
       val repr = internalModIDGenerator.representativeClass(classNames)
       val id = internalModIDGenerator.forClassName(repr)
       moduleIndexToID(moduleIndex) = id

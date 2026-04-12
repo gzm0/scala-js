@@ -66,7 +66,7 @@ object WasmTransients {
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$")
       out.print(wasmInstr.mnemonic)
-      out.printArgs(List(lhs))
+      out.printArgs(Vector(lhs))
     }
   }
 
@@ -154,7 +154,7 @@ object WasmTransients {
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$")
       out.print(wasmInstr.mnemonic)
-      out.printArgs(List(lhs, rhs))
+      out.printArgs(Vector(lhs, rhs))
     }
   }
 
@@ -220,7 +220,7 @@ object WasmTransients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$stringFromCodePoint")
-      out.printArgs(List(codePoint))
+      out.printArgs(Vector(codePoint))
     }
   }
 
@@ -254,7 +254,7 @@ object WasmTransients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$codePointAt")
-      out.printArgs(List(string, index))
+      out.printArgs(Vector(string, index))
     }
   }
 
@@ -292,7 +292,7 @@ object WasmTransients {
 
     def printIR(out: IRTreePrinter): Unit = {
       out.print("$substring")
-      out.printArgs(string :: start :: optEnd.toList)
+      out.printArgs(string +: start +: optEnd.toVector)
     }
   }
 }

@@ -104,7 +104,7 @@ private[linker] object LambdaSynthesizer {
   def makeConstructorName(descriptor: NewLambda.Descriptor): MethodName = {
     val closureTypeNonNull =
       ClosureType(descriptor.paramTypes, descriptor.resultType, nullable = false)
-    MethodName.constructor(TransientTypeRef(ClosureTypeRefName)(closureTypeNonNull) :: Nil)
+    MethodName.constructor(TransientTypeRef(ClosureTypeRefName)(closureTypeNonNull) +: Vector())
   }
 
   /** Computes the `ClassInfo` of a lambda class, for use by the `Analyzer`.
@@ -138,7 +138,7 @@ private[linker] object LambdaSynthesizer {
     new ClassInfo(className, ClassKind.Class, Some(SyntheticClassKind.Lambda(descriptor)),
         nonExistent = false, Some(descriptor.superClass), descriptor.interfaces,
         jsNativeLoadSpec = None, referencedFieldClasses = Map.empty, methodInfos,
-        jsNativeMembers = Map.empty, jsMethodProps = Nil, topLevelExports = Nil)
+        jsNativeMembers = Map.empty, jsMethodProps = Vector(), topLevelExports = Vector())
   }
 
   /** Synthesizes the `ClassDef` for a lambda class, for use by the `BaseLinker`.
@@ -164,13 +164,13 @@ private[linker] object LambdaSynthesizer {
       MemberFlags.empty.withNamespace(MemberNamespace.Constructor),
       MethodIdent(makeConstructorName(descriptor)),
       NoOriginalName,
-      ctorParamDef :: Nil,
+      ctorParamDef +: Vector(),
       VoidType,
       Some(
         Block(
           Assign(fFieldSelect, ctorParamDef.ref),
           ApplyStatically(ApplyFlags.empty.withConstructor(true), thiz,
-              superClass, MethodIdent(NoArgConstructorName), Nil)(VoidType)
+              superClass, MethodIdent(NoArgConstructorName), Vector())(VoidType)
         )
       )
     )(OptimizerHints.empty, constantVersion)
@@ -198,12 +198,12 @@ private[linker] object LambdaSynthesizer {
       interfaces = interfaces.map(ClassIdent(_)),
       jsSuperClass = None,
       jsNativeLoadSpec = None,
-      fields = List(fFieldDef),
-      methods = List(ctorDef, methodDef),
+      fields = Vector(fFieldDef),
+      methods = Vector(ctorDef, methodDef),
       jsConstructor = None,
-      jsMethodProps = Nil,
-      jsNativeMembers = Nil,
-      topLevelExportDefs = Nil
+      jsMethodProps = Vector(),
+      jsNativeMembers = Vector(),
+      topLevelExportDefs = Vector()
     )(OptimizerHints.empty.withInline(true))
   }
 }

@@ -71,7 +71,7 @@ private[analyzer] object InfoLoader {
 
     private var prevMethodInfos: MethodInfos = Array.fill(MemberNamespace.Count)(Map.empty)
     private var prevJSCtorInfo: Option[Infos.ReachabilityInfo] = None
-    private var prevJSMethodPropDefInfos: List[Infos.ReachabilityInfo] = Nil
+    private var prevJSMethodPropDefInfos: Vector[Infos.ReachabilityInfo] = Vector()
 
     def loadInfo(logger: Logger)(
         implicit ec: ExecutionContext): Future[Infos.ClassInfo] = synchronized {
@@ -115,7 +115,7 @@ private[analyzer] object InfoLoader {
       prevJSMethodPropDefInfos =
         genJSMethodPropDefInfos(classDef.jsMethodProps, prevJSMethodPropDefInfos, generator)
 
-      val exportedMembers = prevJSCtorInfo.toList ::: prevJSMethodPropDefInfos
+      val exportedMembers = prevJSCtorInfo.toVector ++ prevJSMethodPropDefInfos
 
       /* We do not cache top-level exports, because they're quite rare,
        * and usually quite small when they exist.
@@ -141,7 +141,7 @@ private[analyzer] object InfoLoader {
     }
   }
 
-  private def genMethodInfos(methods: List[MethodDef],
+  private def genMethodInfos(methods: Vector[MethodDef],
       prevMethodInfos: MethodInfos, generator: Infos.InfoGenerator): MethodInfos = {
 
     val builders = Array.fill(MemberNamespace.Count)(Map.newBuilder[MethodName, Infos.MethodInfo])
@@ -168,9 +168,9 @@ private[analyzer] object InfoLoader {
     }
   }
 
-  private def genJSMethodPropDefInfos(jsMethodProps: List[JSMethodPropDef],
-      prevJSMethodPropDefInfos: List[Infos.ReachabilityInfo],
-      generator: Infos.InfoGenerator): List[Infos.ReachabilityInfo] = {
+  private def genJSMethodPropDefInfos(jsMethodProps: Vector[JSMethodPropDef],
+      prevJSMethodPropDefInfos: Vector[Infos.ReachabilityInfo],
+      generator: Infos.InfoGenerator): Vector[Infos.ReachabilityInfo] = {
     /* For JS method and property definitions, we use their index in the list of
      * `linkedClass.exportedMembers` as their identity. We cannot use their name
      * because the name itself is a `Tree`.

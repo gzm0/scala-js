@@ -195,7 +195,7 @@ private[linker] object Desugarer {
         case NewLambda(descriptor, fun) =>
           implicit val pos = tree.pos
           val (className, ctorName) = syntheticLambdaNamesFor(descriptor)
-          New(className, MethodIdent(ctorName), List(transform(fun)))
+          New(className, MethodIdent(ctorName), Vector(transform(fun)))
 
         case _ =>
           super.transform(tree)

@@ -18,7 +18,7 @@ private[emitter] sealed abstract class PolyfillableBuiltin(
     val polyfillField: VarField, val availableInESVersion: ESVersion)
 
 private[emitter] object PolyfillableBuiltin {
-  lazy val All: List[PolyfillableBuiltin] = List(
+  lazy val All: Vector[PolyfillableBuiltin] = Vector(
     ObjectIsBuiltin,
     ImulBuiltin,
     Clz32Builtin,

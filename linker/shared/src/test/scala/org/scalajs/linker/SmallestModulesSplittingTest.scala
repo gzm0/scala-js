@@ -35,13 +35,13 @@ class SmallestModulesSplittingTest {
   def splitsModules(): AsyncResult = await {
     val strClsType = ClassType(BoxedStringClass, nullable = true, exact = false)
 
-    val greetMethodName = m("greet", Nil, T)
+    val greetMethodName = m("greet", Vector(), T)
 
-    val greeterMethods = List(
+    val greeterMethods = Vector(
       trivialCtor("lib.Greeter"),
 
       // @noinline def greet(): String = "Hello world!"
-      MethodDef(EMF, greetMethodName, NON, Nil, strClsType, Some {
+      MethodDef(EMF, greetMethodName, NON, Vector(), strClsType, Some {
         str("Hello world!")
       })(EOH.withNoinline(true), UNV)
     )
@@ -55,8 +55,8 @@ class SmallestModulesSplittingTest {
 
       mainTestClassDef {
         // console.log(new lib.Greeter().greet())
-        val newGreeter = New("lib.Greeter", NoArgConstructorName, Nil)
-        val callGreet = Apply(EAF, newGreeter, greetMethodName, Nil)(strClsType)
+        val newGreeter = New("lib.Greeter", NoArgConstructorName, Vector())
+        val callGreet = Apply(EAF, newGreeter, greetMethodName, Vector())(strClsType)
         consoleLog(callGreet)
       }
     )

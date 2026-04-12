@@ -51,16 +51,16 @@ class LibrarySizeTest {
 
     def line(pattern: String, flags: Int, input: String): Tree = {
       val compiledPattern = ApplyStatic(EAF, PatternClass,
-          m("compile", List(T, I), ClassRef(PatternClass)),
-          List(str(pattern), int(flags)))(
+          m("compile", Vector(T, I), ClassRef(PatternClass)),
+          Vector(str(pattern), int(flags)))(
           ClassType(PatternClass, nullable = true, exact = false))
 
       val matcher = Apply(EAF, compiledPattern,
-          m("matcher", List(ClassRef("java.lang.CharSequence")), ClassRef(MatcherClass)),
-          List(str(input)))(
+          m("matcher", Vector(ClassRef("java.lang.CharSequence")), ClassRef(MatcherClass)),
+          Vector(str(input)))(
           ClassType(MatcherClass, nullable = true, exact = false))
 
-      consoleLog(Apply(EAF, matcher, m("matches", Nil, Z), Nil)(BooleanType))
+      consoleLog(Apply(EAF, matcher, m("matches", Vector(), Z), Vector())(BooleanType))
     }
 
     val classDefs = Seq(
@@ -81,19 +81,19 @@ class LibrarySizeTest {
   // Call to parseInt; requires information about the digit code points
   private val parseIntCall: Tree = {
     consoleLog(ApplyStatic(EAF, BoxedIntegerClass,
-        m("parseInt", List(T, I), I), List(str("456"), int(30)))(IntType))
+        m("parseInt", Vector(T, I), I), Vector(str("456"), int(30)))(IntType))
   }
 
   // Call to isLowerCase; requires the full character type database
   private val isLowerCaseCall: Tree = {
     consoleLog(ApplyStatic(EAF, BoxedCharacterClass,
-        m("isLowerCase", List(I), Z), List(int('θ'.toInt)))(BooleanType))
+        m("isLowerCase", Vector(I), Z), Vector(int('θ'.toInt)))(BooleanType))
   }
 
   // Call to isMirrored; requires the ad hoc isMirroredIndices array
   private val isMirroredCall: Tree = {
     consoleLog(ApplyStatic(EAF, BoxedCharacterClass,
-        m("isMirrored", List(I), Z), List(int('∊'.toInt)))(BooleanType))
+        m("isMirrored", Vector(I), Z), Vector(int('∊'.toInt)))(BooleanType))
   }
 
   @Test
@@ -155,7 +155,7 @@ object LibrarySizeTest {
       expectedFullLinkSize: Int,
       classDefs: Seq[ClassDef],
       symbolRequirements: SymbolRequirement = reqsFactory.none(),
-      moduleInitializers: Seq[ModuleInitializer] = Nil)(
+      moduleInitializers: Seq[ModuleInitializer] = Vector())(
       implicit ec: ExecutionContext): Future[Unit] = {
 
     val logger = new ScalaConsoleLogger(Level.Error)

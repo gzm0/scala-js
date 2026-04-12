@@ -52,8 +52,8 @@ object NodeOutputDirectory {
       }
     }
 
-    def listFiles()(implicit ec: ExecutionContext): Future[List[String]] =
-      cbFuture[js.Array[String]](NodeFS.readdir(directory, _)).map(_.toList)
+    def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]] =
+      cbFuture[js.Array[String]](NodeFS.readdir(directory, _)).map(_.toVector)
 
     def delete(name: String)(implicit ec: ExecutionContext): Future[Unit] =
       cbFuture[Unit](NodeFS.unlink(getPath(name), _))

@@ -130,7 +130,7 @@ object Report {
       if (v != ScalaJSVersions.current) {
         None
       } else {
-        val publicModules = List.fill(in.readInt())(readModule())
+        val publicModules = Vector.fill(in.readInt())(readModule())
         Some(new ReportImpl(publicModules))
       }
     }

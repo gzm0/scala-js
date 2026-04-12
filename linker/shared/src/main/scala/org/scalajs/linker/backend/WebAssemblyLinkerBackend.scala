@@ -60,15 +60,15 @@ final class WebAssemblyLinkerBackend(config: LinkerBackendImpl.Config)
   def emit(moduleSet: ModuleSet, output: OutputDirectory, logger: Logger)(
       implicit ec: ExecutionContext): Future[Report] = {
     moduleSet.modules match {
-      case Nil =>
+      case Vector() =>
         val outputImpl = OutputDirectoryImpl.fromOutputDirectory(output)
         for {
           currentFilesList <- outputImpl.listFiles()
           _ <- Future.traverse(currentFilesList) { f =>
             outputImpl.delete(f)
           }
-        } yield new ReportImpl(Nil)
-      case onlyModule :: Nil =>
+        } yield new ReportImpl(Vector())
+      case onlyModule +: Vector() =>
         emit(onlyModule, moduleSet.globalInfo, output, logger)
       case modules =>
         throw new UnsupportedOperationException(
@@ -158,7 +158,7 @@ final class WebAssemblyLinkerBackend(config: LinkerBackendImpl.Config)
         None,
         coreSpec.moduleKind
       )
-      new ReportImpl(List(reportModule))
+      new ReportImpl(Vector(reportModule))
     }
   }
 }

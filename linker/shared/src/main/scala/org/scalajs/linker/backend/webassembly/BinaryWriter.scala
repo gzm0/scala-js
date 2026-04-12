@@ -40,7 +40,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
     val importedFunctionIDs = module.imports.collect {
       case Import(_, _, ImportDesc.Func(id, _, _)) => id
     }
-    val allIDs = importedFunctionIDs ::: module.funcs.map(_.id)
+    val allIDs = importedFunctionIDs ++ module.funcs.map(_.id)
     allIDs.zipWithIndex.toMap
   }
 
@@ -48,7 +48,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
     val importedTagIDs = module.imports.collect { case Import(_, _, ImportDesc.Tag(id, _, _)) =>
       id
     }
-    val allIDs = importedTagIDs ::: module.tags.map(_.id)
+    val allIDs = importedTagIDs ++ module.tags.map(_.id)
     allIDs.zipWithIndex.toMap
   }
 
@@ -56,7 +56,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
     val importedGlobalIDs = module.imports.collect {
       case Import(_, _, ImportDesc.Global(id, _, _, _)) => id
     }
-    val allIDs = importedGlobalIDs ::: module.globals.map(_.id)
+    val allIDs = importedGlobalIDs ++ module.globals.map(_.id)
     allIDs.zipWithIndex.toMap
   }
 
@@ -72,7 +72,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
   private var localIdxValues: Option[Map[LocalID, Int]] = None
 
   /** A stack of the labels in scope (innermost labels are on top of the stack). */
-  private var labelsInScope: List[Option[LabelID]] = Nil
+  private var labelsInScope: Vector[Option[LabelID]] = Vector()
 
   private def withLocalIdxValues(values: Map[LocalID, Int])(f: => Unit): Unit = {
     val saved = localIdxValues
@@ -137,7 +137,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
   private def writeTypeSection(): Unit = {
     buf.vec(module.types) { recType =>
       recType.subTypes match {
-        case singleSubType :: Nil =>
+        case singleSubType +: Vector() =>
           writeSubType(singleSubType)
         case subTypes =>
           buf.byte(0x4e) // `rectype`
@@ -281,7 +281,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
     }
     val definedFunctionNames =
       module.funcs.filter(_.originalName.isDefined).map(f => f.id -> f.originalName)
-    val allFunctionNames = importFunctionNames ::: definedFunctionNames
+    val allFunctionNames = importFunctionNames ++ definedFunctionNames
 
     buf.byte(0x01) // function names
     buf.byteLengthSubSection {
@@ -301,7 +301,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
       buf.vec(module.funcs) { func =>
         writeFuncIdx(func.id)
         val namedLocals =
-          (func.params ::: func.locals).zipWithIndex.filter(_._1.originalName.isDefined)
+          (func.params ++ func.locals).zipWithIndex.filter(_._1.originalName.isDefined)
         buf.vec(namedLocals) { localAndIndex =>
           buf.u32(localAndIndex._2)
           buf.name(localAndIndex._1.originalName.get)
@@ -373,7 +373,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
       writeType(local.tpe)
     }
 
-    withLocalIdxValues((func.params ::: func.locals).map(_.id).zipWithIndex.toMap) {
+    withLocalIdxValues((func.params ++ func.locals).map(_.id).zipWithIndex.toMap) {
       writeExpr(func.body)
     }
 
@@ -401,7 +401,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
     }
   }
 
-  private def writeResultType(resultType: List[Type]): Unit =
+  private def writeResultType(resultType: Vector[Type]): Unit =
     buf.vec(resultType)(writeType(_))
 
   private def writeTypeIdx(typeID: TypeID): Unit =
@@ -466,7 +466,7 @@ private sealed class BinaryWriter(module: Module, emitDebugInfo: Boolean) {
         instr match {
           case instr: StructuredLabeledInstr =>
             // We must register even the `None` labels, because they contribute to relative numbering
-            labelsInScope ::= instr.label
+            labelsInScope +:= instr.label
           case End =>
             labelsInScope = labelsInScope.tail
           case _ =>
@@ -656,7 +656,7 @@ object BinaryWriter {
     }
 
     def opt[A](elemOpt: Option[A])(op: A => Unit): Unit =
-      vec(elemOpt.toList)(op)
+      vec(elemOpt.toVector)(op)
 
     def name(s: String): Unit =
       name(UTF8String(s))

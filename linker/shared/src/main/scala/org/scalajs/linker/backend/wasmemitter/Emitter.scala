@@ -70,7 +70,7 @@ final class Emitter(config: Emitter.Config) {
       globalInfo: LinkedGlobalInfo): (wamod.Module, JSFileContentInfo) = {
     // Inject the derived linked classes
     val allClasses =
-      DerivedClasses.deriveClasses(module.classDefs) ::: module.classDefs
+      DerivedClasses.deriveClasses(module.classDefs) ++ module.classDefs
 
     /* Sort by ancestor count so that superclasses always appear before
      * subclasses, then tie-break by name for stability.
@@ -82,7 +82,7 @@ final class Emitter(config: Emitter.Config) {
     }
 
     val topLevelExports = module.topLevelExports
-    val moduleInitializers = module.initializers.toList
+    val moduleInitializers = module.initializers.toVector
 
     val coreLib = new CoreWasmLib(coreSpec, globalInfo)
 
@@ -121,9 +121,9 @@ final class Emitter(config: Emitter.Config) {
   }
 
   private def genStartFunction(
-      sortedClasses: List[LinkedClass],
-      moduleInitializers: List[ModuleInitializer.Initializer],
-      topLevelExportDefs: List[LinkedTopLevelExport]
+      sortedClasses: Vector[LinkedClass],
+      moduleInitializers: Vector[ModuleInitializer.Initializer],
+      topLevelExportDefs: Vector[LinkedTopLevelExport]
   )(implicit ctx: WasmContext): Unit = {
     import org.scalajs.ir.Trees._
 
@@ -220,7 +220,7 @@ final class Emitter(config: Emitter.Config) {
         js.Function(ClosureFlags.function, argsParamDefs, restParamDef, {
           js.Return(js.Apply(
             fRef,
-            argsParamDefs.map(_.ref) ::: restParamDef.map(_.ref).toList
+            argsParamDefs.map(_.ref) ++ restParamDef.map(_.ref).toVector
           ))
         })
       }
@@ -229,14 +229,14 @@ final class Emitter(config: Emitter.Config) {
     fb += wa.Call(helperID)
   }
 
-  private def genPrivateJSFields(sortedClasses: List[LinkedClass])(
-      implicit ctx: WasmContext): List[(String, FieldName)] = {
+  private def genPrivateJSFields(sortedClasses: Vector[LinkedClass])(
+      implicit ctx: WasmContext): Vector[(String, FieldName)] = {
     import org.scalajs.ir.Trees._
 
     val privateJSFieldGetterTypeID = ctx.moduleBuilder.functionTypeToTypeID(
-        watpe.FunctionType(List(watpe.RefType.anyref), List(watpe.RefType.anyref)))
+        watpe.FunctionType(Vector(watpe.RefType.anyref), Vector(watpe.RefType.anyref)))
     val privateJSFieldSetterTypeID = ctx.moduleBuilder.functionTypeToTypeID(
-        watpe.FunctionType(List(watpe.RefType.anyref, watpe.RefType.anyref), Nil))
+        watpe.FunctionType(Vector(watpe.RefType.anyref, watpe.RefType.anyref), Vector()))
 
     val setSuffix = UTF8String("_set")
 
@@ -287,7 +287,7 @@ final class Emitter(config: Emitter.Config) {
        * introduce these declarations.
        */
       val exprs = funcDeclarations.map { funcID =>
-        wa.Expr(List(wa.RefFunc(funcID)))
+        wa.Expr(Vector(wa.RefFunc(funcID)))
       }
       ctx.moduleBuilder.addElement(
         wamod.Element(watpe.RefType.funcref, exprs, wamod.Element.Mode.Declarative)
@@ -301,7 +301,7 @@ final class Emitter(config: Emitter.Config) {
     implicit val noPos = Position.NoPosition
 
     // Sort for stability
-    val importedModules = module.externalDependencies.toList.sorted
+    val importedModules = module.externalDependencies.toVector.sorted
 
     // External imports
 
@@ -318,13 +318,13 @@ final class Emitter(config: Emitter.Config) {
     } yield {
       val ident = js.Ident(s"exported$exportName")
       val decl = js.Let(ident, mutable = true, None)
-      val exportStat = js.Export(List(ident -> js.ExportName(exportName)))
+      val exportStat = js.Export(Vector(ident -> js.ExportName(exportName)))
       val xParam = js.ParamDef(js.Ident("x"))
-      val setterFun = js.Function(ClosureFlags.arrow, List(xParam), None, {
+      val setterFun = js.Function(ClosureFlags.arrow, Vector(xParam), None, {
         js.Assign(js.VarRef(ident), xParam.ref)
       })
       val setterItem = js.StringLiteral(exportName) -> setterFun
-      (List(decl, exportStat), setterItem)
+      (Vector(decl, exportStat), setterItem)
     }).unzip
 
     val exportSettersDict = js.ObjectConstr(exportSettersItems)
@@ -335,8 +335,8 @@ final class Emitter(config: Emitter.Config) {
       (for ((varName, fieldName) <- info.privateJSFields) yield {
         val symbolValue = {
           val args =
-            if (coreSpec.semantics.productionMode) Nil
-            else js.StringLiteral(fieldName.nameString) :: Nil
+            if (coreSpec.semantics.productionMode) Vector()
+            else js.StringLiteral(fieldName.nameString) +: Vector()
           js.Apply(js.VarRef(js.Ident("Symbol")), args)
         }
 
@@ -346,11 +346,11 @@ final class Emitter(config: Emitter.Config) {
         val valueParamDef = js.ParamDef(js.Ident("value"))
 
         val varDef = js.VarDef(varIdent, Some(symbolValue))
-        val getterItem = importName -> js.Function(ClosureFlags.arrow, List(qualParamDef), None, {
+        val getterItem = importName -> js.Function(ClosureFlags.arrow, Vector(qualParamDef), None, {
           js.Return(js.BracketSelect(qualParamDef.ref, js.VarRef(varIdent)))
         })
         val setterItem = {
-          importName -> js.Function(ClosureFlags.arrow, List(qualParamDef, valueParamDef), None, {
+          importName -> js.Function(ClosureFlags.arrow, Vector(qualParamDef, valueParamDef), None, {
             js.Assign(js.BracketSelect(qualParamDef.ref, js.VarRef(varIdent)), valueParamDef.ref)
           })
         }
@@ -379,13 +379,13 @@ final class Emitter(config: Emitter.Config) {
 
     val loadFunIdent = js.Ident("__load")
     val loaderImport = js.Import(
-      List(js.ExportName("load") -> loadFunIdent),
+      Vector(js.ExportName("load") -> loadFunIdent),
       js.StringLiteral(config.loaderModuleName)
     )
 
     val loadCall = js.Apply(
       js.VarRef(loadFunIdent),
-      List(
+      Vector(
         js.StringLiteral(config.internalWasmFileURIPattern(module.id)),
         exportSettersDict,
         privateJSFieldGettersDict,
@@ -395,13 +395,12 @@ final class Emitter(config: Emitter.Config) {
       )
     )
 
-    val fullTree = (
-      moduleImports :::
-        loaderImport ::
-        privateJSFieldDecls :::
-        exportDecls.flatten :::
-        js.Await(loadCall) ::
-        Nil
+    val fullTree = Vector.concat(
+      moduleImports,
+      Vector(loaderImport),
+      privateJSFieldDecls,
+      exportDecls.flatten,
+      Vector(js.Await(loadCall)),
     )
 
     val writer = new ByteArrayWriter
@@ -452,11 +451,11 @@ object Emitter {
 
   private final class JSFileContentInfo(
       /** Private JS fields for which we need symbols: pairs of `(importName/identName, fieldName)`. */
-      val privateJSFields: List[(String, FieldName)],
+      val privateJSFields: Vector[(String, FieldName)],
       /** Custom JS helpers to generate: pairs of `(importName, jsFunction)`. */
-      val customJSHelpers: List[(String, js.Function)],
+      val customJSHelpers: Vector[(String, js.Function)],
       /** WTF-16 string constants: pairs of `(importName, stringValue)`. */
-      val wtf16Strings: List[(String, String)]
+      val wtf16Strings: Vector[(String, String)]
   )
 
   final class Result(

@@ -109,9 +109,9 @@ final class BaseLinker(config: CommonPhaseConfig, checkIR: Boolean) {
         analysis.isClassSuperClassUsed
       )
 
-      new LinkingUnit(linkedClassDefs.toList,
-          linkedTopLevelExports.flatten.toList,
-          moduleInitializers.toList,
+      new LinkingUnit(linkedClassDefs.toVector,
+          linkedTopLevelExports.flatten.toVector,
+          moduleInitializers.toVector,
           globalInfo)
     }
   }
@@ -121,8 +121,8 @@ private[frontend] object BaseLinker {
 
   /** Takes a ClassDef and DCE infos to construct a stripped down LinkedClass. */
   private[frontend] def linkClassDef(classDef: ClassDef, version: Version,
-      syntheticMethodDefs: List[MethodDef],
-      analysis: Analysis): (LinkedClass, List[LinkedTopLevelExport]) = {
+      syntheticMethodDefs: Vector[MethodDef],
+      analysis: Analysis): (LinkedClass, Vector[LinkedTopLevelExport]) = {
     import ir.Trees._
 
     val classInfo = analysis.classInfos(classDef.className)
@@ -145,7 +145,7 @@ private[frontend] object BaseLinker {
     // Will stay empty for most classes
     var desugaringRequirements = LinkedClass.DesugaringRequirements.Empty
 
-    val methods: List[MethodDef] = classDef.methods.iterator
+    val methods: Vector[MethodDef] = classDef.methods.iterator
       .map(m => m -> classInfo.methodInfos(m.flags.namespace)(m.methodName))
       .filter(_._2.isReachable)
       .map { case (m, info) =>
@@ -155,7 +155,7 @@ private[frontend] object BaseLinker {
           desugaringRequirements = desugaringRequirements.addMethod(m.flags.namespace, m.methodName)
         m
       }
-      .toList
+      .toVector
 
     val jsConstructor =
       if (classInfo.isAnySubclassInstantiated) classDef.jsConstructor
@@ -163,7 +163,7 @@ private[frontend] object BaseLinker {
 
     val jsMethodProps =
       if (classInfo.isAnySubclassInstantiated) classDef.jsMethodProps
-      else Nil
+      else Vector()
 
     if (classInfo.anyJSMemberNeedsDesugaring)
       desugaringRequirements = desugaringRequirements.addAnyExportedMember()
@@ -190,7 +190,7 @@ private[frontend] object BaseLinker {
         jsNativeMembers,
         classDef.optimizerHints,
         classDef.pos,
-        ancestors.toList,
+        ancestors.toVector,
         hasInstances = classInfo.isAnySubclassInstantiated,
         hasDirectInstances = classInfo.isInstantiated,
         hasInstanceTests = classInfo.areInstanceTestsUsed,

@@ -65,17 +65,17 @@ class RunTest {
   def wrapAsThrowable(): AsyncResult = await {
     // Check that WrapAsThrowable can link without js.JavaScriptException on the classpath
 
-    val getMessage = MethodName("getMessage", Nil, T)
+    val getMessage = MethodName("getMessage", Vector(), T)
 
     val e = VarRef("e")(ClassType(ThrowableClass, nullable = true, exact = false))
 
     val classDefs = Seq(
       mainTestClassDef(Block(
         VarDef("e", NON, ClassType(ThrowableClass, nullable = true, exact = false), mutable = false,
-            UnaryOp(UnaryOp.WrapAsThrowable, JSNew(JSGlobalRef("RangeError"), List(str("boom"))))),
+            UnaryOp(UnaryOp.WrapAsThrowable, JSNew(JSGlobalRef("RangeError"), Vector(str("boom"))))),
         genAssert(IsInstanceOf(e, ClassType("java.lang.Exception", nullable = false, exact = false))),
         genAssertEquals(str("RangeError: boom"),
-            Apply(EAF, e, getMessage, Nil)(
+            Apply(EAF, e, getMessage, Vector())(
                 ClassType(BoxedStringClass, nullable = true, exact = false)))
       ))
     )
@@ -89,13 +89,13 @@ class RunTest {
 
   private def genAssert(test: Tree): Tree = {
     If(UnaryOp(UnaryOp.Boolean_!, test),
-        UnaryOp(UnaryOp.Throw, JSNew(JSGlobalRef("Error"), List(str("Assertion failed")))),
+        UnaryOp(UnaryOp.Throw, JSNew(JSGlobalRef("Error"), Vector(str("Assertion failed")))),
         Skip())(
         VoidType)
   }
 
   private def testLinkAndRun(classDefs: Seq[ClassDef],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       linkerConfig: StandardConfig, inputKind: TestKit.InputKind): Future[Unit] = {
     val output = tempFolder.newFolder().toPath
 

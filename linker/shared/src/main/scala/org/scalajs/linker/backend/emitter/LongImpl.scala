@@ -20,9 +20,9 @@ private[linker] object LongImpl {
   final val RuntimeLongClass = ClassName("org.scalajs.linker.runtime.RuntimeLong")
   final val RuntimeLongModClass = ClassName("org.scalajs.linker.runtime.RuntimeLong$")
 
-  private final val TwoIntRefs = IntRef :: IntRef :: Nil
-  private final val ThreeIntRefs = IntRef :: TwoIntRefs
-  private final val FourIntRefs = IntRef :: ThreeIntRefs
+  private final val TwoIntRefs = IntRef +: IntRef +: Vector()
+  private final val ThreeIntRefs = IntRef +: TwoIntRefs
+  private final val FourIntRefs = IntRef +: ThreeIntRefs
 
   final val pack = MethodName("pack", TwoIntRefs, LongRef)
 
@@ -71,13 +71,13 @@ private[linker] object LongImpl {
   final val toInt = MethodName("toInt", TwoIntRefs, IntRef)
   final val toFloat = MethodName("toFloat", TwoIntRefs, FloatRef)
   final val toDouble = MethodName("toDouble", TwoIntRefs, DoubleRef)
-  final val bitsToDouble = MethodName("bitsToDouble", List(IntRef, IntRef, ObjectRef), DoubleRef)
+  final val bitsToDouble = MethodName("bitsToDouble", Vector(IntRef, IntRef, ObjectRef), DoubleRef)
   final val clz = MethodName("clz", TwoIntRefs, IntRef)
 
-  final val fromInt = MethodName("fromInt", List(IntRef), LongRef)
-  final val fromUnsignedInt = MethodName("fromUnsignedInt", List(IntRef), LongRef)
-  final val fromDouble = MethodName("fromDouble", List(DoubleRef), LongRef)
-  final val fromDoubleBits = MethodName("fromDoubleBits", List(DoubleRef, ObjectRef), LongRef)
+  final val fromInt = MethodName("fromInt", Vector(IntRef), LongRef)
+  final val fromUnsignedInt = MethodName("fromUnsignedInt", Vector(IntRef), LongRef)
+  final val fromDouble = MethodName("fromDouble", Vector(DoubleRef), LongRef)
+  final val fromDoubleBits = MethodName("fromDoubleBits", Vector(DoubleRef, ObjectRef), LongRef)
 
   final val toString_ = MethodName("toString", TwoIntRefs, ClassRef(BoxedStringClass))
 

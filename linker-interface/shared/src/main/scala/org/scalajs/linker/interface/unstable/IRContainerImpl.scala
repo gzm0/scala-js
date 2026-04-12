@@ -50,7 +50,7 @@ abstract class IRContainerImpl(
    *
    *  It is up to the implementation whether these files are read lazily or not.
    */
-  def sjsirFiles(implicit ec: ExecutionContext): Future[List[IRFile]]
+  def sjsirFiles(implicit ec: ExecutionContext): Future[Vector[IRFile]]
 }
 
 object IRContainerImpl {

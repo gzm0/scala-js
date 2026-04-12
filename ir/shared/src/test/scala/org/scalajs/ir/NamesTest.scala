@@ -32,7 +32,7 @@ class NamesTest {
     assertEquals("foo", SimpleFieldName("foo").nameString)
 
   @Test def nameStringFieldName(): Unit = {
-    assertEquals("a.B::foo",
+    assertEquals("a.B+:foo",
         FieldName(ClassName("a.B"), SimpleFieldName("foo")).nameString)
   }
 
@@ -44,18 +44,18 @@ class NamesTest {
   }
 
   @Test def nameStringMethodName(): Unit = {
-    assertEquals("foo;I", MethodName("foo", Nil, IntRef).nameString)
-    assertEquals("foo;Z;I", MethodName("foo", List(BooleanRef), IntRef).nameString)
-    assertEquals("foo;Z;V", MethodName("foo", List(BooleanRef), VoidRef).nameString)
+    assertEquals("foo;I", MethodName("foo", Vector(), IntRef).nameString)
+    assertEquals("foo;Z;I", MethodName("foo", Vector(BooleanRef), IntRef).nameString)
+    assertEquals("foo;Z;V", MethodName("foo", Vector(BooleanRef), VoidRef).nameString)
 
     assertEquals("foo;S;Ljava.io.Serializable;V",
-        MethodName("foo", List(ShortRef, ClassRef(SerializableClass)), VoidRef).nameString)
+        MethodName("foo", Vector(ShortRef, ClassRef(SerializableClass)), VoidRef).nameString)
 
-    assertEquals("<init>;I;V", MethodName.constructor(List(IntRef)).nameString)
+    assertEquals("<init>;I;V", MethodName.constructor(Vector(IntRef)).nameString)
 
-    assertEquals("foo;Z;R", MethodName.reflectiveProxy("foo", List(BooleanRef)).nameString)
+    assertEquals("foo;Z;R", MethodName.reflectiveProxy("foo", Vector(BooleanRef)).nameString)
 
-    val refAndNameStrings: List[(TypeRef, String)] = List(
+    val refAndNameStrings: Vector[(TypeRef, String)] = Vector(
       ClassRef(ObjectClass) -> "Ljava.lang.Object",
       ClassRef(SerializableClass) -> "Ljava.io.Serializable",
       ClassRef(BoxedStringClass) -> "Ljava.lang.String",
@@ -65,7 +65,7 @@ class NamesTest {
     )
     for ((ref, nameString) <- refAndNameStrings) {
       assertEquals(s"foo;$nameString;V",
-          MethodName("foo", List(ref), VoidRef).nameString)
+          MethodName("foo", Vector(ref), VoidRef).nameString)
     }
   }
 

@@ -43,7 +43,7 @@ private class TextWriter(module: Module) {
       case Import(_, _, ImportDesc.Func(id, origName, _)) => id -> nameGen.genName(origName)
     }
     val definedFunctionNames = module.funcs.map(f => f.id -> nameGen.genName(f.originalName))
-    (importedFunctionNames ::: definedFunctionNames).toMap
+    (importedFunctionNames ++ definedFunctionNames).toMap
   }
 
   private val tagNames: Map[TagID, String] = {
@@ -53,7 +53,7 @@ private class TextWriter(module: Module) {
         id -> nameGen.genName(origName)
     }
     val definedTagNames = module.tags.map(t => t.id -> nameGen.genName(t.originalName))
-    (importedTagNames ::: definedTagNames).toMap
+    (importedTagNames ++ definedTagNames).toMap
   }
 
   private val globalNames: Map[GlobalID, String] = {
@@ -62,7 +62,7 @@ private class TextWriter(module: Module) {
       case Import(_, _, ImportDesc.Global(id, origName, _, _)) => id -> nameGen.genName(origName)
     }
     val definedGlobalNames = module.globals.map(g => g.id -> nameGen.genName(g.originalName))
-    (importedGlobalNames ::: definedGlobalNames).toMap
+    (importedGlobalNames ++ definedGlobalNames).toMap
   }
 
   private val fieldNames: Map[TypeID, Map[FieldID, String]] = {
@@ -123,7 +123,7 @@ private class TextWriter(module: Module) {
     val RecType(subTypes) = recType
 
     subTypes match {
-      case singleSubType :: Nil =>
+      case singleSubType +: Vector() =>
         writeTypeDefinition(singleSubType)
       case subTypes =>
         b.newLineList("rec") {
@@ -245,7 +245,7 @@ private class TextWriter(module: Module) {
 
     localNames = {
       val nameGen = new FreshNameGenerator
-      Some((params ::: locals).map(l => l.id -> nameGen.genName(l.originalName)).toMap)
+      Some((params ++ locals).map(l => l.id -> nameGen.genName(l.originalName)).toMap)
     }
     labelNames = Some(mutable.HashMap.empty)
     labelNameGen = Some(new FreshNameGenerator)

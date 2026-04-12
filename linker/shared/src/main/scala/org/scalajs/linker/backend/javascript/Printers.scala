@@ -65,7 +65,7 @@ object Printers {
       newIndentArray
     }
 
-    private def printRow(ts: List[Tree], start: Char, end: Char): Unit = {
+    private def printRow(ts: Vector[Tree], start: Char, end: Char): Unit = {
       print(start)
       var rest = ts
       while (rest.nonEmpty) {
@@ -96,7 +96,7 @@ object Printers {
       undent(); printIndent(); print('}')
     }
 
-    private def printSig(args: List[ParamDef], restParam: Option[ParamDef]): Unit = {
+    private def printSig(args: Vector[ParamDef], restParam: Option[ParamDef]): Unit = {
       print("(")
       var rem = args
       while (rem.nonEmpty) {
@@ -114,7 +114,7 @@ object Printers {
       print(") ")
     }
 
-    private def printArgs(args: List[Tree]): Unit =
+    private def printArgs(args: Vector[Tree]): Unit =
       printRow(args, '(', ')')
 
     /** Prints a stat including leading indent and trailing newline. */
@@ -495,7 +495,7 @@ object Printers {
           printRow(items, '[', ']')
           printSeparatorIfStat()
 
-        case ObjectConstr(Nil) =>
+        case ObjectConstr(Vector()) =>
           /* #4949 Always wrap object literals with () in case they end up at
            * the start of an `ExpressionStatement`.
            */

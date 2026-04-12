@@ -41,21 +41,21 @@ class SmallModulesForSplittingTest {
      */
     val strClsType = ClassType(BoxedStringClass, nullable = true, exact = false)
 
-    val methodName = m("get", Nil, T)
+    val methodName = m("get", Vector(), T)
 
     val SMF = EMF.withNamespace(MemberNamespace.PublicStatic)
 
     def methodHolder(name: ClassName, body: Tree) = {
       classDef(name,
           kind = ClassKind.Interface,
-          methods = List(
-            MethodDef(SMF, methodName, NON, Nil, strClsType, Some(body))(
+          methods = Vector(
+            MethodDef(SMF, methodName, NON, Vector(), strClsType, Some(body))(
                 EOH.withNoinline(true), UNV)
           ))
     }
 
     def call(name: ClassName): Tree =
-      ApplyStatic(EAF, name, methodName, Nil)(strClsType)
+      ApplyStatic(EAF, name, methodName, Vector())(strClsType)
 
     val helloWorldClass = "helloworld.HelloWorld$"
 
@@ -84,9 +84,9 @@ class SmallModulesForSplittingTest {
         module.classDefs.map(_.name.name)
       }
 
-      assertEquals(List[ClassName]("foo.A"), moduleClasses("foo.-A"))
-      assertEquals(List[ClassName]("foo.C"), moduleClasses("foo.-C"))
-      assertEquals(List(MainTestClassName), moduleClasses("main"))
+      assertEquals(Vector[ClassName]("foo.A"), moduleClasses("foo.-A"))
+      assertEquals(Vector[ClassName]("foo.C"), moduleClasses("foo.-C"))
+      assertEquals(Vector(MainTestClassName), moduleClasses("main"))
 
       /* Expect two additional modules, one for each:
        * - Scala.js core
@@ -111,27 +111,27 @@ class SmallModulesForSplittingTest {
     def methodHolder(name: ClassName, methodName: String, body: Tree): ClassDef = {
       classDef(name,
           kind = ClassKind.Interface,
-          methods = List(
-            MethodDef(SMF, m(methodName, Nil, I), NON, Nil, IntType, Some(body))(
+          methods = Vector(
+            MethodDef(SMF, m(methodName, Vector(), I), NON, Vector(), IntType, Some(body))(
                 EOH.withNoinline(true), UNV)
           ))
     }
 
     def call(name: ClassName, methodName: String): Tree =
-      ApplyStatic(EAF, name, m(methodName, Nil, I), Nil)(IntType)
+      ApplyStatic(EAF, name, m(methodName, Vector(), I), Vector())(IntType)
 
     val EntryPointsClass = ClassName("lib.EntryPoints")
     val entryPointsClassDef = classDef(
       EntryPointsClass,
       superClass = Some(ObjectClass),
-      methods = List(
+      methods = Vector(
         trivialCtor(EntryPointsClass)
       ),
-      topLevelExportDefs = List(
+      topLevelExportDefs = Vector(
         TopLevelMethodExportDef("moda",
-            JSMethodDef(SMF, str("expa"), Nil, None, call("lib.A", "baz"))(EOH, UNV)),
+            JSMethodDef(SMF, str("expa"), Vector(), None, call("lib.A", "baz"))(EOH, UNV)),
         TopLevelMethodExportDef("modb",
-            JSMethodDef(SMF, str("expb"), Nil, None, call("lib.A", "baz"))(EOH, UNV))
+            JSMethodDef(SMF, str("expb"), Vector(), None, call("lib.A", "baz"))(EOH, UNV))
       )
     )
 
@@ -149,7 +149,7 @@ class SmallModulesForSplittingTest {
       .withSourceMap(false)
 
     for {
-      moduleSet <- linkToModuleSet(classDefs, Nil, config = linkerConfig)
+      moduleSet <- linkToModuleSet(classDefs, Vector(), config = linkerConfig)
     } yield {
       checkNoCyclicDependencies(moduleSet)
     }
@@ -166,27 +166,27 @@ class SmallModulesForSplittingTest {
     def methodHolder(name: ClassName, methodName: String, body: Tree): ClassDef = {
       classDef(name,
           kind = ClassKind.Interface,
-          methods = List(
-            MethodDef(SMF, m(methodName, Nil, I), NON, Nil, IntType, Some(body))(
+          methods = Vector(
+            MethodDef(SMF, m(methodName, Vector(), I), NON, Vector(), IntType, Some(body))(
                 EOH.withNoinline(true), UNV)
           ))
     }
 
     def call(name: ClassName, methodName: String): Tree =
-      ApplyStatic(EAF, name, m(methodName, Nil, I), Nil)(IntType)
+      ApplyStatic(EAF, name, m(methodName, Vector(), I), Vector())(IntType)
 
     val EntryPointsClass = ClassName("entry.EntryPoints")
     val entryPointsClassDef = classDef(
       EntryPointsClass,
       superClass = Some(ObjectClass),
-      methods = List(
+      methods = Vector(
         trivialCtor(EntryPointsClass)
       ),
-      topLevelExportDefs = List(
+      topLevelExportDefs = Vector(
         TopLevelMethodExportDef("moda",
-            JSMethodDef(SMF, str("expa"), Nil, None, call("app.A", "baz"))(EOH, UNV)),
+            JSMethodDef(SMF, str("expa"), Vector(), None, call("app.A", "baz"))(EOH, UNV)),
         TopLevelMethodExportDef("modb",
-            JSMethodDef(SMF, str("expb"), Nil, None, call("app.A", "baz"))(EOH, UNV))
+            JSMethodDef(SMF, str("expb"), Vector(), None, call("app.A", "baz"))(EOH, UNV))
       )
     )
 
@@ -204,7 +204,7 @@ class SmallModulesForSplittingTest {
       .withSourceMap(false)
 
     for {
-      moduleSet <- linkToModuleSet(classDefs, Nil, config = linkerConfig)
+      moduleSet <- linkToModuleSet(classDefs, Vector(), config = linkerConfig)
     } yield {
       checkNoCyclicDependencies(moduleSet)
     }

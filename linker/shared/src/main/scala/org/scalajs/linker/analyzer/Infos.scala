@@ -28,9 +28,9 @@ import org.scalajs.linker.standard.ModuleSet.ModuleID
 object Infos {
 
   private val StringArgConstructorName =
-    MethodName.constructor(List(ClassRef(BoxedStringClass)))
+    MethodName.constructor(Vector(ClassRef(BoxedStringClass)))
 
-  private val cloneMethodName = MethodName("clone", Nil, ClassRef(ObjectClass))
+  private val cloneMethodName = MethodName("clone", Vector(), ClassRef(ObjectClass))
 
   /* Elements of WrapAsThrowable and UnwrapFromThrowable used by the Emitter
    * In theory, these should be an implementation detail of the Emitter, and
@@ -39,7 +39,7 @@ object Infos {
    * would be annoying.
    */
   private val JavaScriptExceptionClass = ClassName("scala.scalajs.js.JavaScriptException")
-  private val AnyArgConstructorName = MethodName.constructor(List(ClassRef(ObjectClass)))
+  private val AnyArgConstructorName = MethodName.constructor(Vector(ClassRef(ObjectClass)))
 
   final case class NamespacedMethodName(
       namespace: MemberNamespace, methodName: MethodName)
@@ -50,7 +50,7 @@ object Infos {
       val syntheticKind: Option[SyntheticClassKind],
       val nonExistent: Boolean,
       val superClass: Option[ClassName], // always None for interfaces
-      val interfaces: List[ClassName], // direct parent interfaces only
+      val interfaces: Vector[ClassName], // direct parent interfaces only
       val jsNativeLoadSpec: Option[JSNativeLoadSpec],
       /* Referenced classes of non-static fields.
        *
@@ -64,8 +64,8 @@ object Infos {
       val referencedFieldClasses: Map[FieldName, ClassName],
       val methods: Array[Map[MethodName, MethodInfo]],
       val jsNativeMembers: Map[MethodName, JSNativeLoadSpec],
-      val jsMethodProps: List[ReachabilityInfo],
-      val topLevelExports: List[TopLevelExportInfo]
+      val jsMethodProps: Vector[ReachabilityInfo],
+      val topLevelExports: Vector[TopLevelExportInfo]
   ) {
     override def toString(): String = className.nameString
   }
@@ -527,7 +527,7 @@ object Infos {
   }
 
   final class InfoGenerator(linkTimeProperties: LinkTimeProperties) {
-    def genReferencedFieldClasses(fields: List[AnyFieldDef]): Map[FieldName, ClassName] = {
+    def genReferencedFieldClasses(fields: Vector[AnyFieldDef]): Map[FieldName, ClassName] = {
       val builder = Map.newBuilder[FieldName, ClassName]
 
       fields.foreach {

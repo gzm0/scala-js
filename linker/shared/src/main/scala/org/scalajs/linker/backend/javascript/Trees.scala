@@ -166,7 +166,7 @@ object Trees {
 
   sealed case class Skip()(implicit val pos: Position) extends Tree
 
-  sealed class Block private (val stats: List[Tree])(
+  sealed class Block private (val stats: Vector[Tree])(
       implicit val pos: Position)
       extends Tree {
     override def toString(): String =
@@ -178,7 +178,7 @@ object Trees {
       apply(stats.iterator)
 
     def apply(stats: Iterator[Tree])(implicit pos: Position): Tree = {
-      /* Do a fused _.flatMap(...).toList on our own. This is the only
+      /* Do a fused _.flatMap(...).toVector on our own. This is the only
        * implementation I could come up with that:
        * - Is efficient.
        * - Works on 2.12 and 2.13.
@@ -186,7 +186,7 @@ object Trees {
        *
        * Not fusing this would produce a relatively complex iterator construct for no reason.
        */
-      val builder = List.newBuilder[Tree]
+      val builder = Vector.newBuilder[Tree]
 
       val flattenedStats = stats.foreach {
         case Skip()          => // skip :)
@@ -195,8 +195,8 @@ object Trees {
       }
 
       builder.result() match {
-        case Nil         => Skip()
-        case only :: Nil => only
+        case Vector()         => Skip()
+        case only +: Vector() => only
         case stats       => new Block(stats)
       }
     }
@@ -204,7 +204,7 @@ object Trees {
     def apply(stats: Tree*)(implicit pos: Position): Tree =
       apply(stats)
 
-    def unapply(block: Block): Some[List[Tree]] = Some(block.stats)
+    def unapply(block: Block): Some[Vector[Tree]] = Some(block.stats)
   }
 
   sealed case class Labeled(label: Ident, body: Tree)(
@@ -263,7 +263,7 @@ object Trees {
       implicit val pos: Position)
       extends Tree
 
-  sealed case class Switch(selector: Tree, cases: List[(Tree, Tree)],
+  sealed case class Switch(selector: Tree, cases: Vector[(Tree, Tree)],
       default: Tree)(
       implicit val pos: Position)
       extends Tree
@@ -272,7 +272,7 @@ object Trees {
 
   // Expressions
 
-  sealed case class New(ctor: Tree, args: List[Tree])(
+  sealed case class New(ctor: Tree, args: Vector[Tree])(
       implicit val pos: Position)
       extends Tree
 
@@ -302,7 +302,7 @@ object Trees {
    *  It is a method call if fun is a dot-select or bracket-select. It is a
    *  function call otherwise.
    */
-  sealed case class Apply(fun: Tree, args: List[Tree])(
+  sealed case class Apply(fun: Tree, args: Vector[Tree])(
       implicit val pos: Position)
       extends Tree
 
@@ -322,7 +322,7 @@ object Trees {
      *  This builder method protects the `fun` against both of those accidental
      *  semantic quirks.
      */
-    def makeProtected(fun: Tree, args: List[Tree])(implicit pos: Position): Apply = {
+    def makeProtected(fun: Tree, args: Vector[Tree])(implicit pos: Position): Apply = {
       val protectedFun = fun match {
         case _:DotSelect | _:BracketSelect | VarRef(Ident("eval", _)) =>
           Block(IntLiteral(0), fun)
@@ -395,9 +395,9 @@ object Trees {
     type Code = ir.Trees.JSBinaryOp.Code
   }
 
-  sealed case class ArrayConstr(items: List[Tree])(implicit val pos: Position) extends Tree
+  sealed case class ArrayConstr(items: Vector[Tree])(implicit val pos: Position) extends Tree
 
-  sealed case class ObjectConstr(fields: List[(PropertyName, Tree)])(
+  sealed case class ObjectConstr(fields: Vector[(PropertyName, Tree)])(
       implicit val pos: Position)
       extends Tree
 
@@ -440,14 +440,14 @@ object Trees {
    *  The other flags: `arrow` and `async`, are meaningful. They have the same
    *  meaning as in `ir.Trees.Closure`.
    */
-  sealed case class Function(flags: ClosureFlags, args: List[ParamDef],
+  sealed case class Function(flags: ClosureFlags, args: Vector[ParamDef],
       restParam: Option[ParamDef], body: Tree)(
       implicit val pos: Position)
       extends Tree
 
   // Named function definition
 
-  sealed case class FunctionDef(name: MaybeDelayedIdent, args: List[ParamDef],
+  sealed case class FunctionDef(name: MaybeDelayedIdent, args: Vector[ParamDef],
       restParam: Option[ParamDef], body: Tree)(
       implicit val pos: Position)
       extends Tree
@@ -455,12 +455,12 @@ object Trees {
   // ECMAScript 6 classes
 
   sealed case class ClassDef(className: Option[MaybeDelayedIdent],
-      parentClass: Option[Tree], members: List[Tree])(
+      parentClass: Option[Tree], members: Vector[Tree])(
       implicit val pos: Position)
       extends Tree
 
   sealed case class MethodDef(static: Boolean, name: PropertyName,
-      args: List[ParamDef], restParam: Option[ParamDef], body: Tree)(
+      args: Vector[ParamDef], restParam: Option[ParamDef], body: Tree)(
       implicit val pos: Position)
       extends Tree
 
@@ -555,7 +555,7 @@ object Trees {
    *    `import { binding } from 'from'`.
    *  - When `_1.name == "default"`, it is equivalent to a default import.
    */
-  sealed case class Import(bindings: List[(ExportName, MaybeDelayedIdent)],
+  sealed case class Import(bindings: Vector[(ExportName, MaybeDelayedIdent)],
       from: StringLiteral)(
       implicit val pos: Position)
       extends Tree
@@ -581,7 +581,7 @@ object Trees {
    *  module that are exported. The `_2` parts are the names under which they
    *  are exported to other modules.
    */
-  sealed case class Export(bindings: List[(MaybeDelayedIdent, ExportName)])(
+  sealed case class Export(bindings: Vector[(MaybeDelayedIdent, ExportName)])(
       implicit val pos: Position)
       extends Tree
 
@@ -594,7 +594,7 @@ object Trees {
    *  The `_1` parts of bindings are the identifiers that are imported.
    *  The `_2` parts are the names under which they are exported.
    */
-  sealed case class ExportImport(bindings: List[(ExportName, ExportName)],
+  sealed case class ExportImport(bindings: Vector[(ExportName, ExportName)],
       from: StringLiteral)(
       implicit val pos: Position)
       extends Tree

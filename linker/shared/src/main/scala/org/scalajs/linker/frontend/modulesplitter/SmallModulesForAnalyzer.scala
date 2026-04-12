@@ -30,7 +30,7 @@ import org.scalajs.linker.standard.ModuleSet.ModuleID
  *  [[FewestModulesAnalyzer]].
  */
 private final class SmallModulesForAnalyzer(
-    packages: List[ClassName])
+    packages: Vector[ClassName])
     extends ModuleAnalyzer {
   def analyze(info: ModuleAnalyzer.DependencyInfo): ModuleAnalyzer.Analysis = {
     val (targetClassToRepr, reprToModuleID) = smallRun(info, packages)
@@ -42,7 +42,7 @@ private final class SmallModulesForAnalyzer(
     new SmallModulesForAnalyzer.Analysis(targetClassToRepr, reprToModuleID, largeModuleMap)
   }
 
-  private def smallRun(info: ModuleAnalyzer.DependencyInfo, packages: List[ClassName]) = {
+  private def smallRun(info: ModuleAnalyzer.DependencyInfo, packages: Vector[ClassName]) = {
     val run = new SmallModulesForAnalyzer.SmallRun(info, packages)
     run.analyze()
 
@@ -65,7 +65,7 @@ private object SmallModulesForAnalyzer {
   }
 
   private final class SmallRun(info: ModuleAnalyzer.DependencyInfo,
-      packages: List[ClassName])
+      packages: Vector[ClassName])
       extends StrongConnect(info) {
 
     private val internalModIDGenerator =
@@ -80,7 +80,7 @@ private object SmallModulesForAnalyzer {
 
     val reprToModuleID = mutable.Map.empty[ClassName, ModuleID]
 
-    protected def emitModule(moduleIndex: Int, classNames: List[ClassName]): Unit = {
+    protected def emitModule(moduleIndex: Int, classNames: Vector[ClassName]): Unit = {
       // Target classes contained in this strongly connected component.
       val targetNames = classNames.filter(clazz => packages.exists(inPackage(clazz, _)))
 

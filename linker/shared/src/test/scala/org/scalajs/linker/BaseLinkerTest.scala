@@ -37,29 +37,29 @@ class BaseLinkerTest {
 
   @Test
   def noUnnecessaryDefaultBridges(): AsyncResult = await {
-    val fooName = m("foo", Nil, IntRef)
+    val fooName = m("foo", Vector(), IntRef)
     val classDefs = Seq(
       classDef(
         "Intf",
         kind = ClassKind.Interface,
-        methods = List(
-            MethodDef(EMF, fooName, NON, Nil, IntType, Some(int(1)))(EOH, UNV))
+        methods = Vector(
+            MethodDef(EMF, fooName, NON, Vector(), IntType, Some(int(1)))(EOH, UNV))
       ),
       classDef(
         "Base",
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        interfaces = List("Intf"),
-        methods = List(trivialCtor("Base"))
+        interfaces = Vector("Intf"),
+        methods = Vector(trivialCtor("Base"))
       ),
       classDef(
         "Sub",
         kind = ClassKind.Class,
         superClass = Some("Base"),
-        methods = List(trivialCtor("Sub", "Base"))
+        methods = Vector(trivialCtor("Sub", "Base"))
       ),
       mainTestClassDef(
-        consoleLog(Apply(EAF, New("Sub", NoArgConstructorName, Nil), fooName, Nil)(IntType))
+        consoleLog(Apply(EAF, New("Sub", NoArgConstructorName, Vector()), fooName, Vector())(IntType))
       )
     )
 
@@ -73,13 +73,13 @@ class BaseLinkerTest {
 
   @Test
   def correctThisTypeInHijackedClassReflectiveProxies_Issue4982(): AsyncResult = await {
-    val compareTo = m("compareTo", List(ClassRef(BoxedIntegerClass)), IntRef)
+    val compareTo = m("compareTo", Vector(ClassRef(BoxedIntegerClass)), IntRef)
     val compareToReflProxy =
-      MethodName.reflectiveProxy("compareTo", List(ClassRef(BoxedIntegerClass)))
+      MethodName.reflectiveProxy("compareTo", Vector(ClassRef(BoxedIntegerClass)))
 
     val classDefs = Seq(
       mainTestClassDef(
-        consoleLog(Apply(EAF, IntLiteral(5), compareToReflProxy, List(IntLiteral(6)))(AnyType))
+        consoleLog(Apply(EAF, IntLiteral(5), compareToReflProxy, Vector(IntLiteral(6)))(AnyType))
       )
     )
 

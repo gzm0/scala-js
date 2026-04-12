@@ -198,7 +198,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     if (!classDef.kind.isJSClass && classDef.jsSuperClass.isDefined)
       reportError("Only non-native JS types may have a jsSuperClass")
 
-    classDef.jsSuperClass.foreach(checkTree(_, Env.fromParams(classDef.jsClassCaptures.getOrElse(Nil))))
+    classDef.jsSuperClass.foreach(checkTree(_, Env.fromParams(classDef.jsClassCaptures.getOrElse(Vector()))))
   }
 
   private def checkJSNativeLoadSpec()(implicit ctx: ErrorContext): Unit = {
@@ -331,7 +331,7 @@ private final class ClassDefChecker(classDef: ClassDef,
 
     checkJSParamDefs(params, restParam)
 
-    val startEnv = Env.fromParams(classDef.jsClassCaptures.getOrElse(Nil) ++ params ++ restParam)
+    val startEnv = Env.fromParams(classDef.jsClassCaptures.getOrElse(Vector()) ++ params ++ restParam)
       .withHasNewTarget(true)
 
     val envJustBeforeSuper = checkBlockStats(body.beforeSuper, startEnv)
@@ -363,7 +363,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     checkExportedPropertyName(pName)
     checkJSParamDefs(params, restParam)
 
-    val env = Env.fromParams(classDef.jsClassCaptures.getOrElse(Nil) ++ params ++ restParam)
+    val env = Env.fromParams(classDef.jsClassCaptures.getOrElse(Vector()) ++ params ++ restParam)
       .withMaybeThisType(!static, instanceThisType)
 
     checkTree(body, env)
@@ -387,7 +387,7 @@ private final class ClassDefChecker(classDef: ClassDef,
 
     checkExportedPropertyName(pName)
 
-    val jsClassCaptures = classDef.jsClassCaptures.getOrElse(Nil)
+    val jsClassCaptures = classDef.jsClassCaptures.getOrElse(Vector())
 
     getterBody.foreach { body =>
       withPerMethodState {
@@ -399,7 +399,7 @@ private final class ClassDefChecker(classDef: ClassDef,
 
     setterArgAndBody.foreach { case (setterArg, body) =>
       withPerMethodState {
-        checkJSParamDefs(setterArg :: Nil, None)
+        checkJSParamDefs(setterArg +: Vector(), None)
         val bodyEnv = Env.fromParams(jsClassCaptures :+ setterArg)
           .withMaybeThisType(!static, instanceThisType)
         checkTree(body, bodyEnv)
@@ -508,7 +508,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     if ((name.isStaticInitializer || name.isClassInitializer) != (namespace == MemberNamespace.StaticConstructor))
       reportError("a member can have a static constructor name iff it is in the static constructor namespace")
 
-    if ((name.resultTypeRef :: name.paramTypeRefs).exists(_.isInstanceOf[TransientTypeRef])) {
+    if ((name.resultTypeRef +: name.paramTypeRefs).exists(_.isInstanceOf[TransientTypeRef])) {
       if (featureSet.supports(FeatureSet.TransientTypeRefs)) {
         if (namespace == MemberNamespace.Public)
           reportError(i"Illegal transient type ref in public method $name")
@@ -518,7 +518,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     }
   }
 
-  private def checkCaptureParamDefs(params: List[ParamDef])(
+  private def checkCaptureParamDefs(params: Vector[ParamDef])(
       implicit ctx: ErrorContext): Unit = {
     for (ParamDef(name, _, ctpe, mutable) <- params) {
       checkDeclareLocalVar(name)
@@ -529,7 +529,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     }
   }
 
-  private def checkJSParamDefs(params: List[ParamDef], restParam: Option[ParamDef])(
+  private def checkJSParamDefs(params: Vector[ParamDef], restParam: Option[ParamDef])(
       implicit ctx: ErrorContext): Unit = {
     for (ParamDef(name, _, ptpe, _) <- params ++ restParam) {
       checkDeclareLocalVar(name)
@@ -538,7 +538,7 @@ private final class ClassDefChecker(classDef: ClassDef,
     }
   }
 
-  private def checkTypedParamDefs(params: List[ParamDef])(
+  private def checkTypedParamDefs(params: Vector[ParamDef])(
       implicit ctx: ErrorContext): Unit = {
     for (ParamDef(name, _, ctpe, _) <- params) {
       checkDeclareLocalVar(name)
@@ -576,8 +576,8 @@ private final class ClassDefChecker(classDef: ClassDef,
 
     val bodyStats = body match {
       case Block(stats) => stats
-      case Skip()       => Nil
-      case _            => body :: Nil
+      case Skip()       => Vector()
+      case _            => body +: Vector()
     }
 
     if (isJLObject) {
@@ -598,7 +598,7 @@ private final class ClassDefChecker(classDef: ClassDef,
           handleStoreModulesAfterSuperCtorCall(bodyStats)
         checkBlockStats(bodyStatsStoreModulesHandled, bodyEnv)
       } else {
-        val (delegateCtorCall: ApplyStatically) :: afterDelegateCtor = rest
+        val (delegateCtorCall: ApplyStatically) +: afterDelegateCtor = rest
         val ApplyStatically(_, receiver, cls, MethodIdent(ctor), args) = delegateCtorCall
 
         val initEnv = bodyEnv.withIsThisRestricted(true)
@@ -627,8 +627,8 @@ private final class ClassDefChecker(classDef: ClassDef,
     }
   }
 
-  private def handleStoreModulesAfterSuperCtorCall(trees: List[Tree])(
-      implicit ctx: ErrorContext): List[Tree] = {
+  private def handleStoreModulesAfterSuperCtorCall(trees: Vector[Tree])(
+      implicit ctx: ErrorContext): Vector[Tree] = {
 
     if (classDef.kind.hasModuleAccessor) {
       if (featureSet.supports(FeatureSet.RelaxedCtorBodies)) {
@@ -641,7 +641,7 @@ private final class ClassDefChecker(classDef: ClassDef,
          * right after the super constructor call.
          */
         trees match {
-          case StoreModule() :: rest =>
+          case StoreModule() +: rest =>
             rest
           case _ =>
             reportError(i"Missing StoreModule right after the super constructor call")
@@ -653,23 +653,23 @@ private final class ClassDefChecker(classDef: ClassDef,
     }
   }
 
-  private def checkBlockStats(stats: List[Tree], env: Env): Env = {
+  private def checkBlockStats(stats: Vector[Tree], env: Env): Env = {
     stats.foldLeft(env) { (prevEnv, stat) =>
       checkTree(stat, prevEnv)
     }
   }
 
-  private def checkTreeOrSpreads(trees: List[TreeOrJSSpread], env: Env): Unit = {
+  private def checkTreeOrSpreads(trees: Vector[TreeOrJSSpread], env: Env): Unit = {
     trees.foreach {
       case JSSpread(items) => checkTree(items, env)
       case tree: Tree      => checkTree(tree, env)
     }
   }
 
-  private def checkTrees(trees: List[Tree], env: Env): Unit =
+  private def checkTrees(trees: Vector[Tree], env: Env): Unit =
     trees.foreach(checkTree(_, env))
 
-  private def checkApplyArgs(methodName: MethodName, args: List[Tree], env: Env)(
+  private def checkApplyArgs(methodName: MethodName, args: Vector[Tree], env: Env)(
       implicit ctx: ErrorContext): Unit = {
     val paramRefsCount = methodName.paramTypeRefs.size
     if (args.size != paramRefsCount)
@@ -680,7 +680,7 @@ private final class ClassDefChecker(classDef: ClassDef,
   private def checkTree(tree: Tree, env: Env): Env = {
     implicit val ctx = ErrorContext(tree)
 
-    def checkApplyGeneric(methodName: MethodName, args: List[Tree]): Unit =
+    def checkApplyGeneric(methodName: MethodName, args: Vector[Tree]): Unit =
       checkApplyArgs(methodName, args, env)
 
     val newEnv = tree match {
@@ -1252,7 +1252,7 @@ object ClassDefChecker {
       jsConstructorDef,
       exportedMembers,
       jsNativeMembers,
-      topLevelExportDefs = Nil
+      topLevelExportDefs = Vector()
     )(optimizerHints)
 
     check(classDef, previousPhase, logger)
@@ -1309,7 +1309,7 @@ object ClassDefChecker {
       )
     }
 
-    def fromParams(params: List[ParamDef]): Env = {
+    def fromParams(params: Vector[ParamDef]): Env = {
       val paramLocalDefs = {
         for (p @ ParamDef(ident, _, tpe, mutable) <- params)
           yield ident.name -> LocalDef(ident.name, tpe, mutable)

@@ -40,6 +40,6 @@ object ModuleInitializerImpl {
       extends ModuleInitializerImpl
 
   final case class MainMethodWithArgs(className: ClassName,
-      encodedMainMethodName: MethodName, args: List[String])
+      encodedMainMethodName: MethodName, args: Vector[String])
       extends ModuleInitializerImpl
 }

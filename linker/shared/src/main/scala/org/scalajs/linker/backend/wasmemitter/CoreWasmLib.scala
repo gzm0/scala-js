@@ -34,7 +34,7 @@ import SWasmGen._
 import TypeTransformer._
 
 object CoreWasmLib {
-  val arrayBaseRefs: List[NonArrayTypeRef] = List(
+  val arrayBaseRefs: Vector[NonArrayTypeRef] = Vector(
     BooleanRef,
     CharRef,
     ByteRef,
@@ -54,7 +54,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
 
   private implicit val noPos: Position = Position.NoPosition
 
-  private val primRefsWithKinds = List(
+  private val primRefsWithKinds = Vector(
     VoidRef -> KindVoid,
     BooleanRef -> KindBoolean,
     CharRef -> KindChar,
@@ -79,14 +79,14 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
    *  @see
    *    [[VarGen.genFieldID.typeData]], which contains documentation of what is in each field.
    */
-  val typeDataStructFields: List[StructField] = {
+  val typeDataStructFields: Vector[StructField] = {
     import genFieldID.typeData._
     import RefType.nullable
 
     def make(id: FieldID, tpe: Type, isMutable: Boolean): StructField =
       StructField(id, OriginalName(id.toString()), tpe, isMutable)
 
-    List(
+    Vector(
       make(name, RefType.externref, isMutable = true),
       make(kind, Int32, isMutable = false),
       make(specialInstanceTypes, Int32, isMutable = false),
@@ -155,14 +155,14 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     genCoreType(
       genTypeID.cloneFunctionType,
       FunctionType(
-        List(RefType(genTypeID.ObjectStruct)),
-        List(RefType(genTypeID.ObjectStruct))
+        Vector(RefType(genTypeID.ObjectStruct)),
+        Vector(RefType(genTypeID.ObjectStruct))
       )
     )
 
     genCoreType(
       genTypeID.isJSClassInstanceFuncType,
-      FunctionType(List(RefType.anyref), List(Int32))
+      FunctionType(Vector(RefType.anyref), Vector(Int32))
     )
 
     genCoreType(
@@ -188,7 +188,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     genCoreType(
       genTypeID.reflectiveProxy,
       StructType(
-        List(
+        Vector(
           StructField(
             genFieldID.reflectiveProxy.methodID,
             OriginalName(genFieldID.reflectiveProxy.methodID.toString()),
@@ -216,7 +216,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
   }
 
   private def genTagImports()(implicit ctx: WasmContext): Unit = {
-    val exceptionSig = FunctionType(List(RefType.externref), Nil)
+    val exceptionSig = FunctionType(Vector(RefType.externref), Vector())
     val typeID = ctx.moduleBuilder.functionTypeToTypeID(exceptionSig)
     ctx.moduleBuilder.addImport(
       Import(
@@ -252,7 +252,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     import RefType.{extern, externref}
 
     def addHelperImport(id: genFunctionID.JSHelperFunctionID,
-        params: List[Type], results: List[Type]): Unit = {
+        params: Vector[Type], results: Vector[Type]): Unit = {
       val sig = FunctionType(params, results)
       val typeID = ctx.moduleBuilder.functionTypeToTypeID(sig)
       ctx.moduleBuilder.addImport(
@@ -264,21 +264,21 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
       )
     }
 
-    addHelperImport(genFunctionID.stringBuiltins.test, List(externref), List(Int32))
-    addHelperImport(genFunctionID.stringBuiltins.fromCharCode, List(Int32), List(extern))
-    addHelperImport(genFunctionID.stringBuiltins.fromCodePoint, List(Int32), List(extern))
-    addHelperImport(genFunctionID.stringBuiltins.charCodeAt, List(externref, Int32), List(Int32))
-    addHelperImport(genFunctionID.stringBuiltins.codePointAt, List(externref, Int32), List(Int32))
-    addHelperImport(genFunctionID.stringBuiltins.length, List(externref), List(Int32))
-    addHelperImport(genFunctionID.stringBuiltins.concat, List(externref, externref), List(extern))
+    addHelperImport(genFunctionID.stringBuiltins.test, Vector(externref), Vector(Int32))
+    addHelperImport(genFunctionID.stringBuiltins.fromCharCode, Vector(Int32), Vector(extern))
+    addHelperImport(genFunctionID.stringBuiltins.fromCodePoint, Vector(Int32), Vector(extern))
+    addHelperImport(genFunctionID.stringBuiltins.charCodeAt, Vector(externref, Int32), Vector(Int32))
+    addHelperImport(genFunctionID.stringBuiltins.codePointAt, Vector(externref, Int32), Vector(Int32))
+    addHelperImport(genFunctionID.stringBuiltins.length, Vector(externref), Vector(Int32))
+    addHelperImport(genFunctionID.stringBuiltins.concat, Vector(externref, externref), Vector(extern))
     addHelperImport(
-        genFunctionID.stringBuiltins.substring, List(externref, Int32, Int32), List(extern))
-    addHelperImport(genFunctionID.stringBuiltins.equals, List(externref, externref), List(Int32))
+        genFunctionID.stringBuiltins.substring, Vector(externref, Int32, Int32), Vector(extern))
+    addHelperImport(genFunctionID.stringBuiltins.equals, Vector(externref, externref), Vector(Int32))
   }
 
   private def genHelperImports()(implicit ctx: WasmContext): Unit = {
     def addHelperImport(id: genFunctionID.JSHelperFunctionID,
-        params: List[Type], results: List[Type]): Unit = {
+        params: Vector[Type], results: Vector[Type]): Unit = {
       val sig = FunctionType(params, results)
       val typeID = ctx.moduleBuilder.functionTypeToTypeID(sig)
       ctx.moduleBuilder.addImport(
@@ -290,70 +290,70 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
       )
     }
 
-    addHelperImport(genFunctionID.is, List(anyref, anyref), List(Int32))
+    addHelperImport(genFunctionID.is, Vector(anyref, anyref), Vector(Int32))
 
-    addHelperImport(genFunctionID.isUndef, List(anyref), List(Int32))
+    addHelperImport(genFunctionID.isUndef, Vector(anyref), Vector(Int32))
 
-    for (primType <- List(BooleanType, FloatType, DoubleType)) {
+    for (primType <- Vector(BooleanType, FloatType, DoubleType)) {
       val primRef = primType.primRef
       val wasmType = transformPrimType(primType)
       if (primType != BooleanType)
-        addHelperImport(genFunctionID.box(primRef), List(wasmType), List(RefType.any))
-      addHelperImport(genFunctionID.unbox(primRef), List(anyref), List(wasmType))
-      addHelperImport(genFunctionID.typeTest(primRef), List(anyref), List(Int32))
+        addHelperImport(genFunctionID.box(primRef), Vector(wasmType), Vector(RefType.any))
+      addHelperImport(genFunctionID.unbox(primRef), Vector(anyref), Vector(wasmType))
+      addHelperImport(genFunctionID.typeTest(primRef), Vector(anyref), Vector(Int32))
     }
 
-    addHelperImport(genFunctionID.bIFallback, List(Int32), List(RefType.any))
-    addHelperImport(genFunctionID.uIFallback, List(anyref), List(Int32))
-    addHelperImport(genFunctionID.typeTest(IntRef), List(anyref), List(Int32))
+    addHelperImport(genFunctionID.bIFallback, Vector(Int32), Vector(RefType.any))
+    addHelperImport(genFunctionID.uIFallback, Vector(anyref), Vector(Int32))
+    addHelperImport(genFunctionID.typeTest(IntRef), Vector(anyref), Vector(Int32))
 
-    addHelperImport(genFunctionID.jsValueToString, List(RefType.any), List(RefType.extern))
-    addHelperImport(genFunctionID.jsValueToStringForConcat, List(anyref), List(RefType.extern))
-    addHelperImport(genFunctionID.booleanToString, List(Int32), List(RefType.extern))
-    addHelperImport(genFunctionID.intToString, List(Int32), List(RefType.extern))
-    addHelperImport(genFunctionID.longToString, List(Int64), List(RefType.extern))
-    addHelperImport(genFunctionID.doubleToString, List(Float64), List(RefType.extern))
+    addHelperImport(genFunctionID.jsValueToString, Vector(RefType.any), Vector(RefType.extern))
+    addHelperImport(genFunctionID.jsValueToStringForConcat, Vector(anyref), Vector(RefType.extern))
+    addHelperImport(genFunctionID.booleanToString, Vector(Int32), Vector(RefType.extern))
+    addHelperImport(genFunctionID.intToString, Vector(Int32), Vector(RefType.extern))
+    addHelperImport(genFunctionID.longToString, Vector(Int64), Vector(RefType.extern))
+    addHelperImport(genFunctionID.doubleToString, Vector(Float64), Vector(RefType.extern))
 
-    addHelperImport(genFunctionID.jsValueType, List(RefType.any), List(Int32))
-    addHelperImport(genFunctionID.jsValueDescription, List(anyref), List(RefType.extern))
-    addHelperImport(genFunctionID.bigintHashCode, List(RefType.any), List(Int32))
+    addHelperImport(genFunctionID.jsValueType, Vector(RefType.any), Vector(Int32))
+    addHelperImport(genFunctionID.jsValueDescription, Vector(anyref), Vector(RefType.extern))
+    addHelperImport(genFunctionID.bigintHashCode, Vector(RefType.any), Vector(Int32))
     addHelperImport(
       genFunctionID.symbolDescription,
-      List(RefType.any),
-      List(RefType.externref)
+      Vector(RefType.any),
+      Vector(RefType.externref)
     )
     addHelperImport(
       genFunctionID.idHashCodeGet,
-      List(RefType.extern, RefType.any),
-      List(Int32)
+      Vector(RefType.extern, RefType.any),
+      Vector(Int32)
     )
     addHelperImport(
       genFunctionID.idHashCodeSet,
-      List(RefType.extern, RefType.any, Int32),
-      Nil
+      Vector(RefType.extern, RefType.any, Int32),
+      Vector()
     )
 
-    addHelperImport(genFunctionID.makeTypeError, List(RefType.extern), List(RefType.extern))
+    addHelperImport(genFunctionID.makeTypeError, Vector(RefType.extern), Vector(RefType.extern))
 
-    addHelperImport(genFunctionID.jsNewArray, Nil, List(RefType.any))
-    addHelperImport(genFunctionID.jsNewObject, Nil, List(RefType.any))
-    addHelperImport(genFunctionID.jsNewNoArg, List(anyref), List(anyref))
-    addHelperImport(genFunctionID.jsImportMeta, Nil, List(anyref))
-    addHelperImport(genFunctionID.jsAwait, List(anyref), List(anyref))
-    addHelperImport(genFunctionID.jsDelete, List(anyref, anyref), Nil)
-    addHelperImport(genFunctionID.jsForInStart, List(anyref), List(anyref))
-    addHelperImport(genFunctionID.jsForInNext, List(anyref), List(anyref, Int32))
-    addHelperImport(genFunctionID.jsIsTruthy, List(anyref), List(Int32))
+    addHelperImport(genFunctionID.jsNewArray, Vector(), Vector(RefType.any))
+    addHelperImport(genFunctionID.jsNewObject, Vector(), Vector(RefType.any))
+    addHelperImport(genFunctionID.jsNewNoArg, Vector(anyref), Vector(anyref))
+    addHelperImport(genFunctionID.jsImportMeta, Vector(), Vector(anyref))
+    addHelperImport(genFunctionID.jsAwait, Vector(anyref), Vector(anyref))
+    addHelperImport(genFunctionID.jsDelete, Vector(anyref, anyref), Vector())
+    addHelperImport(genFunctionID.jsForInStart, Vector(anyref), Vector(anyref))
+    addHelperImport(genFunctionID.jsForInNext, Vector(anyref), Vector(anyref, Int32))
+    addHelperImport(genFunctionID.jsIsTruthy, Vector(anyref), Vector(Int32))
 
     addHelperImport(
       genFunctionID.jsSuperSelect,
-      List(anyref, anyref, anyref),
-      List(anyref)
+      Vector(anyref, anyref, anyref),
+      Vector(anyref)
     )
     addHelperImport(
       genFunctionID.jsSuperSelectSet,
-      List(anyref, anyref, anyref, anyref),
-      Nil
+      Vector(anyref, anyref, anyref, anyref),
+      Vector()
     )
   }
 
@@ -365,7 +365,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     val typeDataTypeID = genTypeID.typeData
 
     // Other than `name` and `kind`, all the fields have the same value for all primitives
-    val commonFieldValues = List(
+    val commonFieldValues = Vector(
       // specialInstanceTypes
       I32Const(0),
       // strictAncestors
@@ -387,9 +387,10 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     for ((primRef, kind) <- primRefsWithKinds) {
       val nameValue = ctx.stringPool.getConstantStringInstr(primRef.displayName)
 
-      val instrs: List[Instr] = {
-        nameValue :: I32Const(kind) :: commonFieldValues :::
-        StructNew(genTypeID.typeData) :: Nil
+      val instrs: Vector[Instr] = {
+        Vector(nameValue, I32Const(kind)) ++
+        commonFieldValues :+
+        StructNew(genTypeID.typeData)
       }
 
       ctx.addGlobal(
@@ -405,14 +406,14 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
   }
 
   private def genBoxedZeroGlobals()(implicit ctx: WasmContext): Unit = {
-    val primTypesWithBoxClasses: List[(GlobalID, ClassName, Instr)] = List(
+    val primTypesWithBoxClasses: Vector[(GlobalID, ClassName, Instr)] = Vector(
       (genGlobalID.bZeroChar, SpecialNames.CharBoxClass, I32Const(0)),
       (genGlobalID.bZeroLong, SpecialNames.LongBoxClass, I64Const(0))
     )
 
     for ((globalID, boxClassName, zeroValueInstr) <- primTypesWithBoxClasses) {
       val boxStruct = genTypeID.forClass(boxClassName)
-      val instrs: List[Instr] = List(
+      val instrs: Vector[Instr] = Vector(
         GlobalGet(genGlobalID.forVTable(boxClassName)),
         zeroValueInstr,
         StructNew(boxStruct)
@@ -524,7 +525,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     fb += GlobalGet(genGlobalID.bTrue)
     fb += GlobalGet(genGlobalID.bFalse)
     fb += LocalGet(xParam)
-    fb += Select(List(RefType.any))
+    fb += Select(Vector(RefType.any))
 
     fb.buildAndAddToModule()
   }
@@ -733,7 +734,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     fb += Call(genFunctionID.newDefault(ClassClass))
     fb += LocalTee(classInstanceLocal)
 
-    // Call java.lang.Class::<init>()
+    // Call java.lang.Class+:<init>()
     fb += Call(
       genFunctionID.forMethod(
         MemberNamespace.Constructor,
@@ -858,7 +859,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
 
   /** Generates the `asInstance` functions for primitive types. */
   private def genPrimitiveAsInstances()(implicit ctx: WasmContext): Unit = {
-    val primTypesWithAsInstances: List[PrimType] = List(
+    val primTypesWithAsInstances: Vector[PrimType] = Vector(
       UndefType,
       BooleanType,
       CharType,
@@ -1359,7 +1360,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
      * we do for other classes.
      */
     val strictAncestors = {
-      List(ObjectClass, CloneableClass, SerializableClass)
+      Vector(ObjectClass, CloneableClass, SerializableClass)
         .filter(name => ctx.getClassInfoOption(name).exists(_.hasRuntimeTypeInfo))
     }
 
@@ -1411,7 +1412,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
 
         // itable slots
         val objectClassInfo = ctx.getClassInfo(ObjectClass)
-        fb ++= ClassEmitter.genItableSlots(objectClassInfo, List(SerializableClass, CloneableClass))
+        fb ++= ClassEmitter.genItableSlots(objectClassInfo, Vector(SerializableClass, CloneableClass))
 
         // vtable items
         fb ++= objectClassInfo.tableEntries.map { methodName =>
@@ -1436,7 +1437,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
       // if dims == 0 then
       //   return typeData.arrayOf (which is on the stack)
       fb += I32Eqz
-      fb.ifThen(FunctionType(List(objectVTableType), List(objectVTableType))) {
+      fb.ifThen(FunctionType(Vector(objectVTableType), Vector(objectVTableType))) {
         fb += Return
       }
 
@@ -1567,7 +1568,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
           fb += Call(genFunctionID.stringBuiltins.length)
           fb += I32GtU
 
-          fb += Select(Nil) // infer i32
+          fb += Select(Vector()) // infer i32
         }
       }
       fb += ExternConvertAny
@@ -1631,61 +1632,61 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
       fb += StructGet(genTypeID.typeData, kind)
     }(
       // case anyPrimitiveKind => false
-      (KindVoid to KindLastPrimitive).toList -> { () =>
+      (KindVoid to KindLastPrimitive).toVector -> { () =>
         fb += I32Const(0)
       },
       // case KindObject => value ne null
-      List(KindObject) -> { () =>
+      Vector(KindObject) -> { () =>
         fb += LocalGet(valueParam)
         fb += RefIsNull
         fb += I32Eqz
       },
       // for each boxed class, the corresponding primitive type test
-      List(KindBoxedUnit) -> { () =>
+      Vector(KindBoxedUnit) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.isUndef)
       },
-      List(KindBoxedBoolean) -> { () =>
+      Vector(KindBoxedBoolean) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.typeTest(BooleanRef))
       },
-      List(KindBoxedCharacter) -> { () =>
+      Vector(KindBoxedCharacter) -> { () =>
         fb += LocalGet(valueParam)
         val structTypeID = genTypeID.forClass(SpecialNames.CharBoxClass)
         fb += RefTest(RefType(structTypeID))
       },
-      List(KindBoxedByte) -> { () =>
+      Vector(KindBoxedByte) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.typeTest(ByteRef))
       },
-      List(KindBoxedShort) -> { () =>
+      Vector(KindBoxedShort) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.typeTest(ShortRef))
       },
-      List(KindBoxedInteger) -> { () =>
+      Vector(KindBoxedInteger) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.typeTest(IntRef))
       },
-      List(KindBoxedLong) -> { () =>
+      Vector(KindBoxedLong) -> { () =>
         fb += LocalGet(valueParam)
         val structTypeID = genTypeID.forClass(SpecialNames.LongBoxClass)
         fb += RefTest(RefType(structTypeID))
       },
-      List(KindBoxedFloat) -> { () =>
+      Vector(KindBoxedFloat) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.typeTest(FloatRef))
       },
-      List(KindBoxedDouble) -> { () =>
+      Vector(KindBoxedDouble) -> { () =>
         fb += LocalGet(valueParam)
         fb += Call(genFunctionID.typeTest(DoubleRef))
       },
-      List(KindBoxedString) -> { () =>
+      Vector(KindBoxedString) -> { () =>
         fb += LocalGet(valueParam)
         fb += ExternConvertAny
         fb += Call(genFunctionID.stringBuiltins.test)
       },
       // case KindJSType | KindJSTypeWithSuperClass => call typeData.isJSClassInstance(value) or throw if it is null
-      List(KindJSType, KindJSTypeWithSuperClass) -> { () =>
+      Vector(KindJSType, KindJSTypeWithSuperClass) -> { () =>
         fb.block(RefType.anyref) { isJSClassInstanceIsNull =>
           // Load value as the argument to the function
           fb += LocalGet(valueParam)
@@ -1826,11 +1827,11 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
         fb += StructGet(genTypeID.typeData, kind)
       }(
         // case anyPrimitiveKind => return false
-        (KindVoid to KindLastPrimitive).toList -> { () =>
+        (KindVoid to KindLastPrimitive).toVector -> { () =>
           fb += I32Const(0)
         },
         // case KindArray => check that from is an array, recurse into component types
-        List(KindArray) -> { () =>
+        Vector(KindArray) -> { () =>
           fb.block() { fromComponentTypeIsNullLabel =>
             // fromTypeData := fromTypeData.componentType; jump out if null
             fb += LocalGet(fromTypeDataParam)
@@ -1852,7 +1853,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
           fb += I32Const(0)
         },
         // case KindObject => return (fromTypeData.kind > KindLastPrimitive)
-        List(KindObject) -> { () =>
+        Vector(KindObject) -> { () =>
           fb += LocalGet(fromTypeDataParam)
           fb += StructGet(genTypeID.typeData, kind)
           fb += I32Const(KindLastPrimitive)
@@ -2111,7 +2112,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     }(
       // case KindPrim (or KindObject) => array.new_default underlyingPrimArray; struct.new PrimArray/ObjectArray
       (primRefsWithKinds :+ (ObjectRef, KindObject)).map { case (baseRef, kind) =>
-        List(kind) -> { () =>
+        Vector(kind) -> { () =>
           if (baseRef == VoidRef) {
             // throw IllegalArgumentException for VoidRef
             genNewScalaClass(fb, IllegalArgumentExceptionClass, NoArgConstructorName) {
@@ -2233,17 +2234,17 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
         fb += Call(genFunctionID.jsValueType)
       }(
         // case JSValueTypeFalse, JSValueTypeTrue => typeDataOf[jl.Boolean]
-        List(JSValueTypeFalse, JSValueTypeTrue) -> { () =>
+        Vector(JSValueTypeFalse, JSValueTypeTrue) -> { () =>
           fb += getHijackedClassTypeDataInstr(BoxedBooleanClass)
           fb += Return
         },
         // case JSValueTypeString => typeDataOf[jl.String]
-        List(JSValueTypeString) -> { () =>
+        Vector(JSValueTypeString) -> { () =>
           fb += getHijackedClassTypeDataInstr(BoxedStringClass)
           fb += Return
         },
         // case JSValueTypeNumber => ...
-        List(JSValueTypeNumber) -> { () =>
+        Vector(JSValueTypeNumber) -> { () =>
           /* For `number`s, the result is based on the actual value, as specified by
            * [[https://www.scala-js.org/doc/semantics.html#getclass]].
            */
@@ -2317,7 +2318,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
           fb += Return
         },
         // case JSValueTypeUndefined => typeDataOf[jl.Void]
-        List(JSValueTypeUndefined) -> { () =>
+        Vector(JSValueTypeUndefined) -> { () =>
           fb += getHijackedClassTypeDataInstr(BoxedUnitClass)
           fb += Return
         }
@@ -2375,7 +2376,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
         OriginalName(genGlobalID.lastIDHashCode.toString()),
         isMutable = true,
         Int32,
-        Expr(List(I32Const(0)))
+        Expr(Vector(I32Const(0)))
       )
     )
 
@@ -2403,15 +2404,15 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
         fb += LocalGet(objNonNullLocal)
         fb += Call(genFunctionID.jsValueType)
       }(
-        List(JSValueTypeFalse) -> { () =>
+        Vector(JSValueTypeFalse) -> { () =>
           fb += I32Const(1237) // specified by jl.Boolean.hashCode()
           fb += Return
         },
-        List(JSValueTypeTrue) -> { () =>
+        Vector(JSValueTypeTrue) -> { () =>
           fb += I32Const(1231) // specified by jl.Boolean.hashCode()
           fb += Return
         },
-        List(JSValueTypeString) -> { () =>
+        Vector(JSValueTypeString) -> { () =>
           fb += LocalGet(objNonNullLocal)
           fb += ExternConvertAny
           fb += Call(
@@ -2419,7 +2420,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
           )
           fb += Return
         },
-        List(JSValueTypeNumber) -> { () =>
+        Vector(JSValueTypeNumber) -> { () =>
           fb += LocalGet(objNonNullLocal)
           fb += Call(genFunctionID.unbox(DoubleRef))
           fb += Call(
@@ -2427,16 +2428,16 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
           )
           fb += Return
         },
-        List(JSValueTypeUndefined) -> { () =>
+        Vector(JSValueTypeUndefined) -> { () =>
           fb += I32Const(0) // specified by jl.Void.hashCode(), Scala.js only
           fb += Return
         },
-        List(JSValueTypeBigInt) -> { () =>
+        Vector(JSValueTypeBigInt) -> { () =>
           fb += LocalGet(objNonNullLocal)
           fb += Call(genFunctionID.bigintHashCode)
           fb += Return
         },
-        List(JSValueTypeSymbol) -> { () =>
+        Vector(JSValueTypeSymbol) -> { () =>
           fb.block() { descriptionIsNullLabel =>
             fb += LocalGet(objNonNullLocal)
             fb += Call(genFunctionID.symbolDescription)
@@ -2865,7 +2866,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     val lengthParam = fb.addParam("length", Int32)
 
     val anyrefToAnyrefBlockType =
-      fb.sigToBlockType(FunctionType(List(RefType.anyref), List(RefType.anyref)))
+      fb.sigToBlockType(FunctionType(Vector(RefType.anyref), Vector(RefType.anyref)))
 
     // note: this block is never used for Unchecked arrayStores, but it does not hurt much
     fb.block(anyref) { mismatchLabel =>

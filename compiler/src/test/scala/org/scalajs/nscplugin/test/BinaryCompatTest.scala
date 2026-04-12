@@ -24,7 +24,7 @@ class BinaryCompatTest extends JSASTTest {
 
   @Test
   def emitDefaultAccessorsOfJSNativeDefs(): Unit = {
-    val XDefaultAccessorName = MethodName("foo$default$1", Nil, IntRef)
+    val XDefaultAccessorName = MethodName("foo$default$1", Vector(), IntRef)
 
     /* Check that, even with the fix to #4553, we still emit default accessors
      * for JS native defs, unless they are `= js.native`.

@@ -59,7 +59,7 @@ object ModuleSplitStyle {
 
   private def isValidPackage(pkg: String): Boolean = {
     pkg.nonEmpty && isValidUTF16(pkg) &&
-    List(':', '[', '/').forall(!pkg.contains(_)) &&
+    Vector(':', '[', '/').forall(!pkg.contains(_)) &&
     pkg.split("\\.", -1).forall(_.nonEmpty)
   }
 

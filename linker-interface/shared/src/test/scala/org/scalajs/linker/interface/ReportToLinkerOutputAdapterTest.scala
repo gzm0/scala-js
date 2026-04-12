@@ -31,7 +31,7 @@ class ReportToLinkerOutputAdapterTest {
   import ReportToLinkerOutputAdapterTest._
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  private val dummyReport = new ReportImpl(List(
+  private val dummyReport = new ReportImpl(Vector(
     new ReportImpl.ModuleImpl(
       moduleID = "dummy",
       jsFileName = "main.js",
@@ -40,7 +40,7 @@ class ReportToLinkerOutputAdapterTest {
     )
   ))
 
-  private val emptyReport = new ReportImpl(Nil)
+  private val emptyReport = new ReportImpl(Vector())
 
   @Test
   def testReplaceLinks(): AsyncResult = await {
@@ -257,8 +257,8 @@ object ReportToLinkerOutputAdapterTest {
       Future.successful(ByteBuffer.wrap(fileContents(name).getBytes(UTF_8)))
     }
 
-    def listFiles()(implicit ec: ExecutionContext): Future[List[String]] =
-      Future.successful(fileContents.keys.toList)
+    def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]] =
+      Future.successful(fileContents.keys.toVector)
 
     def delete(name: String)(implicit ec: ExecutionContext): Future[Unit] =
       throw new AssertionError("should not be called")
@@ -278,7 +278,7 @@ object ReportToLinkerOutputAdapterTest {
       throw new AssertionError("should not be called")
     }
 
-    def listFiles()(implicit ec: ExecutionContext): Future[List[String]] =
+    def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]] =
       throw new AssertionError("should not be called")
 
     def delete(name: String)(implicit ec: ExecutionContext): Future[Unit] =

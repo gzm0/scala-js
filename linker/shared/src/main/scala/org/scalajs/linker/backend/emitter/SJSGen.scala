@@ -157,10 +157,10 @@ private[emitter] final class SJSGen(
   /* This is a `val` because it is used at the top of every file, outside of
    * any cache. Fortunately it does not depend on any dynamic content.
    */
-  val declarePrototypeVar: List[Tree] = {
+  val declarePrototypeVar: Vector[Tree] = {
     implicit val pos = Position.NoPosition
-    if (minify) VarDef(fileLevelVarIdent(VarField.p), None) :: Nil
-    else Nil
+    if (minify) VarDef(fileLevelVarIdent(VarField.p), None) +: Vector()
+    else Vector()
   }
 
   def prototypeFor(classRef: Tree)(implicit pos: Position): Tree = {
@@ -182,10 +182,10 @@ private[emitter] final class SJSGen(
   }
 
   /** Under `minify`, set `$p` to `classRef.prototype`. */
-  def setPrototypeVar(classRef: Tree)(implicit pos: Position): List[Tree] = {
+  def setPrototypeVar(classRef: Tree)(implicit pos: Position): Vector[Tree] = {
     import TreeDSL._
-    if (minify) (fileLevelVar(VarField.p) := classRef.prototype) :: Nil
-    else Nil
+    if (minify) (fileLevelVar(VarField.p) := classRef.prototype) +: Vector()
+    else Vector()
   }
 
   def genZeroOf(tpe: Type)(
@@ -243,7 +243,7 @@ private[emitter] final class SJSGen(
   def genLongApplyStatic(methodName: MethodName, args: Tree*)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): Tree = {
-    Apply(globalVar(VarField.s, (LongImpl.RuntimeLongClass, methodName)), args.toList)
+    Apply(globalVar(VarField.s, (LongImpl.RuntimeLongClass, methodName)), args.toVector)
   }
 
   def usesUnderlyingTypedArray(elemTypeRef: NonArrayTypeRef): Boolean = {
@@ -356,14 +356,14 @@ private[emitter] final class SJSGen(
     (DotSelect(receiver, loFieldIdent), DotSelect(receiver, hiFieldIdent))
   }
 
-  def genApply(receiver: Tree, methodName: MethodName, args: List[Tree])(
+  def genApply(receiver: Tree, methodName: MethodName, args: Vector[Tree])(
       implicit pos: Position): Tree = {
     Apply(DotSelect(receiver, genMethodIdent(methodName)), args)
   }
 
   def genApply(receiver: Tree, methodName: MethodName, args: Tree*)(
       implicit pos: Position): Tree = {
-    genApply(receiver, methodName, args.toList)
+    genApply(receiver, methodName, args.toVector)
   }
 
   def genMethodIdent(methodIdent: irt.MethodIdent): MaybeDelayedIdent =
@@ -395,10 +395,10 @@ private[emitter] final class SJSGen(
 
   def genSyntheticPropApply(receiver: Tree, prop: SyntheticProperty, args: Tree*)(
       implicit pos: Position): Tree = {
-    genSyntheticPropApply(receiver, prop, args.toList)
+    genSyntheticPropApply(receiver, prop, args.toVector)
   }
 
-  def genSyntheticPropApply(receiver: Tree, prop: SyntheticProperty, args: List[Tree])(
+  def genSyntheticPropApply(receiver: Tree, prop: SyntheticProperty, args: Vector[Tree])(
       implicit pos: Position): Tree = {
     Apply(genSyntheticPropSelect(receiver, prop), args)
   }
@@ -456,7 +456,7 @@ private[emitter] final class SJSGen(
             !globalKnowledge.isInterface(className)) {
           genIsInstanceOfClass(expr, className)
         } else {
-          Apply(globalVar(VarField.is, className), List(expr))
+          Apply(globalVar(VarField.is, className), Vector(expr))
         }
 
       case ArrayType(arrayTypeRef, false, false) =>
@@ -464,7 +464,7 @@ private[emitter] final class SJSGen(
           case ArrayTypeRef(_:PrimRef | ClassRef(ObjectClass), 1) =>
             expr instanceof genArrayConstrOf(arrayTypeRef)
           case ArrayTypeRef(base, depth) =>
-            Apply(typeRefVar(VarField.isArrayOf, base), List(expr, IntLiteral(depth)))
+            Apply(typeRefVar(VarField.isArrayOf, base), Vector(expr, IntLiteral(depth)))
         }
 
       case UndefType   => expr === Undefined()
@@ -567,10 +567,10 @@ private[emitter] final class SJSGen(
         case ClassType(ObjectClass, true, false) =>
           expr
         case ClassType(className, true, false) =>
-          Apply(globalVar(VarField.as, className), List(expr))
+          Apply(globalVar(VarField.as, className), Vector(expr))
 
         case ArrayType(ArrayTypeRef(base, depth), true, false) =>
-          Apply(typeRefVar(VarField.asArrayOf, base), List(expr, IntLiteral(depth)))
+          Apply(typeRefVar(VarField.asArrayOf, base), Vector(expr, IntLiteral(depth)))
 
         case UndefType   => genCallHelper(VarField.uV, expr)
         case BooleanType => genCallHelper(VarField.uZ, expr)
@@ -608,7 +608,7 @@ private[emitter] final class SJSGen(
    *  "likelihood".
    */
   def subsetOfHijackedClassesOrderedForTypeTests(
-      hijackedClasses: Set[ClassName]): List[ClassName] = {
+      hijackedClasses: Set[ClassName]): Vector[ClassName] = {
     val baseList = {
       if (hijackedClasses.contains(BoxedDoubleClass))
         nonSmallNumberHijackedClassesOrderedForTypeTests
@@ -624,7 +624,7 @@ private[emitter] final class SJSGen(
    *
    *  Those with `typeof`-based tests come first because they are cheaper.
    */
-  private val nonSmallNumberHijackedClassesOrderedForTypeTests = List(
+  private val nonSmallNumberHijackedClassesOrderedForTypeTests = Vector(
     BoxedStringClass,
     BoxedDoubleClass,
     BoxedBooleanClass,
@@ -636,17 +636,17 @@ private[emitter] final class SJSGen(
   /** List of all the hijacked classes ordered by priority for a series of type
    *  tests.
    */
-  private val allHijackedClassesOrderedForTypeTests = List(
+  private val allHijackedClassesOrderedForTypeTests = Vector(
     BoxedByteClass,
     BoxedShortClass,
     BoxedIntegerClass,
     BoxedFloatClass
-  ) ::: nonSmallNumberHijackedClassesOrderedForTypeTests
+  ) ++ nonSmallNumberHijackedClassesOrderedForTypeTests
 
   def genCallHelper(helperName: VarField, args: Tree*)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): Tree = {
-    Apply(globalVar(helperName, CoreVar), args.toList)
+    Apply(globalVar(helperName, CoreVar), args.toVector)
   }
 
   def genCallPolyfillableBuiltin(builtin: PolyfillableBuiltin, args: Tree*)(
@@ -655,10 +655,10 @@ private[emitter] final class SJSGen(
     if (esFeatures.esVersion >= builtin.availableInESVersion) {
       builtin match {
         case builtin: GlobalVarBuiltin =>
-          for (global <- globalRef(builtin.globalVar)) yield Apply(global, args.toList)
+          for (global <- globalRef(builtin.globalVar)) yield Apply(global, args.toVector)
         case builtin: NamespacedBuiltin =>
           for (namespace <- globalRef(builtin.namespaceGlobalVar))
-            yield Apply(genIdentBracketSelect(namespace, builtin.builtinName), args.toList)
+            yield Apply(genIdentBracketSelect(namespace, builtin.builtinName), args.toVector)
       }
     } else {
       WithGlobals(genCallHelper(builtin.polyfillField, args: _*))
@@ -669,18 +669,18 @@ private[emitter] final class SJSGen(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): Tree = {
     import TreeDSL._
-    Apply(globalVar(VarField.m, moduleClass), Nil)
+    Apply(globalVar(VarField.m, moduleClass), Vector())
   }
 
   def genScalaClassNew(className: ClassName, ctor: MethodName, args: Tree*)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): Tree = {
     val encodedClassVar = globalVar(VarField.c, className)
-    val argsList = args.toList
+    val argsList = args.toVector
     if (globalKnowledge.hasInlineableInit(className)) {
       New(encodedClassVar, argsList)
     } else {
-      Apply(globalVar(VarField.ct, (className, ctor)), New(encodedClassVar, Nil) :: argsList)
+      Apply(globalVar(VarField.ct, (className, ctor)), New(encodedClassVar, Vector()) +: argsList)
     }
   }
 
@@ -709,14 +709,14 @@ private[emitter] final class SJSGen(
   def genNonNativeJSClassConstructor(className: ClassName)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): Tree = {
-    Apply(globalVar(VarField.a, className), Nil)
+    Apply(globalVar(VarField.a, className), Vector())
   }
 
   def genLoadJSFromSpec(spec: irt.JSNativeLoadSpec)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       tracking: GlobalRefTracking, pos: Position): WithGlobals[Tree] = {
 
-    def pathSelection(from: Tree, path: List[String]): Tree = {
+    def pathSelection(from: Tree, path: Vector[String]): Tree = {
       path.foldLeft(from) {
         (prev, part) => genBracketSelect(prev, StringLiteral(part))
       }
@@ -729,7 +729,7 @@ private[emitter] final class SJSGen(
       case irt.JSNativeLoadSpec.Import(module, path) =>
         val moduleValue = VarRef(externalModuleFieldIdent(module))
         path match {
-          case "default" :: rest if moduleKind == ModuleKind.CommonJSModule =>
+          case "default" +: rest if moduleKind == ModuleKind.CommonJSModule =>
             val defaultField = genCallHelper(VarField.moduleDefault, moduleValue)
             WithGlobals(pathSelection(defaultField, rest))
           case _ =>
@@ -746,7 +746,7 @@ private[emitter] final class SJSGen(
     }
   }
 
-  def genArrayValue(arrayTypeRef: ArrayTypeRef, elems: List[Tree])(
+  def genArrayValue(arrayTypeRef: ArrayTypeRef, elems: Vector[Tree])(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       tracking: GlobalRefTracking, pos: Position): WithGlobals[Tree] = {
     genNativeArrayWrapper(arrayTypeRef, ArrayConstr(elems))
@@ -759,7 +759,7 @@ private[emitter] final class SJSGen(
       case ArrayTypeRef(elemTypeRef, 1) =>
         getArrayUnderlyingTypedArrayClassRef(elemTypeRef) match {
           case Some(typedArrayWithGlobals) =>
-            for (typedArray <- typedArrayWithGlobals) yield New(typedArray, nativeArray :: Nil)
+            for (typedArray <- typedArrayWithGlobals) yield New(typedArray, nativeArray +: Vector())
           case _ =>
             WithGlobals(nativeArray)
         }
@@ -767,7 +767,7 @@ private[emitter] final class SJSGen(
         WithGlobals(nativeArray)
     }
 
-    for (arg <- argWithGlobals) yield New(genArrayConstrOf(arrayTypeRef), arg :: Nil)
+    for (arg <- argWithGlobals) yield New(genArrayConstrOf(arrayTypeRef), arg +: Vector())
   }
 
   def genArrayConstrOf(arrayTypeRef: ArrayTypeRef)(
@@ -788,7 +788,7 @@ private[emitter] final class SJSGen(
   def genClassOf(typeRef: TypeRef)(
       implicit moduleContext: ModuleContext, globalKnowledge: GlobalKnowledge,
       pos: Position): Tree = {
-    Apply(DotSelect(genClassDataOf(typeRef), Ident(cpn.getClassOf)), Nil)
+    Apply(DotSelect(genClassDataOf(typeRef), Ident(cpn.getClassOf)), Vector())
   }
 
   def genClassOf(className: ClassName)(
@@ -807,7 +807,7 @@ private[emitter] final class SJSGen(
       case ArrayTypeRef(base, dims) =>
         val baseData = genClassDataOf(base)
         (1 to dims).foldLeft[Tree](baseData) { (prev, _) =>
-          Apply(DotSelect(prev, Ident(cpn.getArrayOf)), Nil)
+          Apply(DotSelect(prev, Ident(cpn.getArrayOf)), Vector())
         }
 
       case typeRef: TransientTypeRef =>

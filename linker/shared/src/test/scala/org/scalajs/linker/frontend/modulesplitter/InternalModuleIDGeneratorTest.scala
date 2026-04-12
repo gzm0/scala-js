@@ -22,7 +22,7 @@ import org.scalajs.linker.standard.ModuleSet.ModuleID
 /** Whitebox tests for `InternalModuleIDGenerator`. */
 class InternalModuleIDGeneratorTest {
   @Test def testForClassName(): Unit = {
-    val testPublicModuleIDs = List(
+    val testPublicModuleIDs = Vector(
       ModuleID("test.-Public"),
       ModuleID("test.-Other-Public"),
       // test collision with hashed name
@@ -62,21 +62,21 @@ class InternalModuleIDGeneratorTest {
 
     val digest = Array(0x12.toByte, 0x34.toByte, 0xef.toByte)
 
-    val generator1 = new InternalModuleIDGenerator.ForDigests(Nil)
+    val generator1 = new InternalModuleIDGenerator.ForDigests(Vector())
     assertEquals("internal-1234ef", generator1.forDigest(digest).id)
 
-    val generator2 = new InternalModuleIDGenerator.ForDigests(List(goodModuleID, otherGoodModuleID))
+    val generator2 = new InternalModuleIDGenerator.ForDigests(Vector(goodModuleID, otherGoodModuleID))
     assertEquals("internal-1234ef", generator2.forDigest(digest).id)
 
-    val generator3 = new InternalModuleIDGenerator.ForDigests(List(goodModuleID, collidingModuleID))
+    val generator3 = new InternalModuleIDGenerator.ForDigests(Vector(goodModuleID, collidingModuleID))
     assertEquals("internal--1234ef", generator3.forDigest(digest).id)
 
     val generator4 =
-      new InternalModuleIDGenerator.ForDigests(List(collidingCaseInsensitiveModuleID, goodModuleID))
+      new InternalModuleIDGenerator.ForDigests(Vector(collidingCaseInsensitiveModuleID, goodModuleID))
     assertEquals("internal---1234ef", generator4.forDigest(digest).id)
 
     val generator5 =
-      new InternalModuleIDGenerator.ForDigests(List(collidingCaseInsensitiveModuleID2, goodModuleID))
+      new InternalModuleIDGenerator.ForDigests(Vector(collidingCaseInsensitiveModuleID2, goodModuleID))
     assertEquals("internal--1234ef", generator5.forDigest(digest).id)
   }
 }

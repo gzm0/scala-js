@@ -33,7 +33,7 @@ final class FunctionBuilder(
 
   private val params = mutable.ListBuffer.empty[Local]
   private val locals = mutable.ListBuffer.empty[Local]
-  private var resultTypes: List[Type] = Nil
+  private var resultTypes: Vector[Type] = Vector()
 
   private var specialFunctionType: Option[TypeID] = None
 
@@ -69,26 +69,26 @@ final class FunctionBuilder(
 
   /** Sets the list of result types of the function to build.
    *
-   *  By default, the list of result types is `Nil`.
+   *  By default, the list of result types is `Vector()`.
    *
    *  @note
    *    This follows a builder pattern to be consistent with `addParam`.
    */
-  def setResultTypes(tpes: List[Type]): Unit =
+  def setResultTypes(tpes: Vector[Type]): Unit =
     resultTypes = tpes
 
   /** Sets the list of result types to a single type.
    *
    *  This method is equivalent to
    *  {{{
-   *  setResultTypes(tpe :: Nil)
+   *  setResultTypes(tpe +: Vector())
    *  }}}
    *
    *  @note
    *    This follows a builder pattern to be consistent with `addParam`.
    */
   def setResultType(tpe: Type): Unit =
-    setResultTypes(tpe :: Nil)
+    setResultTypes(tpe +: Vector())
 
   /** Specifies the function type to use for the function.
    *
@@ -140,15 +140,15 @@ final class FunctionBuilder(
   def insert(index: InstructionIndex, instr: Instr): Unit =
     instrs.insert(index.value, instr)
 
-  def insertAll(index: InstructionIndex, instrs: List[Instr]): Unit =
+  def insertAll(index: InstructionIndex, instrs: Vector[Instr]): Unit =
     this.instrs.insertAll(index.value, instrs)
 
   // Helpers to build structured control flow
 
   def sigToBlockType(sig: FunctionType): BlockType = sig match {
-    case FunctionType(Nil, Nil) =>
+    case FunctionType(Vector(), Vector()) =>
       BlockType.ValueType()
-    case FunctionType(Nil, resultType :: Nil) =>
+    case FunctionType(Vector(), resultType +: Vector()) =>
       BlockType.ValueType(resultType)
     case _ =>
       BlockType.FunctionType(moduleBuilder.functionTypeToTypeID(sig))
@@ -165,11 +165,11 @@ final class FunctionBuilder(
    * in the same file.
    *
    * If we remove this line, the invocations with `()` in this file, which
-   * desugar to `(Nil)` due to the default value, do not find the implicit value.
+   * desugar to `(Vector())` due to the default value, do not find the implicit value.
    */
   BlockTypeLike.ForResultTypes
 
-  def ifThenElse[BT: BlockTypeLike](blockType: BT = Nil)(thenp: => Unit)(elsep: => Unit): Unit = {
+  def ifThenElse[BT: BlockTypeLike](blockType: BT = Vector())(thenp: => Unit)(elsep: => Unit): Unit = {
     instrs += If(toBlockType(blockType))
     thenp
     instrs += Else
@@ -177,13 +177,13 @@ final class FunctionBuilder(
     instrs += End
   }
 
-  def ifThen[BT: BlockTypeLike](blockType: BT = Nil)(thenp: => Unit): Unit = {
+  def ifThen[BT: BlockTypeLike](blockType: BT = Vector())(thenp: => Unit): Unit = {
     instrs += If(toBlockType(blockType))
     thenp
     instrs += End
   }
 
-  def block[BT: BlockTypeLike, A](blockType: BT = Nil)(body: LabelID => A): A = {
+  def block[BT: BlockTypeLike, A](blockType: BT = Vector())(body: LabelID => A): A = {
     val label = genLabel()
     instrs += Block(toBlockType(blockType), Some(label))
     val result = body(label)
@@ -191,7 +191,7 @@ final class FunctionBuilder(
     result
   }
 
-  def loop[BT: BlockTypeLike, A](blockType: BT = Nil)(body: LabelID => A): A = {
+  def loop[BT: BlockTypeLike, A](blockType: BT = Vector())(body: LabelID => A): A = {
     val label = genLabel()
     instrs += Loop(toBlockType(blockType), Some(label))
     val result = body(label)
@@ -209,8 +209,8 @@ final class FunctionBuilder(
     }
   }
 
-  def tryTable[BT: BlockTypeLike, A](blockType: BT = Nil)(
-      clauses: List[CatchClause])(body: => A): A = {
+  def tryTable[BT: BlockTypeLike, A](blockType: BT = Vector())(
+      clauses: Vector[CatchClause])(body: => A): A = {
     instrs += TryTable(toBlockType(blockType), clauses)
     val result = body
     instrs += End
@@ -243,7 +243,7 @@ final class FunctionBuilder(
    */
   def switch(scrutineeSig: FunctionType, clauseSig: FunctionType)(
       scrutinee: () => Unit)(
-      clauses: (List[Int], () => Unit)*)(
+      clauses: (Vector[Int], () => Unit)*)(
       default: () => Unit): Unit = {
 
     // Check prerequisites
@@ -270,12 +270,12 @@ final class FunctionBuilder(
         require(dv(caseValue) == defaultLabel, s"Duplicate case value for switch: $caseValue")
         dv(caseValue) = clauseLabel
       }
-      dv.toList
+      dv.toVector
     }
 
     // Input parameter to the overall switch "instruction"
     val switchInputParams =
-      clauseSig.params.drop(scrutineeSig.results.size) ::: scrutineeSig.params
+      clauseSig.params.drop(scrutineeSig.results.size) ++ scrutineeSig.params
 
     // Compute the BlockType's we will need
     val doneBlockType = sigToBlockType(FunctionType(switchInputParams, clauseSig.results))
@@ -307,17 +307,17 @@ final class FunctionBuilder(
   }
 
   def switch(clauseSig: FunctionType)(scrutinee: () => Unit)(
-      clauses: (List[Int], () => Unit)*)(default: () => Unit): Unit = {
+      clauses: (Vector[Int], () => Unit)*)(default: () => Unit): Unit = {
     switch(FunctionType.NilToNil, clauseSig)(scrutinee)(clauses: _*)(default)
   }
 
   def switch(resultType: Type)(scrutinee: () => Unit)(
-      clauses: (List[Int], () => Unit)*)(default: () => Unit): Unit = {
-    switch(FunctionType(Nil, List(resultType)))(scrutinee)(clauses: _*)(default)
+      clauses: (Vector[Int], () => Unit)*)(default: () => Unit): Unit = {
+    switch(FunctionType(Vector(), Vector(resultType)))(scrutinee)(clauses: _*)(default)
   }
 
   def switch()(scrutinee: () => Unit)(
-      clauses: (List[Int], () => Unit)*)(default: () => Unit): Unit = {
+      clauses: (Vector[Int], () => Unit)*)(default: () => Unit): Unit = {
     switch(FunctionType.NilToNil)(scrutinee)(clauses: _*)(default)
   }
 
@@ -325,7 +325,7 @@ final class FunctionBuilder(
 
   def buildAndAddToModule(): Function = {
     val functionTypeID = specialFunctionType.getOrElse {
-      val sig = FunctionType(params.toList.map(_.tpe), resultTypes)
+      val sig = FunctionType(params.toVector.map(_.tpe), resultTypes)
       moduleBuilder.functionTypeToTypeID(sig)
     }
 
@@ -335,9 +335,9 @@ final class FunctionBuilder(
       functionID,
       functionOriginalName,
       functionTypeID,
-      params.toList,
+      params.toVector,
       resultTypes,
-      locals.toList,
+      locals.toVector,
       Expr(dcedInstrs),
       functionPos
     )
@@ -359,8 +359,8 @@ final class FunctionBuilder(
    *  `StructuredLabeledInstr`s during that process, must jump over them. That means we need to
    *  track the level of nesting at which we are.
    */
-  private def localDeadCodeEliminationOfInstrs(): List[Instr] = {
-    val resultBuilder = List.newBuilder[Instr]
+  private def localDeadCodeEliminationOfInstrs(): Vector[Instr] = {
+    val resultBuilder = Vector.newBuilder[Instr]
 
     val iter = instrs.iterator
     while (iter.hasNext) {
@@ -435,9 +435,9 @@ object FunctionBuilder {
         fb.sigToBlockType(value)
     }
 
-    implicit object ForResultTypes extends BlockTypeLike[List[Type]] {
-      def toBlockType(fb: FunctionBuilder, value: List[Type]): BlockType =
-        fb.sigToBlockType(FunctionType(Nil, value))
+    implicit object ForResultTypes extends BlockTypeLike[Vector[Type]] {
+      def toBlockType(fb: FunctionBuilder, value: Vector[Type]): BlockType =
+        fb.sigToBlockType(FunctionType(Vector(), value))
     }
 
     implicit object ForResultType extends BlockTypeLike[Type] {

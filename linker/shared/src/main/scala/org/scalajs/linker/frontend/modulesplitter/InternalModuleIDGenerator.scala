@@ -53,7 +53,7 @@ private[modulesplitter] object InternalModuleIDGenerator {
      *
      *  Guarantees to return the same value independent of the order of [[names]].
      */
-    def representativeClass(names: List[ClassName]): ClassName = {
+    def representativeClass(names: Vector[ClassName]): ClassName = {
       require(names.nonEmpty)
 
       /* Take the lexicographically smallest name as a stable name of the

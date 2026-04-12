@@ -44,23 +44,23 @@ object TestIRBuilder {
   val T = ClassRef(BoxedStringClass)
   val AT = ArrayTypeRef(ClassRef(BoxedStringClass), 1)
 
-  def m(name: String, paramTypeRefs: List[TypeRef], resultTypeRef: TypeRef): MethodName =
+  def m(name: String, paramTypeRefs: Vector[TypeRef], resultTypeRef: TypeRef): MethodName =
     MethodName(name, paramTypeRefs, resultTypeRef)
 
   def classDef(
       className: ClassName,
       kind: ClassKind = ClassKind.Class,
-      jsClassCaptures: Option[List[ParamDef]] = None,
+      jsClassCaptures: Option[Vector[ParamDef]] = None,
       superClass: Option[ClassName] = None,
-      interfaces: List[ClassName] = Nil,
+      interfaces: Vector[ClassName] = Vector(),
       jsSuperClass: Option[Tree] = None,
       jsNativeLoadSpec: Option[JSNativeLoadSpec] = None,
-      fields: List[AnyFieldDef] = Nil,
-      methods: List[MethodDef] = Nil,
+      fields: Vector[AnyFieldDef] = Vector(),
+      methods: Vector[MethodDef] = Vector(),
       jsConstructor: Option[JSConstructorDef] = None,
-      jsMethodProps: List[JSMethodPropDef] = Nil,
-      jsNativeMembers: List[JSNativeMemberDef] = Nil,
-      topLevelExportDefs: List[TopLevelExportDef] = Nil,
+      jsMethodProps: Vector[JSMethodPropDef] = Vector(),
+      jsNativeMembers: Vector[JSNativeMemberDef] = Vector(),
+      topLevelExportDefs: Vector[TopLevelExportDef] = Vector(),
       optimizerHints: OptimizerHints = EOH
   ): ClassDef = {
     val notHashed = ClassDef(ClassIdent(className), NON, kind, jsClassCaptures,
@@ -80,7 +80,7 @@ object TestIRBuilder {
       MainTestClassName,
       kind = ClassKind.Class,
       superClass = Some(ObjectClass),
-      methods = List(
+      methods = Vector(
         trivialCtor(MainTestClassName),
         mainMethodDef(mainBody)
       )
@@ -95,7 +95,7 @@ object TestIRBuilder {
     val body =
       if (forModuleClass) Block(superCtorCall, StoreModule())
       else superCtorCall
-    MethodDef(flags, MethodIdent(NoArgConstructorName), NON, Nil, VoidType, Some(body))(
+    MethodDef(flags, MethodIdent(NoArgConstructorName), NON, Vector(), VoidType, Some(body))(
         EOH, UNV)
   }
 
@@ -104,45 +104,45 @@ object TestIRBuilder {
     ApplyStatically(EAF.withConstructor(true),
         thisFor(enclosingClassName),
         parentClassName, MethodIdent(NoArgConstructorName),
-        Nil)(VoidType)
+        Vector())(VoidType)
   }
 
   def trivialJSCtor(forModuleClass: Boolean = false): JSConstructorDef = {
     val afterSuper =
-      if (forModuleClass) StoreModule() :: Undefined() :: Nil
-      else Undefined() :: Nil
-    JSConstructorDef(JSCtorFlags, Nil, None,
-        JSConstructorBody(Nil, JSSuperConstructorCall(Nil), afterSuper))(
+      if (forModuleClass) StoreModule() +: Undefined() +: Vector()
+      else Undefined() +: Vector()
+    JSConstructorDef(JSCtorFlags, Vector(), None,
+        JSConstructorBody(Vector(), JSSuperConstructorCall(Vector()), afterSuper))(
         EOH, UNV)
   }
 
-  val MainMethodName: MethodName = m("main", List(AT), VoidRef)
+  val MainMethodName: MethodName = m("main", Vector(AT), VoidRef)
 
   def mainMethodDef(body: Tree): MethodDef = {
     val argsParamDef = paramDef("args", ArrayType(AT, nullable = true, exact = false))
     MethodDef(MemberFlags.empty.withNamespace(MemberNamespace.PublicStatic),
-        MainMethodName, NON, List(argsParamDef), VoidType, Some(body))(
+        MainMethodName, NON, Vector(argsParamDef), VoidType, Some(body))(
         EOH, UNV)
   }
 
   def consoleLog(expr: Tree): Tree =
-    JSMethodApply(JSGlobalRef("console"), str("log"), List(expr))
+    JSMethodApply(JSGlobalRef("console"), str("log"), Vector(expr))
 
   def systemOutPrintln(expr: Tree): Tree = {
     val PrintStreamClass = ClassName("java.io.PrintStream")
-    val outMethodName = m("out", Nil, ClassRef(PrintStreamClass))
-    val printlnMethodName = m("println", List(O), VoidRef)
+    val outMethodName = m("out", Vector(), ClassRef(PrintStreamClass))
+    val printlnMethodName = m("println", Vector(O), VoidRef)
 
-    val out = ApplyStatic(EAF, "java.lang.System", outMethodName, Nil)(
+    val out = ApplyStatic(EAF, "java.lang.System", outMethodName, Vector())(
         ClassType(PrintStreamClass, nullable = true, exact = false))
-    Apply(EAF, out, printlnMethodName, List(expr))(VoidType)
+    Apply(EAF, out, printlnMethodName, Vector(expr))(VoidType)
   }
 
   def paramDef(name: LocalName, ptpe: Type): ParamDef =
     ParamDef(LocalIdent(name), NON, ptpe, mutable = false)
 
-  def mainModuleInitializers(moduleClassName: String): List[ModuleInitializer] =
-    ModuleInitializer.mainMethodWithArgs(moduleClassName, "main") :: Nil
+  def mainModuleInitializers(moduleClassName: String): Vector[ModuleInitializer] =
+    ModuleInitializer.mainMethodWithArgs(moduleClassName, "main") +: Vector()
 
   val JSObjectLikeClass = ClassName("JSObject")
 
@@ -151,16 +151,16 @@ object TestIRBuilder {
       JSObjectLikeClass,
       kind = ClassKind.NativeJSClass,
       superClass = Some(ObjectClass),
-      jsNativeLoadSpec = Some(JSNativeLoadSpec.Global("Object", Nil))
+      jsNativeLoadSpec = Some(JSNativeLoadSpec.Global("Object", Vector()))
     )
   }
 
   def requiredMethods(className: ClassName, classKind: ClassKind,
-      parentClassName: ClassName = ObjectClass): List[MethodDef] = {
+      parentClassName: ClassName = ObjectClass): Vector[MethodDef] = {
     if (classKind == ClassKind.ModuleClass)
-      List(trivialCtor(className, parentClassName, forModuleClass = true))
+      Vector(trivialCtor(className, parentClassName, forModuleClass = true))
     else
-      Nil
+      Vector()
   }
 
   def requiredJSConstructor(classKind: ClassKind): Option[JSConstructorDef] = {

@@ -53,8 +53,8 @@ class BackwardsCompatTest {
       mainTestClassDef(
           systemOutPrintln(ApplyStatic(EAF,
               "java.lang.System",
-              m("identityHashCode", List(O), I),
-              List(JSObjectConstr(Nil)))(IntType)))
+              m("identityHashCode", Vector(O), I),
+              Vector(JSObjectConstr(Vector())))(IntType)))
     )
 
     test(classDefs, MainTestModuleInitializers)
@@ -65,12 +65,12 @@ class BackwardsCompatTest {
     val classDefs = Seq(
       classDef("A",
           superClass = Some(ObjectClass),
-          interfaces = List(CloneableClass),
-          methods = List(trivialCtor("A"))),
+          interfaces = Vector(CloneableClass),
+          methods = Vector(trivialCtor("A"))),
       mainTestClassDef(
           systemOutPrintln(Apply(EAF,
-              New("A", NoArgConstructorName, Nil),
-              m("clone", Nil, O), Nil)(AnyType)))
+              New("A", NoArgConstructorName, Vector()),
+              m("clone", Vector(), O), Vector())(AnyType)))
     )
 
     test(classDefs, MainTestModuleInitializers)
@@ -97,11 +97,11 @@ class BackwardsCompatTest {
       mainTestClassDef(systemOutPrintln {
         Apply(
           EAF,
-          ApplyStatic(EAF, Base64Class, m("getDecoder", Nil, DecoderTypeRef), Nil)(DecoderType),
-          m("decode", List(ByteBufferTypeRef), ByteBufferTypeRef),
-          List(
-            ApplyStatic(EAF, ByteBufferClass, m("wrap", List(AB), ByteBufferTypeRef),
-                List(ArrayValue(AB, List[Byte](65, 81, 73, 61).map(ByteLiteral(_)))))(ByteBufferType)
+          ApplyStatic(EAF, Base64Class, m("getDecoder", Vector(), DecoderTypeRef), Vector())(DecoderType),
+          m("decode", Vector(ByteBufferTypeRef), ByteBufferTypeRef),
+          Vector(
+            ApplyStatic(EAF, ByteBufferClass, m("wrap", Vector(AB), ByteBufferTypeRef),
+                Vector(ArrayValue(AB, Vector[Byte](65, 81, 73, 61).map(ByteLiteral(_)))))(ByteBufferType)
           )
         )(ByteBufferType)
       })
@@ -124,12 +124,12 @@ class BackwardsCompatTest {
     val classDefs = Seq(
       mainTestClassDef(Block(
         systemOutPrintln(
-          ApplyStatic(EAF, ReflectArrayClass, m("newInstance", List(ClassClassRef, I), O),
-              List(ClassOf(T), int(5)))(AnyType)
+          ApplyStatic(EAF, ReflectArrayClass, m("newInstance", Vector(ClassClassRef, I), O),
+              Vector(ClassOf(T), int(5)))(AnyType)
         ),
         systemOutPrintln(
-          ApplyStatic(EAF, ReflectArrayClass, m("newInstance", List(ClassClassRef, AI), O),
-              List(ClassOf(T), ArrayValue(AI, List(int(5), int(4)))))(AnyType)
+          ApplyStatic(EAF, ReflectArrayClass, m("newInstance", Vector(ClassClassRef, AI), O),
+              Vector(ClassOf(T), ArrayValue(AI, Vector(int(5), int(4)))))(AnyType)
         )
       ))
     )

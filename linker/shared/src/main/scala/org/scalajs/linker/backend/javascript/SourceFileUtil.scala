@@ -42,7 +42,7 @@ private[backend] object SourceFileUtil {
       val prefixLen = (trgtCmps zip baseCmps).takeWhile(t => t._1 == t._2).size
 
       val newPathCmps =
-        List.fill(baseCmps.size - prefixLen)("..") ++ trgtCmps.drop(prefixLen)
+        Vector.fill(baseCmps.size - prefixLen)("..") ++ trgtCmps.drop(prefixLen)
 
       val newPath = newPathCmps.mkString("/")
 

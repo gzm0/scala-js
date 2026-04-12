@@ -92,9 +92,9 @@ private[emitter] object WithGlobals {
   def apply[A](value: A): WithGlobals[A] =
     new WithGlobals(value, Set.empty)
 
-  val nil: WithGlobals[Nil.type] = WithGlobals(Nil)
+  val nil: WithGlobals[Vector[Nothing]] = WithGlobals(Vector())
 
-  def list[A](xs: List[WithGlobals[A]]): WithGlobals[List[A]] = {
+  def list[A](xs: Vector[WithGlobals[A]]): WithGlobals[Vector[A]] = {
     /* This could be a cascade of flatMap's, but the following should be more
      * efficient.
      */
@@ -103,13 +103,13 @@ private[emitter] object WithGlobals {
     WithGlobals(values, globalVarNames)
   }
 
-  def flatten[A](xs: List[WithGlobals[List[A]]]): WithGlobals[List[A]] = {
+  def flatten[A](xs: Vector[WithGlobals[Vector[A]]]): WithGlobals[Vector[A]] = {
     val values = xs.flatMap(_.value)
     val globalVarNames = collectNames(xs)
     WithGlobals(values, globalVarNames)
   }
 
-  private def collectNames(xs: List[WithGlobals[_]]): Set[String] = {
+  private def collectNames(xs: Vector[WithGlobals[_]]): Set[String] = {
     xs.foldLeft(Set.empty[String]) { (prev, x) =>
       unionPreserveEmpty(prev, x.globalVarNames)
     }

@@ -54,7 +54,7 @@ private abstract class StrongConnect(info: ModuleAnalyzer.DependencyInfo) {
     nodes.get(className).map(_.moduleIndex)
 
   /** Extension point; called once for each strongly connected component (during analyze). */
-  protected def emitModule(moduleIndex: Int, classNames: List[ClassName]): Unit
+  protected def emitModule(moduleIndex: Int, classNames: Vector[ClassName]): Unit
 
   private def strongconnect(className: ClassName): Node = {
     /* Tarjan's algorithm for strongly connected components.
@@ -116,7 +116,7 @@ private abstract class StrongConnect(info: ModuleAnalyzer.DependencyInfo) {
       // This node is the root node of a component/module.
       val moduleIndex = node.index
 
-      val classNames = List.newBuilder[ClassName]
+      val classNames = Vector.newBuilder[ClassName]
 
       @tailrec
       def pop(): Unit = {

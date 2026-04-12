@@ -204,7 +204,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
     }
 
     private def transformInterfaceList(
-        interfaces: List[ClassIdent]): List[ClassIdent] = {
+        interfaces: Vector[ClassIdent]): Vector[ClassIdent] = {
 
       /* Replace references to scala.Serializable by java.io.Serializable.
        * This works around the fact that scalac adds scala.Serializable to the
@@ -247,7 +247,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
     private def eliminateRedundantBridges(classDef: ClassDef): ClassDef = {
       import MemberNamespace._
 
-      def argsCorrespond(args: List[Tree], paramDefs: List[ParamDef]): Boolean = {
+      def argsCorrespond(args: Vector[Tree], paramDefs: Vector[ParamDef]): Boolean = {
         (args.size == paramDefs.size) && args.zip(paramDefs).forall {
           case (VarRef(argName), ParamDef(LocalIdent(paramName), _, _, _)) =>
             argName == paramName
@@ -275,7 +275,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
 
       // Make sure that we did not remove *all* overloads for any method name
 
-      def publicMethodNames(methods: List[MethodDef]): Set[MethodName] = {
+      def publicMethodNames(methods: Vector[MethodDef]): Set[MethodName] = {
         methods
           .withFilter(_.flags.namespace == Public)
           .map(_.name.name)
@@ -328,7 +328,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
       )(classDef.optimizerHints)(classDef.pos)
     }
 
-    private def transformParamDefs(paramDefs: List[ParamDef]): List[ParamDef] = {
+    private def transformParamDefs(paramDefs: Vector[ParamDef]): Vector[ParamDef] = {
       for (paramDef <- paramDefs) yield {
         implicit val pos = paramDef.pos
         val ParamDef(name, originalName, ptpe, mutable) = paramDef
@@ -355,50 +355,50 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
       tree match {
         // <= 2.12 : toJSVarArgs(jsArrayOps(jsArray).toSeq) -> jsArray
         case IntrinsicCall(ScalaJSRuntimeMod, `toJSVarArgsReadOnlyMethodName`,
-            List(Apply(
+            Vector(Apply(
                 ApplyFlags.empty,
-                IntrinsicCall(JSAnyMod, `jsArrayOpsToArrayOpsMethodName`, List(jsArray)),
+                IntrinsicCall(JSAnyMod, `jsArrayOpsToArrayOpsMethodName`, Vector(jsArray)),
                 MethodIdent(`toReadOnlySeqMethodName`),
-                Nil)
+                Vector())
             )) =>
           jsArray
 
         // >= 2.13 : toJSVarArgs(toSeq$extension(jsArray)) -> jsArray
         case IntrinsicCall(ScalaJSRuntimeMod, `toJSVarArgsImmutableMethodName`,
-            List(IntrinsicCall(JSArrayOpsMod, `toImmutableSeqExtensionMethodName`, List(jsArray)))) =>
+            Vector(IntrinsicCall(JSArrayOpsMod, `toImmutableSeqExtensionMethodName`, Vector(jsArray)))) =>
           jsArray
 
-        case IntrinsicCall(JSAnyMod, `jsAnyFromIntMethodName`, List(arg)) =>
+        case IntrinsicCall(JSAnyMod, `jsAnyFromIntMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(JSAnyMod, `jsAnyFromStringMethodName`, List(arg)) =>
+        case IntrinsicCall(JSAnyMod, `jsAnyFromStringMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(JSAnyMod, `jsArrayOpsToArrayMethodName`, List(arg)) =>
+        case IntrinsicCall(JSAnyMod, `jsArrayOpsToArrayMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(JSDynamicImplicitsMod, `number2dynamicMethodName`, List(arg)) =>
+        case IntrinsicCall(JSDynamicImplicitsMod, `number2dynamicMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(JSNumberOpsMod, `enableJSNumberOpsDoubleMethodName`, List(arg)) =>
+        case IntrinsicCall(JSNumberOpsMod, `enableJSNumberOpsDoubleMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(JSNumberOpsMod, `enableJSNumberOpsIntMethodName`, List(arg)) =>
+        case IntrinsicCall(JSNumberOpsMod, `enableJSNumberOpsIntMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(JSStringOpsMod, `enableJSStringOpsMethodName`, List(arg)) =>
+        case IntrinsicCall(JSStringOpsMod, `enableJSStringOpsMethodName`, Vector(arg)) =>
           arg
-        case IntrinsicCall(UnionTypeMod, `unionTypeFromMethodName`, List(arg, _)) =>
+        case IntrinsicCall(UnionTypeMod, `unionTypeFromMethodName`, Vector(arg, _)) =>
           arg
 
-        case IntrinsicCall(JSDynamicImplicitsMod, `truthValueMethodName`, List(arg)) =>
+        case IntrinsicCall(JSDynamicImplicitsMod, `truthValueMethodName`, Vector(arg)) =>
           AsInstanceOf(
               JSUnaryOp(JSUnaryOp.!, JSUnaryOp(JSUnaryOp.!, arg)),
               BooleanType)
 
         // LinkingInfo
         // Must stay in sync with the definitions in `scala.scalajs.LinkingInfo`
-        case IntrinsicCall(LinkingInfoClass, `esVersionMethodName`, Nil) =>
+        case IntrinsicCall(LinkingInfoClass, `esVersionMethodName`, Vector()) =>
           LinkTimeProperty(LinkTimeProperty.ESVersion)(IntType)
 
-        case IntrinsicCall(LinkingInfoClass, `isWebAssemblyMethodName`, Nil) =>
+        case IntrinsicCall(LinkingInfoClass, `isWebAssemblyMethodName`, Vector()) =>
           LinkTimeProperty(LinkTimeProperty.IsWebAssembly)(BooleanType)
 
-        case IntrinsicCall(LinkingInfoClass, `linkerVersionMethodName`, Nil) =>
+        case IntrinsicCall(LinkingInfoClass, `linkerVersionMethodName`, Vector()) =>
           LinkTimeProperty(LinkTimeProperty.LinkerVersion)(StringType)
 
         case _ =>
@@ -407,7 +407,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
     }
 
     private object IntrinsicCall {
-      def unapply(tree: Apply): Option[(ClassName, MethodName, List[Tree])] = tree match {
+      def unapply(tree: Apply): Option[(ClassName, MethodName, Vector[Tree])] = tree match {
         case Apply(ApplyFlags.empty, LoadModule(moduleClassName), MethodIdent(methodName), args) =>
           Some(moduleClassName, methodName, args)
         case _ =>
@@ -416,9 +416,9 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
     }
 
     private object ScalaVarArgsReadOnlyLiteral {
-      def unapply(tree: Apply): Option[List[Tree]] = tree match {
+      def unapply(tree: Apply): Option[Vector[Tree]] = tree match {
         case IntrinsicCall(ScalaJSRuntimeMod, `toScalaVarArgsReadOnlyMethodName`,
-            List(JSArrayConstr(args))) =>
+            Vector(JSArrayConstr(args))) =>
           if (args.forall(_.isInstanceOf[Tree]))
             Some(args.map(_.asInstanceOf[Tree]))
           else
@@ -514,7 +514,7 @@ final class JavalibIRCleaner(baseDirectoryURI: URI) {
     private def genLoadFromLoadSpec(loadSpec: JSNativeLoadSpec)(
         implicit pos: Position): Tree = {
       loadSpec match {
-        case JSNativeLoadSpec.Global(globalRef, Nil) =>
+        case JSNativeLoadSpec.Global(globalRef, Vector()) =>
           JSGlobalRef(globalRef)
         case _ =>
           reportError(
@@ -662,46 +662,46 @@ object JavalibIRCleaner {
   private val LinkingInfoClass = ClassName("scala.scalajs.LinkingInfo$")
 
   private val enableJSNumberOpsDoubleMethodName =
-    MethodName("enableJSNumberOps", List(DoubleRef), ClassRef(JSNumberOps))
+    MethodName("enableJSNumberOps", Vector(DoubleRef), ClassRef(JSNumberOps))
   private val enableJSNumberOpsIntMethodName =
-    MethodName("enableJSNumberOps", List(IntRef), ClassRef(JSNumberOps))
+    MethodName("enableJSNumberOps", Vector(IntRef), ClassRef(JSNumberOps))
   private val enableJSStringOpsMethodName =
-    MethodName("enableJSStringOps", List(ClassRef(BoxedStringClass)), ClassRef(JSStringOps))
+    MethodName("enableJSStringOps", Vector(ClassRef(BoxedStringClass)), ClassRef(JSStringOps))
   private val jsAnyFromIntMethodName =
-    MethodName("fromInt", List(IntRef), ClassRef(JSAny))
+    MethodName("fromInt", Vector(IntRef), ClassRef(JSAny))
   private val jsAnyFromStringMethodName =
-    MethodName("fromString", List(ClassRef(BoxedStringClass)), ClassRef(JSAny))
+    MethodName("fromString", Vector(ClassRef(BoxedStringClass)), ClassRef(JSAny))
   private val jsArrayOpsToArrayMethodName =
-    MethodName("jsArrayOps", List(ClassRef(JSArray)), ClassRef(JSArray))
+    MethodName("jsArrayOps", Vector(ClassRef(JSArray)), ClassRef(JSArray))
   private val jsArrayOpsToArrayOpsMethodName =
-    MethodName("jsArrayOps", List(ClassRef(JSArray)), ClassRef(JSArrayOps))
+    MethodName("jsArrayOps", Vector(ClassRef(JSArray)), ClassRef(JSArrayOps))
   private val number2dynamicMethodName =
-    MethodName("number2dynamic", List(DoubleRef), ClassRef(JSDynamic))
+    MethodName("number2dynamic", Vector(DoubleRef), ClassRef(JSDynamic))
   private val toImmutableSeqExtensionMethodName =
-    MethodName("toSeq$extension", List(ClassRef(JSArray)), ClassRef(ImmutableSeq))
+    MethodName("toSeq$extension", Vector(ClassRef(JSArray)), ClassRef(ImmutableSeq))
   private val toJSVarArgsImmutableMethodName =
-    MethodName("toJSVarArgs", List(ClassRef(ImmutableSeq)), ClassRef(JSArray))
+    MethodName("toJSVarArgs", Vector(ClassRef(ImmutableSeq)), ClassRef(JSArray))
   private val toJSVarArgsReadOnlyMethodName =
-    MethodName("toJSVarArgs", List(ClassRef(ReadOnlySeq)), ClassRef(JSArray))
+    MethodName("toJSVarArgs", Vector(ClassRef(ReadOnlySeq)), ClassRef(JSArray))
   private val toScalaVarArgsReadOnlyMethodName =
-    MethodName("toScalaVarArgs", List(ClassRef(JSArray)), ClassRef(ReadOnlySeq))
+    MethodName("toScalaVarArgs", Vector(ClassRef(JSArray)), ClassRef(ReadOnlySeq))
   private val toReadOnlySeqMethodName =
-    MethodName("toSeq", Nil, ClassRef(ReadOnlySeq))
+    MethodName("toSeq", Vector(), ClassRef(ReadOnlySeq))
   private val truthValueMethodName =
-    MethodName("truthValue", List(ClassRef(JSDynamic)), BooleanRef)
+    MethodName("truthValue", Vector(ClassRef(JSDynamic)), BooleanRef)
   private val unionTypeFromMethodName =
-    MethodName("from", List(ClassRef(ObjectClass), ClassRef(UnionTypeEvidence)), ClassRef(UnionType))
+    MethodName("from", Vector(ClassRef(ObjectClass), ClassRef(UnionTypeEvidence)), ClassRef(UnionType))
   private val writeReplaceMethodName =
-    MethodName("writeReplace", Nil, ClassRef(ObjectClass))
+    MethodName("writeReplace", Vector(), ClassRef(ObjectClass))
 
   // LinkingInfo
-  private val esVersionMethodName = MethodName("esVersion", Nil, IntRef)
-  private val isWebAssemblyMethodName = MethodName("isWebAssembly", Nil, BooleanRef)
-  private val linkerVersionMethodName = MethodName("linkerVersion", Nil, ClassRef(BoxedStringClass))
+  private val esVersionMethodName = MethodName("esVersion", Vector(), IntRef)
+  private val isWebAssemblyMethodName = MethodName("isWebAssembly", Vector(), BooleanRef)
+  private val linkerVersionMethodName = MethodName("linkerVersion", Vector(), ClassRef(BoxedStringClass))
 
   private val ClassNameSubstitutions: Map[ClassName, ClassName] = {
     val refBaseNames =
-      List("Boolean", "Char", "Byte", "Short", "Int", "Long", "Float", "Double", "Object")
+      Vector("Boolean", "Char", "Byte", "Short", "Int", "Long", "Float", "Double", "Object")
     val refPairs = for {
       refBaseName <- refBaseNames
     } yield {
@@ -710,12 +710,12 @@ object JavalibIRCleaner {
     }
 
     val tuplePairs = for {
-      n <- (2 to 22).toList
+      n <- (2 to 22).toVector
     } yield {
       ClassName("scala.Tuple" + n) -> ClassName("java.util.internal.Tuple" + n)
     }
 
-    val otherPairs = List(
+    val otherPairs = Vector(
       /* AssertionError conveniently features a constructor taking an Object.
        * Since any MatchError in the javalib would be a bug, it is fine to
        * rewrite them to AssertionErrors.

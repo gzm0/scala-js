@@ -57,21 +57,21 @@ final class ModuleBuilder(functionSignatureProvider: ModuleBuilder.FunctionTypeP
   def addData(data: Data): Unit = datas += data
 
   def build(): Module = {
-    val builtTypes: List[RecType] = types.toList.map {
+    val builtTypes: Vector[RecType] = types.toVector.map {
       case tpe: RecType            => tpe
       case builder: RecTypeBuilder => builder.build()
     }
 
     new Module(
       builtTypes,
-      imports.toList,
-      funcs.toList,
-      tags.toList,
-      globals.toList,
-      exports.toList,
+      imports.toVector,
+      funcs.toVector,
+      tags.toVector,
+      globals.toVector,
+      exports.toVector,
       start,
-      elems.toList,
-      datas.toList
+      elems.toVector,
+      datas.toVector
     )
   }
 }
@@ -90,6 +90,6 @@ object ModuleBuilder {
     def addSubType(id: TypeID, originalName: OriginalName, compositeType: CompositeType): Unit =
       addSubType(SubType(id, originalName, compositeType))
 
-    def build(): RecType = RecType(subTypes.toList)
+    def build(): RecType = RecType(subTypes.toVector)
   }
 }

@@ -27,7 +27,7 @@ import org.scalajs.linker.standard._
 
 object LinkingUtils {
   def testLink(classDefs: Seq[ClassDef],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       config: StandardConfig = StandardConfig(),
       output: OutputDirectory = MemOutputDirectory())(
       implicit ec: ExecutionContext): Future[Report] = {
@@ -67,7 +67,7 @@ object LinkingUtils {
   }
 
   def linkToModuleSet(classDefs: Seq[ClassDef],
-      moduleInitializers: List[ModuleInitializer],
+      moduleInitializers: Vector[ModuleInitializer],
       config: StandardConfig = StandardConfig(),
       stdlib: Future[Seq[IRFile]] = TestIRRepo.minilib)(
       implicit ec: ExecutionContext): Future[ModuleSet] = {
@@ -93,7 +93,7 @@ object LinkingUtils {
 
   def computeAnalysis(classDefs: Seq[ClassDef],
       symbolRequirements: SymbolRequirement = noSymbolRequirements,
-      moduleInitializers: Seq[ModuleInitializer] = Nil,
+      moduleInitializers: Seq[ModuleInitializer] = Vector(),
       config: StandardConfig = StandardConfig(),
       stdlib: Future[Seq[IRFile]] = TestIRRepo.minilib)(
       implicit ec: ExecutionContext): Future[Analysis] = {

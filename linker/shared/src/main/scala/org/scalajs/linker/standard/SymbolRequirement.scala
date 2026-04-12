@@ -19,7 +19,7 @@ import org.scalajs.linker.interface.unstable.ModuleInitializerImpl
 
 sealed trait SymbolRequirement {
   final def ++(that: SymbolRequirement): SymbolRequirement =
-    SymbolRequirement.multipleInternal(List(this, that))
+    SymbolRequirement.multipleInternal(Vector(this, that))
 }
 
 object SymbolRequirement {
@@ -38,9 +38,9 @@ object SymbolRequirement {
     }
 
     def callOnModule(moduleName: ClassName,
-        methodName: List[MethodName]): SymbolRequirement = {
+        methodName: Vector[MethodName]): SymbolRequirement = {
       val methodCalls = methodName.map(callMethod(moduleName, _))
-      multipleInternal(accessModule(moduleName) :: methodCalls)
+      multipleInternal(accessModule(moduleName) +: methodCalls)
     }
 
     def instantiateClass(className: ClassName,
@@ -49,7 +49,7 @@ object SymbolRequirement {
     }
 
     def instantiateClass(className: ClassName,
-        constructors: List[MethodName]): SymbolRequirement = {
+        constructors: Vector[MethodName]): SymbolRequirement = {
       multipleInternal(constructors.map(instantiateClass(className, _)))
     }
 
@@ -65,7 +65,7 @@ object SymbolRequirement {
     }
 
     def callMethods(className: ClassName,
-        methodNames: List[MethodName]): SymbolRequirement = {
+        methodNames: Vector[MethodName]): SymbolRequirement = {
       multipleInternal(methodNames.map(callMethod(className, _)))
     }
 
@@ -80,7 +80,7 @@ object SymbolRequirement {
     }
 
     def callStaticMethods(className: ClassName,
-        methodNames: List[MethodName]): SymbolRequirement = {
+        methodNames: Vector[MethodName]): SymbolRequirement = {
       multipleInternal(methodNames.map(callStaticMethod(className, _)))
     }
 
@@ -88,21 +88,21 @@ object SymbolRequirement {
     def optional(requirement: SymbolRequirement): SymbolRequirement = requirement
 
     def multiple(requirements: SymbolRequirement*): SymbolRequirement =
-      multipleInternal(requirements.toList)
+      multipleInternal(requirements.toVector)
 
     def none(): SymbolRequirement = NoRequirement
   }
 
-  private def multipleInternal(requirements: List[SymbolRequirement]) = {
+  private def multipleInternal(requirements: Vector[SymbolRequirement]) = {
     val flattened = requirements.flatMap {
-      case NoRequirement          => Nil
+      case NoRequirement          => Vector()
       case Multiple(requirements) => requirements
-      case requirement            => requirement :: Nil
+      case requirement            => requirement +: Vector()
     }
 
     flattened match {
-      case Nil      => NoRequirement
-      case x :: Nil => x
+      case Vector()      => NoRequirement
+      case x +: Vector() => x
       case xs       => Multiple(xs)
     }
   }
@@ -125,7 +125,7 @@ object SymbolRequirement {
         methodName: MethodName)
         extends SymbolRequirement
 
-    final case class Multiple(requirements: List[SymbolRequirement]) extends SymbolRequirement
+    final case class Multiple(requirements: Vector[SymbolRequirement]) extends SymbolRequirement
     case object NoRequirement extends SymbolRequirement
   }
 }

@@ -28,7 +28,7 @@ sealed trait MemOutputDirectory extends OutputDirectory {
   def content(name: String): Option[Array[Byte]]
 
   /** Names of files that are present (in no particular order). */
-  def fileNames(): List[String]
+  def fileNames(): Vector[String]
 }
 
 object MemOutputDirectory {
@@ -41,8 +41,8 @@ object MemOutputDirectory {
       _content.get(name)
     }
 
-    def fileNames(): List[String] = synchronized {
-      _content.keys.toList
+    def fileNames(): Vector[String] = synchronized {
+      _content.keys.toVector
     }
 
     def writeFull(name: String, buf: ByteBuffer)(
@@ -62,7 +62,7 @@ object MemOutputDirectory {
       }
     }
 
-    def listFiles()(implicit ec: ExecutionContext): Future[List[String]] = synchronized {
+    def listFiles()(implicit ec: ExecutionContext): Future[Vector[String]] = synchronized {
       Future.successful(fileNames())
     }
 

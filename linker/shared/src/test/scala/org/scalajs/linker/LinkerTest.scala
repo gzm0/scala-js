@@ -55,7 +55,7 @@ class LinkerTest {
     /* Check a degenerate case where there are not public modules at all.
      * See the special check on ModuleSplitter for details.
      */
-    testLink(Nil, Nil)
+    testLink(Vector(), Vector())
   }
 
   @Test
@@ -91,7 +91,7 @@ class LinkerTest {
 
     def callLink(): Future[Report] = {
       val out = MemOutputDirectory()
-      linker.link(badSeq, Nil, out, NullLogger)
+      linker.link(badSeq, Vector(), out, NullLogger)
     }
 
     // Call first time. Get exception from badSeq.
@@ -163,7 +163,7 @@ class LinkerTest {
 
     // Check it doesn't fail. Content is tested in ReportToLinkerOutputAdapterTest.
     TestIRRepo.minilib.flatMap { minilib =>
-      linker.link(minilib, Nil, output, new ScalaConsoleLogger(Level.Error))
+      linker.link(minilib, Vector(), output, new ScalaConsoleLogger(Level.Error))
     }
   }
 }

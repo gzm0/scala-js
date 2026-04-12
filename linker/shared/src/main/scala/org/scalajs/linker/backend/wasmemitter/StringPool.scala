@@ -43,7 +43,7 @@ private[wasmemitter] final class StringPool {
   /** Generates the string pool, and returns the list of WTF-16 strings that
    *  must be provided by the JS embedding.
    */
-  def genPool()(implicit ctx: WasmContext): List[(String, String)] = {
+  def genPool()(implicit ctx: WasmContext): Vector[(String, String)] = {
     poolWasGenerated = true
 
     val wtf16Strings = new mutable.ListBuffer[(String, String)]
@@ -74,7 +74,7 @@ private[wasmemitter] final class StringPool {
       }
     }
 
-    wtf16Strings.toList
+    wtf16Strings.toVector
   }
 
   private def isValidUTF16String(str: String): Boolean = {

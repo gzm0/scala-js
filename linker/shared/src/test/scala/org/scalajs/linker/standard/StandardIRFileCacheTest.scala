@@ -38,7 +38,7 @@ class StandardIRFileCacheTest {
   val maxConcurrentReads = 5
 
   /** simulates a cache call and aggressive read of all files. */
-  private def readAll(containers: List[IRContainer])(
+  private def readAll(containers: Vector[IRContainer])(
       implicit ec: ExecutionContext): Future[_] = {
     val config = IRFileCacheConfig()
       .withMaxConcurrentReads(maxConcurrentReads)
@@ -54,7 +54,7 @@ class StandardIRFileCacheTest {
   def testThrottlesConcurrentReads(): AsyncResult = await {
     val testEc = new TestExecutionContext(globalEc)
 
-    val containers = List.tabulate(20)(i => new MockIRContainer(path = f"C$i"))
+    val containers = Vector.tabulate(20)(i => new MockIRContainer(path = f"C$i"))
 
     val result = readAll(containers)(testEc)
 
@@ -82,13 +82,13 @@ class StandardIRFileCacheTest {
 
 object StandardIRFileCacheTest {
   final class MockIRContainer(path: String) extends IRContainerImpl(path, Unversioned) {
-    private val files = List.tabulate(10)(i => new MockIRFile(f"$path.F$i"))
+    private val files = Vector.tabulate(10)(i => new MockIRFile(f"$path.F$i"))
 
     private val _sjsirFiles = new MockOperation(files)
 
-    def ops: List[MockOperation[_]] = _sjsirFiles :: files.flatMap(_.ops)
+    def ops: Vector[MockOperation[_]] = _sjsirFiles +: files.flatMap(_.ops)
 
-    def sjsirFiles(implicit ec: ExecutionContext): Future[List[IRFile]] =
+    def sjsirFiles(implicit ec: ExecutionContext): Future[Vector[IRFile]] =
       _sjsirFiles.run()
   }
 
@@ -101,7 +101,7 @@ object StandardIRFileCacheTest {
     private val _tree =
       new MockOperation(classDef(className, superClass = Some(ObjectClass)))
 
-    def ops: List[MockOperation[_]] = List(_entryPointsInfo, _tree)
+    def ops: Vector[MockOperation[_]] = Vector(_entryPointsInfo, _tree)
 
     def entryPointsInfo(implicit ec: ExecutionContext): Future[EntryPointsInfo] =
       _entryPointsInfo.run()
@@ -133,11 +133,11 @@ object StandardIRFileCacheTest {
 
   /** An ExecutionContext that only executes tasks when [[runAll]] is called. */
   final class TestExecutionContext(underlying: ExecutionContext) extends ExecutionContext {
-    private var tasks: List[Runnable] = Nil
+    private var tasks: Vector[Runnable] = Vector()
     private var failureCause: Throwable = _
 
     override def execute(run: Runnable): Unit = synchronized {
-      tasks ::= run
+      tasks +:= run
     }
 
     override def reportFailure(cause: Throwable): Unit = synchronized {
@@ -152,7 +152,7 @@ object StandardIRFileCacheTest {
         implicit val ec = underlying
 
         val taskSnapshot = tasks
-        tasks = Nil
+        tasks = Vector()
 
         if (taskSnapshot.isEmpty) {
           Future.successful(())

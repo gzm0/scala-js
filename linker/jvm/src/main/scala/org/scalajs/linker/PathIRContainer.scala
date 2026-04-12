@@ -55,8 +55,8 @@ object PathIRContainer {
 
   private final class JarIRContainer(path: Path, lastModified: FileTime)
       extends IRContainerImpl(path.toString, fileTimeToVersion(lastModified)) {
-    def sjsirFiles(implicit ec: ExecutionContext): Future[List[IRFile]] = Future {
-      val files = List.newBuilder[IRFile]
+    def sjsirFiles(implicit ec: ExecutionContext): Future[Vector[IRFile]] = Future {
+      val files = Vector.newBuilder[IRFile]
 
       blocking {
         // Open zip/jar file as filesystem.

@@ -68,7 +68,7 @@ object ModuleInitializer {
   def mainMethod(className: String,
       mainMethodName: String): ModuleInitializer = {
     new ModuleInitializer(VoidMainMethod(ClassName(className),
-        MethodName(mainMethodName, Nil, VoidRef)))
+        MethodName(mainMethodName, Vector(), VoidRef)))
   }
 
   /** Makes a [[ModuleInitializer]] that calls a static method of a top-level
@@ -101,8 +101,8 @@ object ModuleInitializer {
   def mainMethodWithArgs(className: String, mainMethodName: String,
       args: List[String]): ModuleInitializer = {
     new ModuleInitializer(MainMethodWithArgs(ClassName(className),
-        MethodName(mainMethodName, ArrayOfStringTypeRef :: Nil, VoidRef),
-        args))
+        MethodName(mainMethodName, Vector(ArrayOfStringTypeRef), VoidRef),
+        args.toVector))
   }
 
   private implicit object MethodNameFingerprint extends Fingerprint[MethodName] {

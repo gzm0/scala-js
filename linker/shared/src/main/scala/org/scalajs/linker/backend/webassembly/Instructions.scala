@@ -25,7 +25,7 @@ import Types._
 object Instructions {
 
   /** A WebAssembly `expr`. */
-  final case class Expr(instr: List[Instr])
+  final case class Expr(instr: Vector[Instr])
 
   /** A WebAssembly `instr`. */
   sealed abstract class Instr(val mnemonic: String, val opcode: Int)
@@ -127,7 +127,7 @@ object Instructions {
   final case class Br(i: LabelID) extends LabelInstr("br", 0x0c, i) with StackPolymorphicInstr
   final case class BrIf(i: LabelID) extends LabelInstr("br_if", 0x0d, i)
 
-  final case class BrTable(table: List[LabelID], default: LabelID)
+  final case class BrTable(table: Vector[LabelID], default: LabelID)
       extends Instr("br_table", 0x0e) with StackPolymorphicInstr
 
   case object Return extends SimpleInstr("return", 0x0f) with StackPolymorphicInstr
@@ -144,10 +144,10 @@ object Instructions {
 
   case object Drop extends SimpleInstr("drop", 0x1a)
 
-  final case class Select(resultTypes: List[Type])
+  final case class Select(resultTypes: Vector[Type])
       extends Instr("select", if (resultTypes.isEmpty) 0x1b else 0x1c)
 
-  final case class TryTable(i: BlockType, cs: List[CatchClause], label: Option[LabelID] = None)
+  final case class TryTable(i: BlockType, cs: Vector[CatchClause], label: Option[LabelID] = None)
       extends Instr("try_table", 0x1f) with StructuredLabeledInstr
 
   // Instructions on local and global variables

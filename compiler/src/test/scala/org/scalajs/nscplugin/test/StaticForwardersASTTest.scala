@@ -47,10 +47,10 @@ class StaticForwardersASTTest extends JSASTTest {
       .sortBy(_.simpleName)
 
     assertEquals(
-      List(
-        MethodName("$lessinit$greater$default$1", Nil, IntRef),
-        MethodName("bar", List(IntRef), IntRef),
-        MethodName("bar$default$1", Nil, IntRef)
+      Vector(
+        MethodName("$lessinit$greater$default$1", Vector(), IntRef),
+        MethodName("bar", Vector(IntRef), IntRef),
+        MethodName("bar$default$1", Vector(), IntRef)
       ),
       staticMethodNames
     )
@@ -78,9 +78,9 @@ class StaticForwardersASTTest extends JSASTTest {
       .sortBy(_.simpleName)
 
     assertEquals(
-      List(
-        MethodName("bar", List(IntRef), IntRef),
-        MethodName("bar$default$1", Nil, IntRef)
+      Vector(
+        MethodName("bar", Vector(IntRef), IntRef),
+        MethodName("bar$default$1", Vector(), IntRef)
       ),
       staticMethodNames
     )

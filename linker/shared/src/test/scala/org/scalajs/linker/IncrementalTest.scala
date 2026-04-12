@@ -47,26 +47,26 @@ class IncrementalTest {
     val FooClass = ClassName("Foo")
 
     val jsMethodName = str("foo")
-    val staticMethodName = m("value", Nil, IntRef)
+    val staticMethodName = m("value", Vector(), IntRef)
 
     def classDefs(pre: Boolean) = Seq(
       v0 -> mainTestClassDef(
-        consoleLog(JSMethodApply(LoadModule(FooClass), jsMethodName, Nil))
+        consoleLog(JSMethodApply(LoadModule(FooClass), jsMethodName, Vector()))
       ),
       v(pre) -> classDef(
         FooClass,
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(FooClass, forModuleClass = true),
           MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic),
-              staticMethodName, NON, Nil, IntType, Some(int(6)))(EOH, UNV)
+              staticMethodName, NON, Vector(), IntType, Some(int(6)))(EOH, UNV)
         ),
-        jsMethodProps = List(
+        jsMethodProps = Vector(
           JSMethodDef(
-              EMF, jsMethodName, Nil, None,
+              EMF, jsMethodName, Vector(), None,
               if (pre) int(5)
-              else ApplyStatic(EAF, FooClass, staticMethodName, Nil)(IntType))(
+              else ApplyStatic(EAF, FooClass, staticMethodName, Vector())(IntType))(
               EOH, UNV)
         )
       )
@@ -79,20 +79,20 @@ class IncrementalTest {
   def testChangeMethodAttributeInlineableForOptimizer(): AsyncResult = await {
     val FooClass = ClassName("Foo")
 
-    val foo = m("foo", List(IntRef), IntRef)
+    val foo = m("foo", Vector(IntRef), IntRef)
 
     val x = LocalName("x")
 
     def classDefs(pre: Boolean) = Seq(
       v0 -> mainTestClassDef {
-        consoleLog(Apply(EAF, New(FooClass, NoArgConstructorName, Nil), foo, List(int(5)))(IntType))
+        consoleLog(Apply(EAF, New(FooClass, NoArgConstructorName, Vector()), foo, Vector(int(5)))(IntType))
       },
       v(pre) -> classDef(
         FooClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(FooClass),
-          MethodDef(EMF, foo, NON, List(paramDef(x, IntType)), IntType,
+          MethodDef(EMF, foo, NON, Vector(paramDef(x, IntType)), IntType,
               Some(VarRef(x)(IntType)))(
               EOH.withNoinline(pre), UNV)
         )
@@ -106,20 +106,20 @@ class IncrementalTest {
   def testChangeMethodAttributeShouldInlineForOptimizer(): AsyncResult = await {
     val FooClass = ClassName("Foo")
 
-    val foo = m("foo", List(IntRef), IntRef)
+    val foo = m("foo", Vector(IntRef), IntRef)
 
     val x = LocalName("x")
 
     def classDefs(pre: Boolean) = Seq(
       v0 -> mainTestClassDef {
-        consoleLog(Apply(EAF, New(FooClass, NoArgConstructorName, Nil), foo, List(int(5)))(IntType))
+        consoleLog(Apply(EAF, New(FooClass, NoArgConstructorName, Vector()), foo, Vector(int(5)))(IntType))
       },
       v(pre) -> classDef(
         FooClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(FooClass),
-          MethodDef(EMF, foo, NON, List(paramDef(x, IntType)), IntType,
+          MethodDef(EMF, foo, NON, Vector(paramDef(x, IntType)), IntType,
               Some(Block(
                 consoleLog(VarRef(x)(IntType)),
                 VarRef(x)(IntType)
@@ -141,7 +141,7 @@ class IncrementalTest {
     val BarType = ClassType(BarInterface, nullable = true, exact = false)
     val Foo1Type = ClassType(Foo1Class, nullable = true, exact = false)
 
-    val meth = m("meth", List(ClassRef(Foo1Class), I), I)
+    val meth = m("meth", Vector(ClassRef(Foo1Class), I), I)
 
     val foo1 = LocalName("foo1")
     val bar = LocalName("bar")
@@ -151,23 +151,23 @@ class IncrementalTest {
     val barRef = VarRef(bar)(BarType)
     val xRef = VarRef(x)(IntType)
 
-    val methParamDefs = List(paramDef(foo1, Foo1Type), paramDef(x, IntType))
+    val methParamDefs = Vector(paramDef(foo1, Foo1Type), paramDef(x, IntType))
 
-    def classDefs(pre: Boolean) = List(
+    def classDefs(pre: Boolean) = Vector(
       // Main
       v0 -> mainTestClassDef(Block(
-        VarDef(foo1, NON, Foo1Type, mutable = false, New(Foo1Class, NoArgConstructorName, Nil)),
+        VarDef(foo1, NON, Foo1Type, mutable = false, New(Foo1Class, NoArgConstructorName, Vector())),
         VarDef(bar, NON, BarType, mutable = false,
             If(AsInstanceOf(JSGlobalRef("randomBool"), BooleanType),
-                New(Foo1Class, NoArgConstructorName, Nil),
-                New(Foo2Class, NoArgConstructorName, Nil))(
+                New(Foo1Class, NoArgConstructorName, Vector()),
+                New(Foo2Class, NoArgConstructorName, Vector()))(
                 BarType)),
-        consoleLog(Apply(EAF, barRef, meth, List(foo1Ref, int(5)))(IntType))
+        consoleLog(Apply(EAF, barRef, meth, Vector(foo1Ref, int(5)))(IntType))
       )),
 
       // Bar
       v0 -> classDef(BarInterface, kind = ClassKind.Interface,
-          methods = List(
+          methods = Vector(
             MethodDef(EMF, meth, NON, methParamDefs, IntType, Some {
               BinaryOp(BinaryOp.Int_+, int(5), BinaryOp(BinaryOp.Int_*, xRef, int(2)))
             })(EOH, UNV)
@@ -177,22 +177,22 @@ class IncrementalTest {
       v(pre) -> classDef(
         Foo1Class,
         superClass = Some(ObjectClass),
-        interfaces = List(BarInterface),
-        methods = List(
+        interfaces = Vector(BarInterface),
+        methods = Vector(
           trivialCtor(Foo1Class),
           MethodDef(EMF, meth, NON, methParamDefs, IntType, Some {
             ApplyStatically(EAF, if (pre) thisFor(Foo1Class) else foo1Ref,
-                BarInterface, meth, List(foo1Ref, xRef))(IntType)
+                BarInterface, meth, Vector(foo1Ref, xRef))(IntType)
           })(EOH, UNV)
         )
       ),
 
       // Foo2
-      v0 -> classDef(Foo2Class, superClass = Some(ObjectClass), interfaces = List(BarInterface),
-          methods = List(
+      v0 -> classDef(Foo2Class, superClass = Some(ObjectClass), interfaces = Vector(BarInterface),
+          methods = Vector(
             trivialCtor(Foo2Class),
             MethodDef(EMF, meth, NON, methParamDefs, IntType, Some {
-              ApplyStatically(EAF, thisFor(Foo2Class), BarInterface, meth, List(foo1Ref, xRef))(
+              ApplyStatically(EAF, thisFor(Foo2Class), BarInterface, meth, Vector(foo1Ref, xRef))(
                   IntType)
             })(EOH, UNV)
           ))
@@ -205,44 +205,44 @@ class IncrementalTest {
   def testStaleMethodBodyAfterItReappears_Issue4416(): AsyncResult = await {
     val FooClass = ClassName("Foo$")
 
-    val meth1 = m("meth1", Nil, VoidRef)
-    val meth2 = m("meth2", Nil, VoidRef)
+    val meth1 = m("meth1", Vector(), VoidRef)
+    val meth2 = m("meth2", Vector(), VoidRef)
 
     def methDef(name: MethodName, body: Tree): MethodDef =
-      MethodDef(EMF, name, NON, Nil, VoidType, Some(body))(EOH.withNoinline(true), UNV)
+      MethodDef(EMF, name, NON, Vector(), VoidType, Some(body))(EOH.withNoinline(true), UNV)
 
     def callMeth(targetMeth: MethodName): Tree =
-      Apply(EAF, LoadModule(FooClass), targetMeth, Nil)(VoidType)
+      Apply(EAF, LoadModule(FooClass), targetMeth, Vector())(VoidType)
 
     def classDefs(step: Int) = {
       val stepDependentMembers = step match {
         case 0 =>
-          List(
+          Vector(
             methDef(meth1, consoleLog(str("a1"))),
             methDef(meth2, consoleLog(str("a2")))
           )
         case 1 =>
-          List(
+          Vector(
             methDef(meth1, consoleLog(str("b1")))
           )
         case 2 =>
-          List(
+          Vector(
             methDef(meth1, consoleLog(str("c1"))),
             methDef(meth2, consoleLog(str("c2")))
           )
       }
 
       val stepDependentMainStats = step match {
-        case 0 => List(callMeth(meth1), callMeth(meth2))
-        case 1 => List(callMeth(meth1))
-        case 2 => List(callMeth(meth1), callMeth(meth2))
+        case 0 => Vector(callMeth(meth1), callMeth(meth2))
+        case 1 => Vector(callMeth(meth1))
+        case 2 => Vector(callMeth(meth1), callMeth(meth2))
       }
 
       val v = Version.fromInt(step)
 
-      List(
+      Vector(
         v -> classDef(FooClass, kind = ClassKind.ModuleClass, superClass = Some(ObjectClass),
-            methods = trivialCtor(FooClass, forModuleClass = true) :: stepDependentMembers),
+            methods = trivialCtor(FooClass, forModuleClass = true) +: stepDependentMembers),
 
         v -> mainTestClassDef(Block(stepDependentMainStats))
       )
@@ -262,47 +262,47 @@ class IncrementalTest {
   def testStaleStaticMethodBodyAfterItReappears(): AsyncResult = await {
     val FooClass = ClassName("Foo")
 
-    val meth1 = m("meth1", Nil, VoidRef)
-    val meth2 = m("meth2", Nil, VoidRef)
+    val meth1 = m("meth1", Vector(), VoidRef)
+    val meth2 = m("meth2", Vector(), VoidRef)
 
     def methDef(name: MethodName, body: Tree): MethodDef = {
-      MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic), name, NON, Nil,
+      MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic), name, NON, Vector(),
           VoidType, Some(body))(
           EOH.withNoinline(true), UNV)
     }
 
     def callMeth(targetMeth: MethodName): Tree =
-      ApplyStatic(EAF, FooClass, targetMeth, Nil)(VoidType)
+      ApplyStatic(EAF, FooClass, targetMeth, Vector())(VoidType)
 
     def classDefs(step: Int) = {
       val stepDependentMembers = step match {
         case 0 =>
-          List(
+          Vector(
             methDef(meth1, consoleLog(str("a1"))),
             methDef(meth2, consoleLog(str("a2")))
           )
         case 1 =>
-          List(
+          Vector(
             methDef(meth1, consoleLog(str("b1")))
           )
         case 2 =>
-          List(
+          Vector(
             methDef(meth1, consoleLog(str("c1"))),
             methDef(meth2, consoleLog(str("c2")))
           )
       }
 
       val stepDependentMainStats = step match {
-        case 0 => List(callMeth(meth1), callMeth(meth2))
-        case 1 => List(callMeth(meth1))
-        case 2 => List(callMeth(meth1), callMeth(meth2))
+        case 0 => Vector(callMeth(meth1), callMeth(meth2))
+        case 1 => Vector(callMeth(meth1))
+        case 2 => Vector(callMeth(meth1), callMeth(meth2))
       }
 
       val v = Version.fromInt(step)
 
-      List(
+      Vector(
         v -> classDef(FooClass, superClass = Some(ObjectClass),
-            methods = trivialCtor(FooClass) :: stepDependentMembers),
+            methods = trivialCtor(FooClass) +: stepDependentMembers),
 
         v -> mainTestClassDef(Block(stepDependentMainStats))
       )
@@ -321,7 +321,7 @@ class IncrementalTest {
         ApplyStatically(EAF.withConstructor(true),
             thisFor(FooModule),
             ObjectClass, MethodIdent(NoArgConstructorName),
-            Nil)(VoidType),
+            Vector())(VoidType),
         StoreModule()
       )
 
@@ -330,7 +330,7 @@ class IncrementalTest {
         else Block(superCtor, consoleLog(str("bar")))
 
       MethodDef(MemberFlags.empty.withNamespace(MemberNamespace.Constructor),
-          MethodIdent(NoArgConstructorName), NON, Nil, VoidType,
+          MethodIdent(NoArgConstructorName), NON, Vector(), VoidType,
           Some(body))(EOH, UNV)
     }
 
@@ -343,7 +343,7 @@ class IncrementalTest {
         FooModule,
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(fooCtor(pre))
+        methods = Vector(fooCtor(pre))
       )
     )
 
@@ -356,31 +356,31 @@ class IncrementalTest {
     val BModule = ClassName("B")
 
     val jsMethodName = str("foo")
-    val targetMethodName = m("value", Nil, IntRef)
+    val targetMethodName = m("value", Vector(), IntRef)
 
     def classDefs(pre: Boolean) = Seq(
       v0 -> mainTestClassDef(
-        consoleLog(JSMethodApply(LoadModule(AModule), jsMethodName, Nil))
+        consoleLog(JSMethodApply(LoadModule(AModule), jsMethodName, Vector()))
       ),
       v0 -> classDef(
         AModule,
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(AModule, forModuleClass = true)
         ),
-        jsMethodProps = List(
-          JSMethodDef(EMF, str("foo"), Nil, None,
-              Apply(EAF, LoadModule(BModule), targetMethodName, Nil)(IntType))(EOH, UNV)
+        jsMethodProps = Vector(
+          JSMethodDef(EMF, str("foo"), Vector(), None,
+              Apply(EAF, LoadModule(BModule), targetMethodName, Vector())(IntType))(EOH, UNV)
         )
       ),
       v(pre) -> classDef(
         BModule,
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(BModule, forModuleClass = true),
-          MethodDef(EMF, targetMethodName, NON, Nil, IntType,
+          MethodDef(EMF, targetMethodName, NON, Vector(), IntType,
               Some(int(if (pre) 1 else 2)))(EOH.withInline(true), UNV)
         )
       )
@@ -396,16 +396,16 @@ class IncrementalTest {
     val JSObject = ClassName("jso")
 
     val jsMethodName = str("foo")
-    val targetMethodName = m("value", Nil, IntRef)
+    val targetMethodName = m("value", Vector(), IntRef)
 
     def classDefs(pre: Boolean) = Seq(
       v0 -> mainTestClassDef(
-        consoleLog(JSNew(LoadJSConstructor(AClass), Nil))
+        consoleLog(JSNew(LoadJSConstructor(AClass), Vector()))
       ),
       v0 -> classDef(
         JSObject,
         kind = ClassKind.NativeJSClass,
-        jsNativeLoadSpec = Some(JSNativeLoadSpec.Global("Object", Nil)),
+        jsNativeLoadSpec = Some(JSNativeLoadSpec.Global("Object", Vector())),
         superClass = Some(ObjectClass)
       ),
       v0 -> classDef(
@@ -413,9 +413,9 @@ class IncrementalTest {
         kind = ClassKind.JSClass,
         superClass = Some(JSObject),
         jsConstructor = Some(
-          JSConstructorDef(EMF.withNamespace(MemberNamespace.Constructor), Nil, None,
-              JSConstructorBody(Nil, JSSuperConstructorCall(Nil), List {
-                consoleLog(Apply(EAF, LoadModule(BModule), targetMethodName, Nil)(IntType))
+          JSConstructorDef(EMF.withNamespace(MemberNamespace.Constructor), Vector(), None,
+              JSConstructorBody(Vector(), JSSuperConstructorCall(Vector()), Vector {
+                consoleLog(Apply(EAF, LoadModule(BModule), targetMethodName, Vector())(IntType))
               }))(EOH, UNV)
         )
       ),
@@ -423,9 +423,9 @@ class IncrementalTest {
         BModule,
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(BModule, forModuleClass = true),
-          MethodDef(EMF, targetMethodName, NON, Nil, IntType,
+          MethodDef(EMF, targetMethodName, NON, Vector(), IntType,
               Some(int(if (pre) 1 else 2)))(EOH.withInline(true), UNV)
         )
       )
@@ -439,32 +439,32 @@ class IncrementalTest {
     val AModule = ClassName("A")
     val BModule = ClassName("B")
 
-    val targetMethodName = m("value", Nil, IntRef)
+    val targetMethodName = m("value", Vector(), IntRef)
 
     def classDefs(pre: Boolean) = Seq(
       v0 -> classDef(
         AModule,
         kind = ClassKind.Interface,
-        topLevelExportDefs = List(
+        topLevelExportDefs = Vector(
           TopLevelMethodExportDef("main",
               JSMethodDef(EMF.withNamespace(MemberNamespace.PublicStatic),
-                  str("foo"), Nil, None,
-                  Apply(EAF, LoadModule(BModule), targetMethodName, Nil)(IntType))(EOH, UNV))
+                  str("foo"), Vector(), None,
+                  Apply(EAF, LoadModule(BModule), targetMethodName, Vector())(IntType))(EOH, UNV))
         )
       ),
       v(pre) -> classDef(
         BModule,
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(BModule, forModuleClass = true),
-          MethodDef(EMF, targetMethodName, NON, Nil, IntType,
+          MethodDef(EMF, targetMethodName, NON, Vector(), IntType,
               Some(int(if (pre) 1 else 2)))(EOH.withInline(true), UNV)
         )
       )
     )
 
-    testIncrementalBidirectional(classDefs(_), _ => Nil)
+    testIncrementalBidirectional(classDefs(_), _ => Vector())
   }
 
   @Test
@@ -475,7 +475,7 @@ class IncrementalTest {
 
     val TestClass = ClassName("pack.Test")
 
-    val testMethodName = m("test", List(ClassRef(AClass)), BooleanRef)
+    val testMethodName = m("test", Vector(ClassRef(AClass)), BooleanRef)
 
     val xParam = paramDef("x", ClassType(AClass, nullable = true, exact = false))
 
@@ -487,31 +487,31 @@ class IncrementalTest {
       v0 -> classDef(
         BClass,
         superClass = Some(ObjectClass),
-        interfaces = List(AClass),
-        methods = List(trivialCtor(BClass))
+        interfaces = Vector(AClass),
+        methods = Vector(trivialCtor(BClass))
       ),
       v0 -> classDef(
         CClass,
         superClass = Some(ObjectClass),
-        interfaces = List(AClass),
-        methods = List(trivialCtor(CClass))
+        interfaces = Vector(AClass),
+        methods = Vector(trivialCtor(CClass))
       ),
       v(pre) -> classDef(
         TestClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(TestClass),
           mainMethodDef(Block(
             consoleLog(ApplyStatic(EAF, TestClass, testMethodName,
-                List(New(BClass, NoArgConstructorName, Nil)))(BooleanType)),
+                Vector(New(BClass, NoArgConstructorName, Vector())))(BooleanType)),
             consoleLog(ApplyStatic(EAF, TestClass, testMethodName,
-                List(New(CClass, NoArgConstructorName, Nil)))(BooleanType))
+                Vector(New(CClass, NoArgConstructorName, Vector())))(BooleanType))
           )),
           MethodDef(
             EMF.withNamespace(MemberNamespace.PublicStatic),
             testMethodName,
             NON,
-            List(xParam),
+            Vector(xParam),
             BooleanType,
             Some {
               IsInstanceOf(xParam.ref,
@@ -538,14 +538,14 @@ class IncrementalTest {
 
     val TestClass = ClassName("pack.Test")
 
-    val fooMethodName = m("foo", List(IntRef), IntRef)
-    val barMethodName = m("bar", List(IntRef), IntRef)
+    val fooMethodName = m("foo", Vector(IntRef), IntRef)
+    val barMethodName = m("bar", Vector(IntRef), IntRef)
 
     val xParam = paramDef("x", IntType)
 
     def makeOneMethodDef(name: MethodName): MethodDef = {
       MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic), name, NON,
-          List(xParam), IntType, Some(xParam.ref))(
+          Vector(xParam), IntType, Some(xParam.ref))(
           EOH.withNoinline(true), UNV)
     }
 
@@ -553,7 +553,7 @@ class IncrementalTest {
       v0 -> classDef(
         AClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(AClass),
           makeOneMethodDef(fooMethodName),
           makeOneMethodDef(barMethodName)
@@ -562,7 +562,7 @@ class IncrementalTest {
       v0 -> classDef(
         BClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(BClass),
           makeOneMethodDef(fooMethodName),
           makeOneMethodDef(barMethodName)
@@ -571,21 +571,21 @@ class IncrementalTest {
       v(pre) -> classDef(
         TestClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(TestClass),
           mainMethodDef(Block(
             // make an instance of A, but not of B
-            consoleLog(New(AClass, NoArgConstructorName, Nil)),
+            consoleLog(New(AClass, NoArgConstructorName, Vector())),
 
             // call both foo methods
-            consoleLog(ApplyStatic(EAF, AClass, fooMethodName, List(int(1)))(IntType)),
-            consoleLog(ApplyStatic(EAF, BClass, fooMethodName, List(int(2)))(IntType)),
+            consoleLog(ApplyStatic(EAF, AClass, fooMethodName, Vector(int(1)))(IntType)),
+            consoleLog(ApplyStatic(EAF, BClass, fooMethodName, Vector(int(2)))(IntType)),
 
             // call both bar methods only in v0
             if (pre) {
               Block(
-                consoleLog(ApplyStatic(EAF, AClass, barMethodName, List(int(3)))(IntType)),
-                consoleLog(ApplyStatic(EAF, BClass, barMethodName, List(int(4)))(IntType))
+                consoleLog(ApplyStatic(EAF, AClass, barMethodName, Vector(int(3)))(IntType)),
+                consoleLog(ApplyStatic(EAF, BClass, barMethodName, Vector(int(4)))(IntType))
               )
             } else {
               Skip()
@@ -609,7 +609,7 @@ object IncrementalTest {
 
   def testIncrementalBidirectional(
       classDefs: Boolean => Seq[(Version, ClassDef)],
-      moduleInitializers: Boolean => List[ModuleInitializer],
+      moduleInitializers: Boolean => Vector[ModuleInitializer],
       config: StandardConfig = StandardConfig())(
       implicit ec: ExecutionContext): Future[Unit] = {
 
@@ -632,7 +632,7 @@ object IncrementalTest {
       contextMessage: String,
       steps: Int,
       stepToClassDefs: Int => Seq[(Version, ClassDef)],
-      stepToModuleInitializers: Int => List[ModuleInitializer],
+      stepToModuleInitializers: Int => Vector[ModuleInitializer],
       config: StandardConfig = StandardConfig())(
       implicit ec: ExecutionContext): Future[Unit] = {
 

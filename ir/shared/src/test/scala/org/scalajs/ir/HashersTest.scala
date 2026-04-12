@@ -80,12 +80,12 @@ class HashersTest {
       assertHashEquals(expected, hashedMethodDef.version)
     }
 
-    val mIIMethodName = MethodName("m", List(I), I)
+    val mIIMethodName = MethodName("m", Vector(I), I)
 
     test(
       "64940df7c6aae58962eb56f4aa6c6b085ca06c25",
       MethodDef(MemberFlags.empty, mIIMethodName, NON,
-          List(ParamDef("x", NON, IntType, mutable = false)),
+          Vector(ParamDef("x", NON, IntType, mutable = false)),
           IntType, None)(
           NoOptHints, UNV)
     )
@@ -93,7 +93,7 @@ class HashersTest {
     test(
       "82df9d6beb7df0ee9f501380323bdb2038cc50cb",
       MethodDef(MemberFlags.empty, mIIMethodName, NON,
-          List(ParamDef("x", NON, IntType, mutable = false)),
+          Vector(ParamDef("x", NON, IntType, mutable = false)),
           IntType, Some(bodyWithInterestingStuff))(
           NoOptHints, UNV)
     )
@@ -108,7 +108,7 @@ class HashersTest {
     test(
       "d0fa6c753502e3d1df34e53ca6f6afb5cbdcd9d4",
       JSMethodDef(MemberFlags.empty, s("m"),
-          List(ParamDef("x", NON, AnyType, mutable = false)), None,
+          Vector(ParamDef("x", NON, AnyType, mutable = false)), None,
           bodyWithInterestingStuff)(
           NoOptHints, UNV)
     )

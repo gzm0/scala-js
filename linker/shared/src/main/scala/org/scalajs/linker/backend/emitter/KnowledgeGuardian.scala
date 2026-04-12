@@ -152,11 +152,11 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
   }
 
   private def computeStaticFieldMirrors(
-      moduleSet: ModuleSet): Map[ClassName, Map[FieldName, List[String]]] = {
+      moduleSet: ModuleSet): Map[ClassName, Map[FieldName, Vector[String]]] = {
     if (config.coreSpec.moduleKind != ModuleKind.NoModule) {
       Map.empty
     } else {
-      var result = Map.empty[ClassName, Map[FieldName, List[String]]]
+      var result = Map.empty[ClassName, Map[FieldName, Vector[String]]]
       for {
         module <- moduleSet.modules
         export <- module.topLevelExports
@@ -165,7 +165,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
           case TopLevelFieldExportDef(_, exportName, FieldIdent(fieldName)) =>
             val className = export.owningClass
             val mirrors = result.getOrElse(className, Map.empty)
-            val newExportNames = exportName :: mirrors.getOrElse(fieldName, Nil)
+            val newExportNames = exportName +: mirrors.getOrElse(fieldName, Vector())
             val newMirrors = mirrors.updated(fieldName, newExportNames)
             result = result.updated(className, newMirrors)
 
@@ -197,7 +197,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
     def isInterface(className: ClassName): Boolean =
       classes(className).askIsInterface(this)
 
-    def getAllScalaClassFieldDefs(className: ClassName): List[AnyFieldDef] =
+    def getAllScalaClassFieldDefs(className: ClassName): Vector[AnyFieldDef] =
       classes(className).askAllScalaClassFieldDefs(this)
 
     def hasInlineableInit(className: ClassName): Boolean =
@@ -209,7 +209,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
     def hasInstances(className: ClassName): Boolean =
       classes(className).askHasInstances(this)
 
-    def getJSClassCaptureTypes(className: ClassName): Option[List[Type]] =
+    def getJSClassCaptureTypes(className: ClassName): Option[Vector[Type]] =
       classes(className).askJSClassCaptureTypes(this)
 
     def getJSNativeLoadSpec(className: ClassName): Option[JSNativeLoadSpec] =
@@ -221,19 +221,19 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
     def getSuperClassOfJSClass(className: ClassName): ClassName =
       classes(className).askJSSuperClass(this)
 
-    def getFieldDefs(className: ClassName): List[AnyFieldDef] =
+    def getFieldDefs(className: ClassName): Vector[AnyFieldDef] =
       classes(className).askFieldDefs(this)
 
-    def getStaticFieldMirrors(field: FieldName): List[String] =
+    def getStaticFieldMirrors(field: FieldName): Vector[String] =
       classes(field.className).askStaticFieldMirrors(this, field)
 
     def getModule(className: ClassName): ModuleID =
       classes(className).askModule(this)
 
-    def methodsInRepresentativeClasses(): List[(MethodName, Set[ClassName])] =
+    def methodsInRepresentativeClasses(): Vector[(MethodName, Set[ClassName])] =
       specialInfo.askMethodsInRepresentativeClasses(this)
 
-    def methodsInObject(): List[MethodDef] =
+    def methodsInObject(): Vector[MethodDef] =
       specialInfo.askMethodsInObject(this)
 
     def hijackedDescendants(className: ClassName): Set[ClassName] =
@@ -245,7 +245,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
 
   private class Class(initClass: LinkedClass,
       initHasInlineableInit: Boolean,
-      initStaticFieldMirrors: Map[FieldName, List[String]],
+      initStaticFieldMirrors: Map[FieldName, Vector[String]],
       initModule: Option[ModuleID])
       extends Unregisterable {
 
@@ -279,7 +279,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
     private val moduleAskers = mutable.Set.empty[Invalidatable]
 
     def update(linkedClass: LinkedClass, newHasInlineableInit: Boolean,
-        newStaticFieldMirrors: Map[FieldName, List[String]],
+        newStaticFieldMirrors: Map[FieldName, Vector[String]],
         newModule: Option[ModuleID]): Unit = {
       isAlive = true
 
@@ -354,7 +354,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
     private def computeHasStoredSuperClass(linkedClass: LinkedClass): Boolean =
       linkedClass.jsSuperClass.isDefined
 
-    private def computeJSClassCaptureTypes(linkedClass: LinkedClass): Option[List[Type]] =
+    private def computeJSClassCaptureTypes(linkedClass: LinkedClass): Option[Vector[Type]] =
       linkedClass.jsClassCaptures.map(_.map(_.ptpe))
 
     private def computeJSNativeLoadSpec(linkedClass: LinkedClass): Option[JSNativeLoadSpec] =
@@ -397,10 +397,10 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       val scalaFieldNamesVersion = linkedClass.fields.collect {
         case FieldDef(_, FieldIdent(name), _, _) => Version.fromUTF8String(name.simpleName.encoded)
       }
-      Version.combine((linkedClass.version :: hasAnyJSFieldVersion :: scalaFieldNamesVersion): _*)
+      Version.combine((linkedClass.version +: hasAnyJSFieldVersion +: scalaFieldNamesVersion): _*)
     }
 
-    private def computeFieldDefs(linkedClass: LinkedClass): List[AnyFieldDef] =
+    private def computeFieldDefs(linkedClass: LinkedClass): Vector[AnyFieldDef] =
       linkedClass.fields
 
     def testAndResetIsAlive(): Boolean = {
@@ -415,14 +415,14 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       isInterface
     }
 
-    def askAllScalaClassFieldDefs(invalidatable: Invalidatable): List[AnyFieldDef] = {
+    def askAllScalaClassFieldDefs(invalidatable: Invalidatable): Vector[AnyFieldDef] = {
       invalidatable.registeredTo(this)
       superClassAskers += invalidatable
       fieldDefsAskers += invalidatable
       val inheritedFieldDefs =
-        if (superClass == null) Nil
+        if (superClass == null) Vector()
         else classes(superClass).askAllScalaClassFieldDefs(invalidatable)
-      inheritedFieldDefs ::: fieldDefs
+      inheritedFieldDefs ++ fieldDefs
     }
 
     def askHasInlineableInit(invalidatable: Invalidatable): Boolean = {
@@ -443,7 +443,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       hasInstances
     }
 
-    def askJSClassCaptureTypes(invalidatable: Invalidatable): Option[List[Type]] = {
+    def askJSClassCaptureTypes(invalidatable: Invalidatable): Option[Vector[Type]] = {
       invalidatable.registeredTo(this)
       jsClassCaptureTypesAskers += invalidatable
       jsClassCaptureTypes
@@ -467,17 +467,17 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       superClass
     }
 
-    def askFieldDefs(invalidatable: Invalidatable): List[AnyFieldDef] = {
+    def askFieldDefs(invalidatable: Invalidatable): Vector[AnyFieldDef] = {
       invalidatable.registeredTo(this)
       fieldDefsAskers += invalidatable
       fieldDefs
     }
 
     def askStaticFieldMirrors(invalidatable: Invalidatable,
-        field: FieldName): List[String] = {
+        field: FieldName): Vector[String] = {
       invalidatable.registeredTo(this)
       staticFieldMirrorsAskers += invalidatable
-      staticFieldMirrors.getOrElse(field, Nil)
+      staticFieldMirrors.getOrElse(field, Vector())
     }
 
     def askModule(invalidatable: Invalidatable): ModuleID = {
@@ -620,7 +620,7 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       globalInfo.isClassSuperClassUsed
 
     private def computeMethodsInRepresentativeClasses(objectClass: Option[LinkedClass],
-        hijackedClasses: Iterable[LinkedClass]): List[(MethodName, Set[ClassName])] = {
+        hijackedClasses: Iterable[LinkedClass]): Vector[(MethodName, Set[ClassName])] = {
       val representativeClasses =
         objectClass.iterator ++ hijackedClasses.iterator
 
@@ -635,11 +635,11 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
           representativeClass.className
       }
 
-      result.toList.sortBy(_._1.nameString).map(kv => (kv._1, kv._2.toSet))
+      result.toVector.sortBy(_._1.nameString).map(kv => (kv._1, kv._2.toSet))
     }
 
-    private def computeMethodsInObject(objectClass: Option[LinkedClass]): List[MethodDef] = {
-      objectClass.toList.flatMap(
+    private def computeMethodsInObject(objectClass: Option[LinkedClass]): Vector[MethodDef] = {
+      objectClass.toVector.flatMap(
           _.methods.filter(_.flags.namespace == MemberNamespace.Public))
     }
 
@@ -684,13 +684,13 @@ private[emitter] final class KnowledgeGuardian(config: Emitter.Config) {
       isParentDataAccessed
 
     def askMethodsInRepresentativeClasses(
-        invalidatable: Invalidatable): List[(MethodName, Set[ClassName])] = {
+        invalidatable: Invalidatable): Vector[(MethodName, Set[ClassName])] = {
       invalidatable.registeredTo(this)
       methodsInRepresentativeClassesAskers += invalidatable
       methodsInRepresentativeClasses
     }
 
-    def askMethodsInObject(invalidatable: Invalidatable): List[MethodDef] = {
+    def askMethodsInObject(invalidatable: Invalidatable): Vector[MethodDef] = {
       invalidatable.registeredTo(this)
       methodsInObjectAskers += invalidatable
       methodsInObject

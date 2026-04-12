@@ -23,8 +23,8 @@ import org.scalajs.ir.WellKnownNames._
 import org.scalajs.linker.testutils.TestIRBuilder._
 
 class LambdaSynthesizerTest {
-  private def makeDesc(superClass: ClassName, interfaces: List[ClassName],
-      methodName: String, paramTypeRefs: List[TypeRef], resultTypeRef: TypeRef): Descriptor = {
+  private def makeDesc(superClass: ClassName, interfaces: Vector[ClassName],
+      methodName: String, paramTypeRefs: Vector[TypeRef], resultTypeRef: TypeRef): Descriptor = {
 
     // Only for tests; would not work for JS class types
     def typeRefToType(typeRef: TypeRef): Type = typeRef match {
@@ -39,8 +39,8 @@ class LambdaSynthesizerTest {
         paramTypeRefs.map(typeRefToType(_)), typeRefToType(resultTypeRef))
   }
 
-  private def makeClassName(superClass: ClassName, interfaces: List[ClassName],
-      methodName: String, paramTypeRefs: List[TypeRef], resultTypeRef: TypeRef): String = {
+  private def makeClassName(superClass: ClassName, interfaces: Vector[ClassName],
+      methodName: String, paramTypeRefs: Vector[TypeRef], resultTypeRef: TypeRef): String = {
     val desc = makeDesc(superClass, interfaces, methodName, paramTypeRefs, resultTypeRef)
     LambdaSynthesizer.makeClassName(desc).nameString
   }
@@ -48,11 +48,11 @@ class LambdaSynthesizerTest {
   @Test def testMakeClassNameBasicShape(): Unit = {
     assertEquals(
         "java.lang.Comparable.$$Lambda$fa13d0f5607243329b6dbf6698569d230ec3ead0",
-        makeClassName(ObjectClass, List("java.lang.Comparable"), "compareTo", List(O), I))
+        makeClassName(ObjectClass, Vector("java.lang.Comparable"), "compareTo", Vector(O), I))
 
     assertEquals(
         "scala.runtime.AbstractFunction1.$$Lambda$7afc3dd0acc1681fb022ef921c83979087aaa919",
-        makeClassName("scala.runtime.AbstractFunction1", Nil, "apply", List(O), O))
+        makeClassName("scala.runtime.AbstractFunction1", Vector(), "apply", Vector(O), O))
   }
 
   @Test def testMakeClassNameEveryBitMatters(): Unit = {
@@ -60,21 +60,21 @@ class LambdaSynthesizerTest {
     val CClass = ClassRef("C")
 
     val descs: Vector[Descriptor] = Vector(
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), I),
-      makeDesc("A", List("I"), "foo", List(IClass), I),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass, CharRef), I),
-      makeDesc(ObjectClass, List("J"), "foo", List(IClass), I),
-      makeDesc(ObjectClass, List("I"), "bar", List(IClass), I),
-      makeDesc(ObjectClass, List("I"), "foo", List(CClass), I),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), Z),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), IClass),
-      makeDesc(ObjectClass, List("I"), "foo", List(CClass), IClass),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), V),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), ArrayTypeRef(I, 1)),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), ArrayTypeRef(IClass, 1)),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), ArrayTypeRef(I, 3)),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), ArrayTypeRef(IClass, 3)),
-      makeDesc(ObjectClass, List("I"), "foo", List(IClass), TransientTypeRef(LabelName("I"))(IntType))
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), I),
+      makeDesc("A", Vector("I"), "foo", Vector(IClass), I),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass, CharRef), I),
+      makeDesc(ObjectClass, Vector("J"), "foo", Vector(IClass), I),
+      makeDesc(ObjectClass, Vector("I"), "bar", Vector(IClass), I),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(CClass), I),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), Z),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), IClass),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(CClass), IClass),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), V),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), ArrayTypeRef(I, 1)),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), ArrayTypeRef(IClass, 1)),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), ArrayTypeRef(I, 3)),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), ArrayTypeRef(IClass, 3)),
+      makeDesc(ObjectClass, Vector("I"), "foo", Vector(IClass), TransientTypeRef(LabelName("I"))(IntType))
     )
 
     val classNames = descs.map(LambdaSynthesizer.makeClassName(_))

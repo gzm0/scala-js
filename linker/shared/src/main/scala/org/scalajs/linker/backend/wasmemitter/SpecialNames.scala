@@ -26,8 +26,8 @@ object SpecialNames {
   val CharBoxClass = BoxedCharacterClass.withSuffix("Box")
   val LongBoxClass = BoxedLongClass.withSuffix("Box")
 
-  val CharBoxCtor = MethodName.constructor(List(CharRef))
-  val LongBoxCtor = MethodName.constructor(List(LongRef))
+  val CharBoxCtor = MethodName.constructor(Vector(CharRef))
+  val LongBoxCtor = MethodName.constructor(Vector(LongRef))
 
   val JLNumberClass = ClassName("java.lang.Number")
 
@@ -48,15 +48,15 @@ object SpecialNames {
 
   // Method names
 
-  val AnyArgConstructorName = MethodName.constructor(List(ClassRef(ObjectClass)))
-  val StringArgConstructorName = MethodName.constructor(List(ClassRef(BoxedStringClass)))
-  val IntArgConstructorName = MethodName.constructor(List(IntRef))
-  val ThrowableArgConsructorName = MethodName.constructor(List(ClassRef(ThrowableClass)))
+  val AnyArgConstructorName = MethodName.constructor(Vector(ClassRef(ObjectClass)))
+  val StringArgConstructorName = MethodName.constructor(Vector(ClassRef(BoxedStringClass)))
+  val IntArgConstructorName = MethodName.constructor(Vector(IntRef))
+  val ThrowableArgConsructorName = MethodName.constructor(Vector(ClassRef(ThrowableClass)))
 
-  val hashCodeMethodName = MethodName("hashCode", Nil, IntRef)
+  val hashCodeMethodName = MethodName("hashCode", Vector(), IntRef)
 
-  val fmodfMethodName = MethodName("fmodf", List(FloatRef, FloatRef), FloatRef)
-  val fmoddMethodName = MethodName("fmodd", List(DoubleRef, DoubleRef), DoubleRef)
+  val fmodfMethodName = MethodName("fmodf", Vector(FloatRef, FloatRef), FloatRef)
+  val fmoddMethodName = MethodName("fmodd", Vector(DoubleRef, DoubleRef), DoubleRef)
 
   /** A unique simple method name to map all method *signatures* into `MethodName`s. */
   val normalizedSimpleMethodName = SimpleMethodName("m")

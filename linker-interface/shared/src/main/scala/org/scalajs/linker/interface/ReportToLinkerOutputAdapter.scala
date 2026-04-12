@@ -49,11 +49,11 @@ object ReportToLinkerOutputAdapter {
   def convert(report: Report, outputDirectory: OutputDirectory,
       legacyOutput: LinkerOutput)(
       implicit ec: ExecutionContext): Future[Unit] = {
-    report.publicModules.toList match {
-      case Nil =>
+    report.publicModules.toVector match {
+      case Vector() =>
         writeEmptyOutput(legacyOutput)
 
-      case List(module) =>
+      case Vector(module) =>
         retrieveOutputFiles(module, outputDirectory)
           .flatMap(writePatchedOutput(_, legacyOutput))
 
@@ -69,7 +69,7 @@ object ReportToLinkerOutputAdapter {
     legacyOutput.sourceMap.fold {
       writeString(legacyOutput.jsFile, "")
     } { sourceMapFile =>
-      val smFields = List(
+      val smFields = Vector(
         "version" -> "3",
         "mappings" -> "\"\"",
         "sources" -> "[]",
@@ -112,7 +112,7 @@ object ReportToLinkerOutputAdapter {
       writeString(sourceMapFile, patched)
     }
 
-    Future.sequence(List(jsFileWrite) ++ sourceMapWrite).map(_ => ())
+    Future.sequence(Vector(jsFileWrite) ++ sourceMapWrite).map(_ => ())
   }
 
   /** Retrieve the linker JS file and an optional source map */
@@ -144,7 +144,7 @@ object ReportToLinkerOutputAdapter {
     for {
       _ <- checkFiles
       jsFileContent <- outDirImpl.readFull(module.jsFileName)
-      sourceMapContent <- Future.traverse(module.sourceMapName.toList)(outDirImpl.readFull(_))
+      sourceMapContent <- Future.traverse(module.sourceMapName.toVector)(outDirImpl.readFull(_))
     } yield {
       (jsFileContent, sourceMapContent.headOption)
     }

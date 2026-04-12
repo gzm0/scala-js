@@ -34,19 +34,19 @@ final class ConstantArrayPool {
   private val constantArrays = Array.fill(4)(mutable.ListBuffer.empty[Array[Byte]])
   private val currentSizes = new Array[Int](4)
 
-  def addArray8[T](elems: List[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
+  def addArray8[T](elems: Vector[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
     addArrayInternal(log2ByteSize = 0, elems)(putElem)
 
-  def addArray16[T](elems: List[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
+  def addArray16[T](elems: Vector[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
     addArrayInternal(log2ByteSize = 1, elems)(putElem)
 
-  def addArray32[T](elems: List[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
+  def addArray32[T](elems: Vector[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
     addArrayInternal(log2ByteSize = 2, elems)(putElem)
 
-  def addArray64[T](elems: List[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
+  def addArray64[T](elems: Vector[T])(putElem: (ByteBuffer, T) => Unit): (DataID, Int) =
     addArrayInternal(log2ByteSize = 3, elems)(putElem)
 
-  private def addArrayInternal[T](log2ByteSize: Int, elems: List[T])(
+  private def addArrayInternal[T](log2ByteSize: Int, elems: Vector[T])(
       putElem: (ByteBuffer, T) => Unit): (DataID, Int) = {
 
     val length = elems.size
@@ -63,9 +63,9 @@ final class ConstantArrayPool {
     (genDataID.constantArrays(log2ByteSize), offset)
   }
 
-  def genPool(): List[Data] = {
+  def genPool(): Vector[Data] = {
     for {
-      log2ByteSize <- constantArrays.indices.toList
+      log2ByteSize <- constantArrays.indices.toVector
       if constantArrays(log2ByteSize).nonEmpty
     } yield {
       val bytes = new Array[Byte](currentSizes(log2ByteSize))

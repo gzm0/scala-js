@@ -142,7 +142,7 @@ class CustomJSHelperBuilder()(implicit ctx: WasmContext, pos: Position) {
   }
 
   def genJSNativeLoadSpec(jsNativeLoadSpec: JSNativeLoadSpec): js.Tree = {
-    def genFollowPath(owner: js.Tree, path: List[String]): js.Tree = {
+    def genFollowPath(owner: js.Tree, path: Vector[String]): js.Tree = {
       path.foldLeft(owner) { (owner, item) =>
         js.BracketSelect.makeOptimized(owner, js.StringLiteral(item))
       }
@@ -161,8 +161,8 @@ class CustomJSHelperBuilder()(implicit ctx: WasmContext, pos: Position) {
   def genJSParamDef(param: ParamDef): js.ParamDef =
     js.ParamDef(newLocalIdent(param.name.name))
 
-  def genJSParamDefs(params: List[ParamDef],
-      restParam: Option[ParamDef]): (List[js.ParamDef], Option[js.ParamDef]) = {
+  def genJSParamDefs(params: Vector[ParamDef],
+      restParam: Option[ParamDef]): (Vector[js.ParamDef], Option[js.ParamDef]) = {
     (params.map(genJSParamDef(_)), restParam.map(genJSParamDef(_)))
   }
 
@@ -179,8 +179,8 @@ class CustomJSHelperBuilder()(implicit ctx: WasmContext, pos: Position) {
       resolver.setResolved(allocatedName)
     }
 
-    val helperFun = js.Function(ClosureFlags.arrow, jsParamDefs.toList, None, body)
-    val wasmFunType = watpe.FunctionType(wasmParamTypes.toList, transformResultType(resultType))
+    val helperFun = js.Function(ClosureFlags.arrow, jsParamDefs.toVector, None, body)
+    val wasmFunType = watpe.FunctionType(wasmParamTypes.toVector, transformResultType(resultType))
     ctx.addCustomJSHelper(helperFun, wasmFunType)
   }
 }

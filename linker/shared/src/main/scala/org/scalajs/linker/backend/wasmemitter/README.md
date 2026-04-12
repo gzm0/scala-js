@@ -130,16 +130,16 @@ For example, given the IR
 
 ```scala
 class A extends java.lang.Object {
-  val A::x: int
+  val A+:x: int
   def x;I(): int = {
-    this.A::x
+    this.A+:x
   }
   def plus;I;I(y: int): int = {
     (this.x;I() +[int] y)
   }
   constructor def <init>;I;V(x: int) {
-    this.A::x = x;
-    this.java.lang.Object::<init>;V()
+    this.A+:x = x;
+    this.java.lang.Object+:<init>;V()
   }
 }
 ```
@@ -654,7 +654,7 @@ Other than that, we have:
 ### JS operation IR nodes
 
 For most IR nodes that implement JS operations, we generate dedicated JS helper functions that we call from Wasm.
-For example, a node `JSMethodApply(receiver, method, List(arg1, arg2))` is implemented as a call to a helper that looks like:
+For example, a node `JSMethodApply(receiver, method, Vector(arg1, arg2))` is implemented as a call to a helper that looks like:
 
 ```js
 __scalaJSCustomHelpers: {
@@ -684,7 +684,7 @@ AsInstanceOf(
   JSMethodApply(
     LoadJSModule("js.Math"),
     StringLiteral("cos"),
-    List(VarRef("x")(DoubleType))
+    Vector(VarRef("x")(DoubleType))
   ),
   DoubleType
 )

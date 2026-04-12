@@ -42,7 +42,7 @@ class ClassDefCheckerTest {
     val wrongClassDef = classDef(
       "A",
       kind = ClassKind.Interface,
-      jsNativeLoadSpec = Some(JSNativeLoadSpec.Global("Foo", Nil))
+      jsNativeLoadSpec = Some(JSNativeLoadSpec.Global("Foo", Vector()))
     )
 
     val config = StandardConfig()
@@ -56,7 +56,7 @@ class ClassDefCheckerTest {
 
     TestIRRepo.minilib.flatMap { stdLibFiles =>
       val irFiles = stdLibFiles :+ MemClassDefIRFile(wrongClassDef)
-      linkerFrontend.link(irFiles, Nil, loadASymbolRequirements, NullLogger)
+      linkerFrontend.link(irFiles, Vector(), loadASymbolRequirements, NullLogger)
     }.failed.map { th =>
       assertTrue(th.toString(), th.isInstanceOf[LinkingException])
     }
@@ -79,7 +79,7 @@ class ClassDefCheckerTest {
   @Test
   def javaLangObjectNoInterfaces(): Unit = {
     assertError(
-        classDef(ObjectClass, interfaces = List("Parent")),
+        classDef(ObjectClass, interfaces = Vector("Parent")),
         "java.lang.Object may not implement any interfaces")
   }
 
@@ -143,12 +143,12 @@ class ClassDefCheckerTest {
       classDef(
         "A",
         superClass = Some(ObjectClass),
-        fields = List(
+        fields = Vector(
           FieldDef(EMF, FieldName("B", "foo"), NON, IntType)
         ),
-        methods = List(trivialCtor("A"))
+        methods = Vector(trivialCtor("A"))
       ),
-      "illegal FieldDef with name B::foo in class A"
+      "illegal FieldDef with name B+:foo in class A"
     )
 
     // evidence that we do not need an explicit check for top-level field exports
@@ -157,16 +157,16 @@ class ClassDefCheckerTest {
         "A",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        fields = List(
+        fields = Vector(
           FieldDef(
               EMF.withNamespace(MemberNamespace.PublicStatic), FieldName("A", "foo"), NON, IntType)
         ),
-        methods = List(trivialCtor("A", forModuleClass = true)),
-        topLevelExportDefs = List(
+        methods = Vector(trivialCtor("A", forModuleClass = true)),
+        topLevelExportDefs = Vector(
           TopLevelFieldExportDef("main", "foo", FieldName("B", "foo"))
         )
       ),
-      "Cannot export non-existent static field 'B::foo'"
+      "Cannot export non-existent static field 'B+:foo'"
     )
   }
 
@@ -174,22 +174,22 @@ class ClassDefCheckerTest {
   def noDuplicateFields(): Unit = {
     assertError(
         classDef("A", superClass = Some(ObjectClass),
-            fields = List(
+            fields = Vector(
               FieldDef(EMF, FieldName("A", "foobar"), NON, IntType),
               FieldDef(EMF, FieldName("A", "foobar"), NON, BooleanType)
             )),
-        "duplicate field 'A::foobar'")
+        "duplicate field 'A+:foobar'")
   }
 
   @Test
   def illegalFieldTypes(): Unit = {
-    val badFieldTypes: List[Type] = List(
+    val badFieldTypes: Vector[Type] = Vector(
       AnyNotNullType,
       ClassType(ArithmeticExceptionClass, nullable = false, exact = false),
       ClassType(ArithmeticExceptionClass, nullable = false, exact = true),
       ArrayType(ArrayTypeRef(I, 1), nullable = false, exact = false),
       ArrayType(ArrayTypeRef(I, 1), nullable = false, exact = true),
-      RecordType(List(RecordType.Field("I", NON, IntType, mutable = true))),
+      RecordType(Vector(RecordType.Field("I", NON, IntType, mutable = true))),
       NothingType,
       VoidType
     )
@@ -197,7 +197,7 @@ class ClassDefCheckerTest {
     for (fieldType <- badFieldTypes) {
       assertError(
           classDef("A", superClass = Some(ObjectClass),
-              fields = List(
+              fields = Vector(
                 FieldDef(EMF, FieldName("A", "x"), NON, fieldType)
               )),
           s"FieldDef cannot have type ${fieldType.show()}")
@@ -206,14 +206,14 @@ class ClassDefCheckerTest {
 
   @Test
   def noDuplicateMethods(): Unit = {
-    val babarMethodName = MethodName("babar", List(IntRef), IntRef)
+    val babarMethodName = MethodName("babar", Vector(IntRef), IntRef)
 
     assertError(
         classDef("A", superClass = Some(ObjectClass),
-            methods = List(
-              MethodDef(EMF, babarMethodName, NON, List(paramDef("x", IntType)),
+            methods = Vector(
+              MethodDef(EMF, babarMethodName, NON, Vector(paramDef("x", IntType)),
                   IntType, None)(EOH, UNV),
-              MethodDef(EMF, babarMethodName, NON, List(paramDef("y", IntType)),
+              MethodDef(EMF, babarMethodName, NON, Vector(paramDef("y", IntType)),
                   IntType, None)(EOH, UNV)
             )),
         "duplicate method 'babar(int)int'")
@@ -222,25 +222,25 @@ class ClassDefCheckerTest {
   @Test
   def noDuplicateConstructors(): Unit = {
     val BoxedStringType = ClassType(BoxedStringClass, nullable = true, exact = false)
-    val stringCtorName = MethodName.constructor(List(T))
+    val stringCtorName = MethodName.constructor(Vector(T))
 
     val FooClass = ClassName("Foo")
 
     val callPrimaryCtorBody: Tree = {
       ApplyStatically(EAF.withConstructor(true), thisFor(FooClass),
-          FooClass, NoArgConstructorName, Nil)(VoidType)
+          FooClass, NoArgConstructorName, Vector())(VoidType)
     }
 
     assertError(
         classDef(FooClass, superClass = Some(ObjectClass),
-            methods = List(
+            methods = Vector(
               trivialCtor(FooClass),
               MethodDef(EMF.withNamespace(MemberNamespace.Constructor),
-                  stringCtorName, NON, List(paramDef("x", BoxedStringType)),
+                  stringCtorName, NON, Vector(paramDef("x", BoxedStringType)),
                   VoidType, Some(callPrimaryCtorBody))(
                   EOH, UNV),
               MethodDef(EMF.withNamespace(MemberNamespace.Constructor),
-                  stringCtorName, NON, List(paramDef("y", BoxedStringType)),
+                  stringCtorName, NON, Vector(paramDef("y", BoxedStringType)),
                   VoidType, Some(callPrimaryCtorBody))(
                   EOH, UNV)
             )),
@@ -249,16 +249,16 @@ class ClassDefCheckerTest {
 
   @Test
   def noStaticAbstractMethods(): Unit = {
-    val fooMethodName = MethodName("foo", Nil, IntRef)
+    val fooMethodName = MethodName("foo", Vector(), IntRef)
 
     assertError(
         classDef(
           "A",
           kind = ClassKind.Interface,
-          methods = List(
+          methods = Vector(
             MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic),
-                fooMethodName, NON, Nil, IntType, None)(EOH, UNV),
-            MethodDef(EMF, fooMethodName, NON, Nil, IntType, None)(EOH, UNV) // OK
+                fooMethodName, NON, Vector(), IntType, None)(EOH, UNV),
+            MethodDef(EMF, fooMethodName, NON, Vector(), IntType, None)(EOH, UNV) // OK
           )
         ),
         "Abstract methods may only be in the public namespace")
@@ -266,15 +266,15 @@ class ClassDefCheckerTest {
 
   @Test
   def publicReflectiveProxy(): Unit = {
-    val babarMethodName = MethodName.reflectiveProxy("babar", Nil)
+    val babarMethodName = MethodName.reflectiveProxy("babar", Vector())
 
     assertError(
       classDef(
         "A",
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic),
-              babarMethodName, NON, Nil, AnyType, Some(int(1)))(EOH, UNV)
+              babarMethodName, NON, Vector(), AnyType, Some(int(1)))(EOH, UNV)
         )
       ),
       "reflective profixes are only allowed in the public namespace",
@@ -292,7 +292,7 @@ class ClassDefCheckerTest {
     )
 
     assertError(
-      classDef("A", kind = ClassKind.Interface, methods = List(mainMethodDef(body))),
+      classDef("A", kind = ClassKind.Interface, methods = Vector(mainMethodDef(body))),
       "Duplicate local variable name x."
     )
   }
@@ -301,11 +301,11 @@ class ClassDefCheckerTest {
   def noDuplicateVarDefForIn(): Unit = {
     val body = Block(
       VarDef("x", NoOriginalName, IntType, mutable = false, int(1)),
-      ForIn(JSObjectConstr(Nil), "x", NoOriginalName, Skip())
+      ForIn(JSObjectConstr(Vector()), "x", NoOriginalName, Skip())
     )
 
     assertError(
-      classDef("A", kind = ClassKind.Interface, methods = List(mainMethodDef(body))),
+      classDef("A", kind = ClassKind.Interface, methods = Vector(mainMethodDef(body))),
       "Duplicate local variable name x."
     )
   }
@@ -318,7 +318,7 @@ class ClassDefCheckerTest {
     )
 
     assertError(
-      classDef("A", kind = ClassKind.Interface, methods = List(mainMethodDef(body))),
+      classDef("A", kind = ClassKind.Interface, methods = Vector(mainMethodDef(body))),
       "Duplicate local variable name x."
     )
   }
@@ -331,8 +331,8 @@ class ClassDefCheckerTest {
         classDef(
           "Foo",
           superClass = Some(ObjectClass),
-          methods = List(
-            MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType,
+          methods = Vector(
+            MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType,
                 Some(int(5)))(EOH, UNV)
           )
         ),
@@ -347,10 +347,10 @@ class ClassDefCheckerTest {
         classDef(
           "Foo",
           superClass = Some(ObjectClass),
-          methods = List(
-            MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+          methods = Vector(
+            MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
               ApplyStatically(EAF.withConstructor(true), thisFor("Foo"),
-                  "Bar", NoArgConstructorName, Nil)(VoidType)
+                  "Bar", NoArgConstructorName, Vector())(VoidType)
             })(EOH, UNV)
           )
         ),
@@ -364,7 +364,7 @@ class ClassDefCheckerTest {
 
     def ctorCall(receiver: Tree): ApplyStatically = {
       ApplyStatically(EAF.withConstructor(true), receiver,
-          ObjectClass, NoArgConstructorName, Nil)(VoidType)
+          ObjectClass, NoArgConstructorName, Vector())(VoidType)
     }
 
     val thiz = thisFor("Foo")
@@ -373,8 +373,8 @@ class ClassDefCheckerTest {
         classDef(
           "Foo",
           superClass = Some(ObjectClass),
-          methods = List(
-            MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType,
+          methods = Vector(
+            MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType,
                 Some(Block(
                   ctorCall(thiz),
                   ctorCall(Null())
@@ -387,8 +387,8 @@ class ClassDefCheckerTest {
         classDef(
           "Foo",
           superClass = Some(ObjectClass),
-          methods = List(
-            MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType,
+          methods = Vector(
+            MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType,
                 Some(Block(
                   ctorCall(thiz),
                   If(BooleanLiteral(true), ctorCall(thiz), Skip())(VoidType)
@@ -401,9 +401,9 @@ class ClassDefCheckerTest {
         classDef(
           "Foo",
           superClass = Some(ObjectClass),
-          methods = List(
+          methods = Vector(
             trivialCtor("Foo"),
-            MethodDef(EMF, m("foo", Nil, V), NON, Nil, VoidType,
+            MethodDef(EMF, m("foo", Vector(), V), NON, Vector(), VoidType,
                 Some(Block(
                   ctorCall(thiz)
                 )))(EOH, UNV)
@@ -429,9 +429,9 @@ class ClassDefCheckerTest {
       classDef(
         "Foo",
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor("Foo"),
-          MethodDef(EMF, m("foo", List(I), V), NON, List(thisParamDef), VoidType, Some(Skip()))(
+          MethodDef(EMF, m("foo", Vector(I), V), NON, Vector(thisParamDef), VoidType, Some(Skip()))(
               EOH, UNV)
         )
       ),
@@ -441,7 +441,7 @@ class ClassDefCheckerTest {
     // Capture param of a Closure
     assertError(
       mainTestClassDef(Block(
-        Closure(ClosureFlags.arrow, List(thisParamDef), Nil, None, AnyType, int(5), List(int(6)))
+        Closure(ClosureFlags.arrow, Vector(thisParamDef), Vector(), None, AnyType, int(5), Vector(int(6)))
       )),
       "Illegal definition of a variable with name `this`"
     )
@@ -449,7 +449,7 @@ class ClassDefCheckerTest {
     // Param of a closure
     assertError(
       mainTestClassDef(Block(
-        Closure(ClosureFlags.arrow, Nil, List(thisParamDef), None, AnyType, int(5), Nil)
+        Closure(ClosureFlags.arrow, Vector(), Vector(thisParamDef), None, AnyType, int(5), Vector())
       )),
       "Illegal definition of a variable with name `this`"
     )
@@ -457,7 +457,7 @@ class ClassDefCheckerTest {
     // Rest param of a closure
     assertError(
       mainTestClassDef(Block(
-        Closure(ClosureFlags.arrow, Nil, Nil, Some(thisParamDef), AnyType, int(5), Nil)
+        Closure(ClosureFlags.arrow, Vector(), Vector(), Some(thisParamDef), AnyType, int(5), Vector())
       )),
       "Illegal definition of a variable with name `this`"
     )
@@ -469,8 +469,8 @@ class ClassDefCheckerTest {
         superClass = Some(ObjectClass),
         kind = ClassKind.JSClass,
         jsConstructor = Some(trivialJSCtor()),
-        jsMethodProps = List(
-          JSMethodDef(EMF, str("foo"), List(thisParamDef), None, Skip())(EOH, UNV)
+        jsMethodProps = Vector(
+          JSMethodDef(EMF, str("foo"), Vector(thisParamDef), None, Skip())(EOH, UNV)
         )
       ),
       "Illegal definition of a variable with name `this`"
@@ -482,7 +482,7 @@ class ClassDefCheckerTest {
         "Foo",
         superClass = Some(ObjectClass),
         kind = ClassKind.JSClass,
-        jsClassCaptures = Some(List(thisParamDef)),
+        jsClassCaptures = Some(Vector(thisParamDef)),
         jsConstructor = Some(trivialJSCtor())
       ),
       "Illegal JS class capture with name '`this`'"
@@ -503,9 +503,9 @@ class ClassDefCheckerTest {
       classDef(
         "Foo",
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor("Foo"),
-          MethodDef(EMF, m("foo", Nil, V), NON, Nil, VoidType,
+          MethodDef(EMF, m("foo", Vector(), V), NON, Vector(), VoidType,
               Some(Block(
                 Assign(thisFor("Foo"), thisFor("Foo"))
               )))(EOH, UNV)
@@ -531,8 +531,8 @@ class ClassDefCheckerTest {
           classDef(
             "Foo",
             superClass = Some(ObjectClass),
-            methods = List(
-              MethodDef(methodFlags, m("bar", Nil, V), NON, Nil, VoidType, Some {
+            methods = Vector(
+              MethodDef(methodFlags, m("bar", Vector(), V), NON, Vector(), VoidType, Some {
                 consoleLog(expr)
               })(EOH, UNV)
             )
@@ -577,20 +577,20 @@ class ClassDefCheckerTest {
         "Variable `this` of type Foo! typed as =Foo")
 
     testThisTypeError(static = false,
-        Closure(ClosureFlags.arrow, Nil, Nil, None, AnyType, This()(VoidType), Nil),
+        Closure(ClosureFlags.arrow, Vector(), Vector(), None, AnyType, This()(VoidType), Vector()),
         "Cannot find variable `this` in scope")
 
     testThisTypeError(static = false,
-        Closure(ClosureFlags.arrow, Nil, Nil, None, AnyType, This()(AnyType), Nil),
+        Closure(ClosureFlags.arrow, Vector(), Vector(), None, AnyType, This()(AnyType), Vector()),
         "Cannot find variable `this` in scope")
 
     testThisTypeError(static = false,
-        Closure(ClosureFlags.function, Nil, Nil, None, AnyType, This()(VoidType), Nil),
+        Closure(ClosureFlags.function, Vector(), Vector(), None, AnyType, This()(VoidType), Vector()),
         "Variable `this` of type any typed as void")
 
     testThisTypeError(static = false,
-        Closure(ClosureFlags.function, Nil, Nil, None, AnyType,
-            This()(ClassType("Foo", nullable = false, exact = false)), Nil),
+        Closure(ClosureFlags.function, Vector(), Vector(), None, AnyType,
+            This()(ClassType("Foo", nullable = false, exact = false)), Vector()),
         "Variable `this` of type any typed as Foo!")
   }
 
@@ -606,9 +606,9 @@ class ClassDefCheckerTest {
           classDef(
             "Foo",
             superClass = Some(ObjectClass),
-            methods = List(
-              MethodDef(ctorFlags, MethodName.constructor(List(I)), NON,
-                  List(xParamDef), VoidType, Some(Block(ctorStats: _*)))(EOH, UNV)
+            methods = Vector(
+              MethodDef(ctorFlags, MethodName.constructor(Vector(I)), NON,
+                  Vector(xParamDef), VoidType, Some(Block(ctorStats: _*)))(EOH, UNV)
             )
           ),
           "Restricted use of `this` before the super constructor call")
@@ -644,8 +644,8 @@ class ClassDefCheckerTest {
 
     testRestrictedThisError(
       ApplyStatically(EAF.withConstructor(true), thiz, ObjectClass,
-          MethodIdent(MethodName.constructor(List(O))),
-          List(thiz))(VoidType)
+          MethodIdent(MethodName.constructor(Vector(O))),
+          Vector(thiz))(VoidType)
     )
   }
 
@@ -660,8 +660,8 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        methods = List(
-          MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+        methods = Vector(
+          MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
             Block(
               superCtorCall,
               StoreModule()
@@ -677,8 +677,8 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
-          MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+        methods = Vector(
+          MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
             Block(
               StoreModule(),
               superCtorCall,
@@ -695,8 +695,8 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
-          MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+        methods = Vector(
+          MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
             Block(
               superCtorCall
             )
@@ -711,8 +711,8 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
-          MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+        methods = Vector(
+          MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
             Block(
               superCtorCall,
               IntLiteral(1)
@@ -728,8 +728,8 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
-          MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+        methods = Vector(
+          MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
             Block(
               superCtorCall,
               StoreModule(),
@@ -746,8 +746,8 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
-          MethodDef(ctorFlags, NoArgConstructorName, NON, Nil, VoidType, Some {
+        methods = Vector(
+          MethodDef(ctorFlags, NoArgConstructorName, NON, Vector(), VoidType, Some {
             Block(
               superCtorCall,
               StoreModule(),
@@ -764,9 +764,9 @@ class ClassDefCheckerTest {
         "Foo",
         kind = ClassKind.ModuleClass,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor("Foo", forModuleClass = true),
-          MethodDef(EMF, MethodName("foo", Nil, VoidRef), NON, Nil, VoidType, Some {
+          MethodDef(EMF, MethodName("foo", Vector(), VoidRef), NON, Vector(), VoidType, Some {
             Block(
               StoreModule()
             )
@@ -782,9 +782,9 @@ class ClassDefCheckerTest {
         kind = ClassKind.JSModuleClass,
         superClass = Some("scala.scalajs.js.Object"),
         jsConstructor = Some(
-          JSConstructorDef(JSCtorFlags, Nil, None,
-              JSConstructorBody(StoreModule() :: Nil, JSSuperConstructorCall(Nil),
-                  StoreModule() :: Undefined() :: Nil))(
+          JSConstructorDef(JSCtorFlags, Vector(), None,
+              JSConstructorBody(StoreModule() +: Vector(), JSSuperConstructorCall(Vector()),
+                  StoreModule() +: Undefined() +: Vector()))(
               EOH, UNV)
         )
       ),
@@ -797,9 +797,9 @@ class ClassDefCheckerTest {
         kind = ClassKind.JSModuleClass,
         superClass = Some("scala.scalajs.js.Object"),
         jsConstructor = Some(
-          JSConstructorDef(JSCtorFlags, Nil, None,
-              JSConstructorBody(Nil, JSSuperConstructorCall(Nil),
-                  Undefined() :: Nil))(
+          JSConstructorDef(JSCtorFlags, Vector(), None,
+              JSConstructorBody(Vector(), JSSuperConstructorCall(Vector()),
+                  Undefined() +: Vector()))(
               EOH, UNV)
         )
       ),
@@ -812,9 +812,9 @@ class ClassDefCheckerTest {
         kind = ClassKind.JSModuleClass,
         superClass = Some("scala.scalajs.js.Object"),
         jsConstructor = Some(
-          JSConstructorDef(JSCtorFlags, Nil, None,
-              JSConstructorBody(Nil, JSSuperConstructorCall(Nil),
-                  StoreModule() :: StoreModule() :: Undefined() :: Nil))(
+          JSConstructorDef(JSCtorFlags, Vector(), None,
+              JSConstructorBody(Vector(), JSSuperConstructorCall(Vector()),
+                  StoreModule() +: StoreModule() +: Undefined() +: Vector()))(
               EOH, UNV)
         )
       ),
@@ -846,7 +846,7 @@ class ClassDefCheckerTest {
     testIsAsInstanceOfError(NothingType)
 
     testIsAsInstanceOfError(
-        RecordType(List(RecordType.Field("f", NON, IntType, mutable = false))))
+        RecordType(Vector(RecordType.Field("f", NON, IntType, mutable = false))))
 
     testIsInstanceOfError(AnyType)
     testAsInstanceOfError(AnyNotNullType)
@@ -876,9 +876,9 @@ class ClassDefCheckerTest {
     val ComparableType = ClassType(ComparableClass, nullable = false, exact = false)
 
     val descriptor = NewLambda.Descriptor(
-        ObjectClass, List(ComparableClass), m("compareTo", List(O), I), List(AnyType), IntType)
+        ObjectClass, Vector(ComparableClass), m("compareTo", Vector(O), I), Vector(AnyType), IntType)
     val closure =
-      Closure(ClosureFlags.typed, Nil, List(paramDef("that", AnyType)), None, IntType, int(0), Nil)
+      Closure(ClosureFlags.typed, Vector(), Vector(paramDef("that", AnyType)), None, IntType, int(0), Vector())
 
     // Wrong Closure flags
     assertError(
@@ -894,7 +894,7 @@ class ClassDefCheckerTest {
     // Something wrong in the Closure itself (smoke test to check that we check the Closure as a whole)
     assertError(
         mainTestClassDef(NewLambda(descriptor,
-            closure.copy(captureValues = List(int(0))))(ComparableType)),
+            closure.copy(captureValues = Vector(int(0))))(ComparableType)),
         "Mismatched size for captures: 0 params vs 1 values")
 
     // NewLambda is rejected after desugaring
@@ -907,7 +907,7 @@ class ClassDefCheckerTest {
   @Test
   def linkTimePropertyTest(): Unit = {
     // Test that some illegal types are rejected
-    for (tpe <- List(FloatType, NullType, NothingType,
+    for (tpe <- Vector(FloatType, NullType, NothingType,
             ClassType(BoxedStringClass, nullable = false, exact = false))) {
       assertError(
           mainTestClassDef(LinkTimeProperty("foo")(tpe)),
@@ -934,9 +934,9 @@ class ClassDefCheckerTest {
       classDef(
         "Foo",
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor("Foo"),
-          MethodDef(EMF, MethodName("foo", Nil, VoidRef), NON, Nil, VoidType, Some {
+          MethodDef(EMF, MethodName("foo", Vector(), VoidRef), NON, Vector(), VoidType, Some {
             LinkTimeIf(
               cond,
               consoleLog(StringLiteral("foo")),

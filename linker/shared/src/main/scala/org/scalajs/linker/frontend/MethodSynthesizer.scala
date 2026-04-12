@@ -30,18 +30,18 @@ private[frontend] final class MethodSynthesizer(
     inputProvider: MethodSynthesizer.InputProvider) {
 
   def synthesizeMembers(classInfo: ClassInfo, analysis: Analysis)(
-      implicit ec: ExecutionContext): Future[List[MethodDef]] = {
+      implicit ec: ExecutionContext): Future[Vector[MethodDef]] = {
     val publicMethodInfos = classInfo.methodInfos(MemberNamespace.Public)
     val futures = publicMethodInfos.valuesIterator.filter(_.isReachable).flatMap { m =>
       m.syntheticKind match {
         case MethodSyntheticKind.None =>
-          Nil
+          Vector()
 
         case MethodSyntheticKind.ReflectiveProxy(targetName) =>
-          List(synthesizeReflectiveProxy(classInfo, m, targetName, analysis))
+          Vector(synthesizeReflectiveProxy(classInfo, m, targetName, analysis))
 
         case MethodSyntheticKind.DefaultBridge(targetInterface) =>
-          List(synthesizeDefaultBridge(classInfo, m, targetInterface, analysis))
+          Vector(synthesizeDefaultBridge(classInfo, m, targetInterface, analysis))
       }
     }
 
@@ -49,7 +49,7 @@ private[frontend] final class MethodSynthesizer(
      * All synthetic members are in the Public namespace, so their `methodName`
      * uniquely identifies them.
      */
-    Future.sequence(futures.toList)
+    Future.sequence(futures.toVector)
       .map(_.sortBy(_.methodName))
   }
 

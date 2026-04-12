@@ -24,8 +24,8 @@ object IRContainer {
   def fromIRFile(irFile: IRFile): IRContainer = {
     val f = IRFileImpl.fromIRFile(irFile)
     new IRContainerImpl(f.path, f.version) {
-      def sjsirFiles(implicit ec: ExecutionContext): Future[List[IRFile]] =
-        Future.successful(List(irFile))
+      def sjsirFiles(implicit ec: ExecutionContext): Future[Vector[IRFile]] =
+        Future.successful(Vector(irFile))
     }
   }
 }

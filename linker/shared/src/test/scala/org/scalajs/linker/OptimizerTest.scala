@@ -57,61 +57,61 @@ class OptimizerTest {
    *  `j.l.Object.clone()` is not otherwise reachable).
    */
   private def testCloneOnArrayInliningGeneric(inlinedWhenOnObject: Boolean,
-      customMethodDefs: List[MethodDef]): Future[Unit] = {
+      customMethodDefs: Vector[MethodDef]): Future[Unit] = {
 
     val thisFoo = thisFor("Foo")
     val intArrayTypeRef = ArrayTypeRef(IntRef, 1)
     val intArrayType = ArrayType(intArrayTypeRef, nullable = true, exact = false)
-    val anArrayOfInts = ArrayValue(intArrayTypeRef, List(IntLiteral(1)))
-    val newFoo = New("Foo", NoArgConstructorName, Nil)
+    val anArrayOfInts = ArrayValue(intArrayTypeRef, Vector(IntLiteral(1)))
+    val newFoo = New("Foo", NoArgConstructorName, Vector())
 
-    val reachCloneMethodName = m("reachClone", Nil, O)
-    val anArrayMethodName = m("anArray", Nil, intArrayTypeRef)
-    val anObjectMethodName = m("anObject", Nil, O)
+    val reachCloneMethodName = m("reachClone", Vector(), O)
+    val anArrayMethodName = m("anArray", Vector(), intArrayTypeRef)
+    val anObjectMethodName = m("anObject", Vector(), O)
 
     def callCloneOn(receiver: Tree): Tree =
-      consoleLog(Apply(EAF, receiver, cloneMethodName, Nil)(AnyType))
+      consoleLog(Apply(EAF, receiver, cloneMethodName, Vector())(AnyType))
 
-    val fooMethodDefs = List(
+    val fooMethodDefs = Vector(
       trivialCtor("Foo"),
 
       // @noinline def witness(): AnyRef = throw null
-      MethodDef(EMF, witnessMethodName, NON, Nil, AnyType, Some {
+      MethodDef(EMF, witnessMethodName, NON, Vector(), AnyType, Some {
         UnaryOp(UnaryOp.Throw, Null())
       })(EOH.withNoinline(true), UNV),
 
       // @noinline def reachClone(): Object = clone()
-      MethodDef(EMF, reachCloneMethodName, NON, Nil, AnyType, Some {
-        Apply(EAF, thisFoo, cloneMethodName, Nil)(AnyType)
+      MethodDef(EMF, reachCloneMethodName, NON, Vector(), AnyType, Some {
+        Apply(EAF, thisFoo, cloneMethodName, Vector())(AnyType)
       })(EOH.withNoinline(true), UNV),
 
       // @noinline def anArray(): Array[Int] = Array(1)
-      MethodDef(EMF, anArrayMethodName, NON, Nil, intArrayType, Some {
+      MethodDef(EMF, anArrayMethodName, NON, Vector(), intArrayType, Some {
         anArrayOfInts
       })(EOH.withNoinline(true), UNV),
 
       // @noinline def anObject(): AnyRef = Array(1)
-      MethodDef(EMF, anObjectMethodName, NON, Nil, AnyType, Some {
+      MethodDef(EMF, anObjectMethodName, NON, Vector(), AnyType, Some {
         anArrayOfInts
       })(EOH.withNoinline(true), UNV)
-    ) ::: customMethodDefs
+    ) ++ customMethodDefs
 
     val classDefs = Seq(
       classDef(
         "Foo",
         superClass = Some(ObjectClass),
-        interfaces = List("java.lang.Cloneable"),
+        interfaces = Vector("java.lang.Cloneable"),
         methods = fooMethodDefs
       ),
       mainTestClassDef(Block(
         // new Foo().reachClone() -- make Foo.clone() reachable for sure
-        Apply(EAF, newFoo, reachCloneMethodName, Nil)(AnyType),
+        Apply(EAF, newFoo, reachCloneMethodName, Vector())(AnyType),
         // Array(1).clone() -- test with an exact static type of I[] -> inline
         callCloneOn(anArrayOfInts),
         // new Foo().anArray().clone() -- test with a static type of I[] -> inline
-        callCloneOn(Apply(EAF, newFoo, anArrayMethodName, Nil)(intArrayType)),
+        callCloneOn(Apply(EAF, newFoo, anArrayMethodName, Vector())(intArrayType)),
         // new Foo().anObject().clone() -- test with a static type of Object -> inlinedWhenOnObject
-        callCloneOn(Apply(EAF, newFoo, anObjectMethodName, Nil)(AnyType))
+        callCloneOn(Apply(EAF, newFoo, anObjectMethodName, Vector())(AnyType))
       ))
     )
 
@@ -142,10 +142,10 @@ class OptimizerTest {
   @Test
   def testCloneOnArrayInliningNonObjectCloneOnly_Issue3778(): AsyncResult = await {
     testCloneOnArrayInliningGeneric(inlinedWhenOnObject = false,
-        List(
+        Vector(
           // @inline override def clone(): AnyRef = witness()
-          MethodDef(EMF, cloneMethodName, NON, Nil, AnyType, Some {
-            Apply(EAF, thisFor("Foo"), witnessMethodName, Nil)(AnyType)
+          MethodDef(EMF, cloneMethodName, NON, Vector(), AnyType, Some {
+            Apply(EAF, thisFor("Foo"), witnessMethodName, Vector())(AnyType)
           })(EOH.withInline(true), UNV)
         ))
   }
@@ -158,7 +158,7 @@ class OptimizerTest {
    */
   @Test
   def testCloneOnArrayInliningObjectCloneOnly_Issue3778(): AsyncResult = await {
-    testCloneOnArrayInliningGeneric(inlinedWhenOnObject = true, Nil)
+    testCloneOnArrayInliningGeneric(inlinedWhenOnObject = true, Vector())
   }
 
   /** Test array `clone()` inlining when `j.l.Object.clone()` and another
@@ -167,13 +167,13 @@ class OptimizerTest {
   @Test
   def testCloneOnArrayInliningObjectCloneAndAnotherClone_Issue3778(): AsyncResult = await {
     testCloneOnArrayInliningGeneric(inlinedWhenOnObject = false,
-        List(
+        Vector(
           // @inline override def clone(): AnyRef = witness()
-          MethodDef(EMF, cloneMethodName, NON, Nil, AnyType, Some {
+          MethodDef(EMF, cloneMethodName, NON, Vector(), AnyType, Some {
             Block(
-              Apply(EAF, thisFor("Foo"), witnessMethodName, Nil)(AnyType),
+              Apply(EAF, thisFor("Foo"), witnessMethodName, Vector())(AnyType),
               ApplyStatically(EAF, thisFor("Foo"),
-                  ObjectClass, cloneMethodName, Nil)(AnyType)
+                  ObjectClass, cloneMethodName, Vector())(AnyType)
             )
           })(EOH.withInline(true), UNV)
         ))
@@ -201,27 +201,27 @@ class OptimizerTest {
   @Test
   def testOptimizerDoesNotEliminateRequiredStaticField_Issue4021(): AsyncResult = await {
     val StringType = ClassType(BoxedStringClass, nullable = true, exact = false)
-    val fooGetter = m("foo", Nil, T)
+    val fooGetter = m("foo", Vector(), T)
     val classDefs = Seq(
       classDef(
         MainTestClassName,
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        fields = List(
+        fields = Vector(
           // static var foo: java.lang.String
           FieldDef(EMF.withNamespace(PublicStatic).withMutable(true),
               FieldName(MainTestClassName, "foo"), NON, StringType)
         ),
-        methods = List(
+        methods = Vector(
           trivialCtor(MainTestClassName),
-          // static def foo(): java.lang.String = Test::foo
+          // static def foo(): java.lang.String = Test+:foo
           MethodDef(EMF.withNamespace(MemberNamespace.PublicStatic),
-              fooGetter, NON, Nil, StringType, Some {
+              fooGetter, NON, Vector(), StringType, Some {
                 SelectStatic(FieldName(MainTestClassName, "foo"))(StringType)
               })(EOH, UNV),
-          // static def main(args: String[]) { println(Test::foo()) }
+          // static def main(args: String[]) { println(Test+:foo()) }
           mainMethodDef {
-            consoleLog(ApplyStatic(EAF, MainTestClassName, fooGetter, Nil)(StringType))
+            consoleLog(ApplyStatic(EAF, MainTestClassName, fooGetter, Vector())(StringType))
           }
         )
       )
@@ -279,7 +279,7 @@ class OptimizerTest {
 
       val boxedIntegerType = ClassType(BoxedIntegerClass, nullable = false, exact = false)
 
-      val results = for (voidReturnArgument <- List(Undefined(), Skip())) yield {
+      val results = for (voidReturnArgument <- Vector(Undefined(), Skip())) yield {
         val classDefs = Seq(
           mainTestClassDef(Block(
             Labeled(matchResult1, VoidType,
@@ -299,7 +299,7 @@ class OptimizerTest {
                             )),
                         Return(voidReturnArgument, matchResult1)
                       )),
-                  UnaryOp(UnaryOp.Throw, New("java.lang.Exception", NoArgConstructorName, Nil))
+                  UnaryOp(UnaryOp.Throw, New("java.lang.Exception", NoArgConstructorName, Vector()))
                 ))
           ))
         )
@@ -313,7 +313,7 @@ class OptimizerTest {
 
   @Test
   def testCaptureElimination(): AsyncResult = await {
-    val sideEffect = m("sideEffect", List(I), I)
+    val sideEffect = m("sideEffect", Vector(I), I)
 
     val x = LocalName("x")
     val x2 = LocalName("x2")
@@ -324,11 +324,11 @@ class OptimizerTest {
         MainTestClassName,
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(MainTestClassName),
           // @noinline static def sideEffect(x: Int): Int = x
           MethodDef(EMF.withNamespace(PublicStatic), sideEffect, NON,
-              List(paramDef(x, IntType)), IntType, Some(VarRef(x)(IntType)))(
+              Vector(paramDef(x, IntType)), IntType, Some(VarRef(x)(IntType)))(
               EOH.withNoinline(true), UNV),
           /* static def main(args: String[]) {
            *   console.log(arrow-lambda<
@@ -345,16 +345,16 @@ class OptimizerTest {
           mainMethodDef {
             val closure = Closure(
               ClosureFlags.arrow,
-              (1 to 5).toList.map(i => paramDef(LocalName("x" + i), IntType)),
-              Nil,
+              (1 to 5).toVector.map(i => paramDef(LocalName("x" + i), IntType)),
+              Vector(),
               None,
               AnyType,
               Block(
                 consoleLog(VarRef(x4)(IntType)),
                 consoleLog(VarRef(x2)(IntType))
               ),
-              (1 to 5).toList.map(
-                  i => ApplyStatic(EAF, MainTestClassName, sideEffect, List(int(i)))(IntType))
+              (1 to 5).toVector.map(
+                  i => ApplyStatic(EAF, MainTestClassName, sideEffect, Vector(int(i)))(IntType))
             )
             consoleLog(closure)
           }
@@ -364,9 +364,9 @@ class OptimizerTest {
 
     for (moduleSet <- linkToModuleSet(classDefs, MainTestModuleInitializers)) yield {
       var lastSideEffectFound = 0
-      var closureParams = List.empty[List[LocalName]]
+      var closureParams = Vector.empty[Vector[LocalName]]
       traverseMainMethod(moduleSet) {
-        case ApplyStatic(_, MainTestClassName, MethodIdent(`sideEffect`), List(IntLiteral(i))) =>
+        case ApplyStatic(_, MainTestClassName, MethodIdent(`sideEffect`), Vector(IntLiteral(i))) =>
           assertEquals("wrong side effect ordering", lastSideEffectFound + 1, i)
           lastSideEffectFound = i
         case c: Closure =>
@@ -374,43 +374,43 @@ class OptimizerTest {
         case _ =>
       }
       assertEquals("wrong number of side effect calls", 5, lastSideEffectFound)
-      assertEquals("wrong closure params", List(List(x2, x4)), closureParams)
+      assertEquals("wrong closure params", Vector(Vector(x2, x4)), closureParams)
     }
   }
 
   @Test
   def testOptimizeDynamicImport(): AsyncResult = await {
-    val thunkMethodName = m("thunk", Nil, O)
-    val implMethodName = m("impl", Nil, O)
+    val thunkMethodName = m("thunk", Vector(), O)
+    val implMethodName = m("impl", Vector(), O)
 
-    val memberMethodName = m("member", Nil, O)
+    val memberMethodName = m("member", Vector(), O)
 
     val SMF = EMF.withNamespace(MemberNamespace.PublicStatic)
 
     val classDefs = Seq(
       mainTestClassDef {
-        consoleLog(ApplyDynamicImport(EAF, "Thunk", thunkMethodName, Nil))
+        consoleLog(ApplyDynamicImport(EAF, "Thunk", thunkMethodName, Vector()))
       },
       classDef(
         "Thunk",
         superClass = Some(ObjectClass),
         optimizerHints = EOH.withInline(true),
-        methods = List(
+        methods = Vector(
           trivialCtor("Thunk"),
-          MethodDef(EMF, implMethodName, NON, Nil, AnyType, Some {
+          MethodDef(EMF, implMethodName, NON, Vector(), AnyType, Some {
             SelectJSNativeMember("Holder", memberMethodName)
           })(EOH, UNV),
-          MethodDef(SMF, thunkMethodName, NON, Nil, AnyType, Some {
-            val inst = New("Thunk", NoArgConstructorName, Nil)
-            Apply(EAF, inst, implMethodName, Nil)(AnyType)
+          MethodDef(SMF, thunkMethodName, NON, Vector(), AnyType, Some {
+            val inst = New("Thunk", NoArgConstructorName, Vector())
+            Apply(EAF, inst, implMethodName, Vector())(AnyType)
           })(EOH, UNV)
         )
       ),
       classDef(
         "Holder",
         kind = ClassKind.Interface,
-        jsNativeMembers = List(
-          JSNativeMemberDef(SMF, memberMethodName, JSNativeLoadSpec.Import("foo", List("bar")))
+        jsNativeMembers = Vector(
+          JSNativeMemberDef(SMF, memberMethodName, JSNativeLoadSpec.Import("foo", Vector("bar")))
         )
       )
     )
@@ -444,9 +444,9 @@ class OptimizerTest {
   def testFoldLiteralClosureCaptures(): AsyncResult = await {
     val classDefs = Seq(
       mainTestClassDef {
-        consoleLog(Closure(ClosureFlags.arrow, List(paramDef("x", IntType)), Nil, None, AnyType, {
+        consoleLog(Closure(ClosureFlags.arrow, Vector(paramDef("x", IntType)), Vector(), None, AnyType, {
           BinaryOp(BinaryOp.Int_+, VarRef("x")(IntType), int(2))
-        }, List(int(3))))
+        }, Vector(int(3))))
       }
     )
 
@@ -464,22 +464,22 @@ class OptimizerTest {
 
   @Test
   def testSupportImplicitClosureCaptures(): AsyncResult = await {
-    val calc = m("calc", Nil, I)
+    val calc = m("calc", Vector(), I)
 
     val classDefs = Seq(
       classDef(
         MainTestClassName,
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           // @noinline static def calc(): Int = 1
-          MethodDef(EMF.withNamespace(PublicStatic), calc, NON, Nil,
+          MethodDef(EMF.withNamespace(PublicStatic), calc, NON, Vector(),
               IntType, Some(int(1)))(EOH.withNoinline(true), UNV),
           mainMethodDef(Block(
             VarDef("x", NON, IntType, mutable = false,
-                ApplyStatic(EAF, MainTestClassName, calc, Nil)(IntType)),
-            consoleLog(Closure(ClosureFlags.arrow, List(paramDef("y", IntType)), Nil, None,
-                AnyType, VarRef("y")(IntType), List(VarRef("x")(IntType))))
+                ApplyStatic(EAF, MainTestClassName, calc, Vector())(IntType)),
+            consoleLog(Closure(ClosureFlags.arrow, Vector(paramDef("y", IntType)), Vector(), None,
+                AnyType, VarRef("y")(IntType), Vector(VarRef("x")(IntType))))
           ))
         )
       )
@@ -491,7 +491,7 @@ class OptimizerTest {
       traverseMainMethod(moduleSet) {
         case c: Closure =>
           c.captureValues match {
-            case List(VarRef(name)) =>
+            case Vector(VarRef(name)) =>
               assertEquals(s"unexpected capture name: $c", c.captureParams.head.name.name, name)
 
             case _ =>
@@ -505,7 +505,7 @@ class OptimizerTest {
 
   private def commonClassDefsForFieldRemovalTests(classInline: Boolean,
       witnessMutable: Boolean): Seq[ClassDef] = {
-    val methodName = m("method", Nil, I)
+    val methodName = m("method", Vector(), I)
 
     val witnessType = ClassType("Witness", nullable = true, exact = false)
 
@@ -515,20 +515,20 @@ class OptimizerTest {
         "Foo",
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        fields = List(
+        fields = Vector(
           // x: Witness
           FieldDef(EMF.withMutable(witnessMutable), FieldName("Foo", "x"), NON, witnessType),
 
           // y: Int
           FieldDef(EMF, FieldName("Foo", "y"), NON, IntType)
         ),
-        methods = List(
+        methods = Vector(
           // def this() = {
           //   this.x = null
           //   this.y = 5
-          //   this.jl.Object::<init>()
+          //   this.jl.Object+:<init>()
           // }
-          MethodDef(EMF.withNamespace(Constructor), NoArgConstructorName, NON, Nil, VoidType,
+          MethodDef(EMF.withNamespace(Constructor), NoArgConstructorName, NON, Vector(), VoidType,
               Some(Block(
                 Assign(Select(thisFor("Foo"), FieldName("Foo", "x"))(witnessType), Null()),
                 Assign(Select(thisFor("Foo"), FieldName("Foo", "y"))(IntType), int(5)),
@@ -536,14 +536,14 @@ class OptimizerTest {
               )))(EOH, UNV),
 
           // def method(): Int = this.y
-          MethodDef(EMF, methodName, NON, Nil, IntType, Some {
+          MethodDef(EMF, methodName, NON, Vector(), IntType, Some {
             Select(thisFor("Foo"), FieldName("Foo", "y"))(IntType)
           })(EOH, UNV)
         ),
         optimizerHints = EOH.withInline(classInline)
       ),
       mainTestClassDef {
-        consoleLog(Apply(EAF, New("Foo", NoArgConstructorName, Nil), methodName, Nil)(IntType))
+        consoleLog(Apply(EAF, New("Foo", NoArgConstructorName, Vector()), methodName, Vector())(IntType))
       }
     )
   }
@@ -556,7 +556,7 @@ class OptimizerTest {
       moduleSet <- linkToModuleSet(classDefs, MainTestModuleInitializers)
     } yield {
       findClass(moduleSet, "Foo").get.fields match {
-        case List(FieldDef(_, FieldIdent(name), _, _)) if name == FieldName("Foo", "y") =>
+        case Vector(FieldDef(_, FieldIdent(name), _, _)) if name == FieldName("Foo", "y") =>
           // ok
 
         case fields =>
@@ -598,15 +598,15 @@ class OptimizerTest {
         MainTestClassName,
         kind = ClassKind.Class,
         superClass = Some(ObjectClass),
-        methods = List(
+        methods = Vector(
           trivialCtor(MainTestClassName),
-          MethodDef(EMF.withNamespace(PublicStatic), witnessMethodName, NON, Nil, AnyType, Some {
+          MethodDef(EMF.withNamespace(PublicStatic), witnessMethodName, NON, Vector(), AnyType, Some {
             // Non-trivial body to ensure no inlining by heuristics.
             Block(consoleLog(str("something")), str("result"))
           })(optimizerHints, UNV),
           mainMethodDef {
             consoleLog {
-              ApplyStatic(applyFlags, MainTestClassName, witnessMethodName, Nil)(AnyType)
+              ApplyStatic(applyFlags, MainTestClassName, witnessMethodName, Vector())(AnyType)
             }
           }
         )
@@ -653,8 +653,8 @@ class OptimizerTest {
 }
 
 object OptimizerTest {
-  private val cloneMethodName = m("clone", Nil, O)
-  private val witnessMethodName = m("witness", Nil, O)
+  private val cloneMethodName = m("clone", Vector(), O)
+  private val witnessMethodName = m("witness", Vector(), O)
 
   private def findClass(moduleSet: ModuleSet, name: ClassName): Option[LinkedClass] =
     moduleSet.modules.flatMap(_.classDefs).find(_.className == name)

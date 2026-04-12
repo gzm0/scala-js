@@ -51,7 +51,7 @@ class PrintersTest {
           |  return x;
           |}
         """,
-      FunctionDef("test", Nil, None,
+      FunctionDef("test", Vector(), None,
           Block(
               Let("x", mutable = false, Some(IntLiteral(2))),
               Return(VarRef("x"))))
@@ -62,7 +62,7 @@ class PrintersTest {
           |function test() {
           |}
         """,
-      FunctionDef("test", Nil, None, Skip())
+      FunctionDef("test", Vector(), None, Skip())
     )
   }
 
@@ -72,7 +72,7 @@ class PrintersTest {
           |class MyClass extends foo.Other {
           |}
         """,
-      ClassDef(Some("MyClass"), Some(DotSelect(VarRef("foo"), "Other")), Nil)
+      ClassDef(Some("MyClass"), Some(DotSelect(VarRef("foo"), "Other")), Vector())
     )
 
     assertPrintEquals(
@@ -88,8 +88,8 @@ class PrintersTest {
           |}
         """,
       ClassDef(Some("MyClass"), None,
-          List(
-            MethodDef(false, "foo", Nil, None, Skip()),
+          Vector(
+            MethodDef(false, "foo", Vector(), None, Skip()),
             GetterDef(false, "a", Return(IntLiteral(1))),
             SetterDef(false, "a", ParamDef("x"), Skip())
           ))
@@ -103,7 +103,7 @@ class PrintersTest {
         |ctor = (function() {
         |});
       """,
-      JSDocConstructor(Assign(VarRef("ctor"), Function(ClosureFlags.function, Nil, None, Skip())))
+      JSDocConstructor(Assign(VarRef("ctor"), Function(ClosureFlags.function, Vector(), None, Skip())))
     )
   }
 
@@ -167,7 +167,7 @@ class PrintersTest {
   }
 
   @Test def printObjectLiteral(): Unit = {
-    assertPrintEquals("({});", ObjectConstr(Nil))
+    assertPrintEquals("({});", ObjectConstr(Vector()))
 
     assertPrintEquals(
       """
@@ -175,7 +175,7 @@ class PrintersTest {
         |  "foo": 1
         |});
       """,
-      ObjectConstr(List(StringLiteral("foo") -> IntLiteral(1)))
+      ObjectConstr(Vector(StringLiteral("foo") -> IntLiteral(1)))
     )
 
     assertPrintEquals(
@@ -186,7 +186,7 @@ class PrintersTest {
         |  baz: 3
         |});
       """,
-      ObjectConstr(List(
+      ObjectConstr(Vector(
         StringLiteral("foo") -> IntLiteral(1),
         ComputedName(StringLiteral("bar")) -> IntLiteral(2),
         Ident("baz") -> IntLiteral(3)

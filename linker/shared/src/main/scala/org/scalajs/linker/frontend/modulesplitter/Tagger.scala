@@ -176,7 +176,7 @@ private class Tagger(infos: ModuleAnalyzer.DependencyInfo,
     }
   }
 
-  private def tag(className: ClassName, pathRoot: ModuleID, pathSteps: List[ClassName],
+  private def tag(className: ClassName, pathRoot: ModuleID, pathSteps: Vector[ClassName],
       excludedHopCount: Int, fromExcluded: Boolean): Unit = {
     val isExcluded = excludedClasses.contains(className)
 
@@ -200,12 +200,12 @@ private class Tagger(infos: ModuleAnalyzer.DependencyInfo,
     }
   }
 
-  private def staticEdge(className: ClassName, pathRoot: ModuleID, pathSteps: List[ClassName],
+  private def staticEdge(className: ClassName, pathRoot: ModuleID, pathSteps: Vector[ClassName],
       excludedHopCount: Int, fromExcluded: Boolean): Unit = {
     tag(className, pathRoot, pathSteps, excludedHopCount, fromExcluded)
   }
 
-  private def dynamicEdge(className: ClassName, pathRoot: ModuleID, pathSteps: List[ClassName],
+  private def dynamicEdge(className: ClassName, pathRoot: ModuleID, pathSteps: Vector[ClassName],
       excludedHopCount: Int, fromExcluded: Boolean): Unit = {
     tag(className, pathRoot, pathSteps :+ className, excludedHopCount, fromExcluded)
   }
@@ -215,7 +215,7 @@ private class Tagger(infos: ModuleAnalyzer.DependencyInfo,
       (moduleID, deps) <- infos.publicModuleDependencies
       className <- deps
     } {
-      staticEdge(className, pathRoot = moduleID, pathSteps = Nil,
+      staticEdge(className, pathRoot = moduleID, pathSteps = Vector(),
           excludedHopCount = 0, fromExcluded = false)
     }
   }
@@ -234,7 +234,7 @@ private object Tagger {
     private val direct = mutable.Set.empty[ModuleID]
     private val dynamic = mutable.Map.empty[ModuleID, DynamicPaths]
 
-    def put(pathRoot: ModuleID, pathSteps: List[ClassName], excludedHopCount: Int): Boolean = {
+    def put(pathRoot: ModuleID, pathSteps: Vector[ClassName], excludedHopCount: Int): Boolean = {
       val hopCountsChanged = excludedHopCount > maxExcludedHopCount
 
       if (hopCountsChanged)
@@ -272,7 +272,7 @@ private object Tagger {
           digestBuilder.update(intToBytes(maxExcludedHopCount))
 
         // Public modules using this.
-        for (id <- direct.toList.sortBy(_.id))
+        for (id <- direct.toVector.sortBy(_.id))
           digestBuilder.update(id.id.getBytes(StandardCharsets.UTF_8))
 
         // Dynamic modules using this.
@@ -310,8 +310,8 @@ private object Tagger {
     private val content = mutable.Map.empty[ClassName, DynamicPaths]
 
     @tailrec
-    def put(path: List[ClassName]): Boolean = {
-      val h :: t = path
+    def put(path: Vector[ClassName]): Boolean = {
+      val h +: t = path
 
       if (content.get(h).exists(_.content.isEmpty)) {
         // shorter or equal path already exists.

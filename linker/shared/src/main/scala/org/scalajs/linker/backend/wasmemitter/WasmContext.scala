@@ -54,7 +54,7 @@ final class WasmContext(
 
   private val functionTypes = LinkedHashMap.empty[watpe.FunctionType, wanme.TypeID]
   private val tableFunctionTypes = mutable.HashMap.empty[MethodName, wanme.TypeID]
-  private val closureDataTypes = LinkedHashMap.empty[List[Type], wanme.TypeID]
+  private val closureDataTypes = LinkedHashMap.empty[Vector[Type], wanme.TypeID]
   private val typedClosureTypes = LinkedHashMap.empty[ClosureType, (wanme.TypeID, wanme.TypeID)]
 
   val jsNameGen = new JSNameGen()
@@ -155,17 +155,17 @@ final class WasmContext(
         mainRecType.addSubType(
           typeID,
           ClassEmitter.makeTableEntryTypeOriginalName(normalizedName),
-          watpe.FunctionType(watpe.RefType.any :: regularParamTyps, resultType)
+          watpe.FunctionType(watpe.RefType.any +: regularParamTyps, resultType)
         )
         typeID
       }
     )
   }
 
-  def getClosureDataStructType(captureParamTypes: List[Type]): wanme.TypeID = {
+  def getClosureDataStructType(captureParamTypes: Vector[Type]): wanme.TypeID = {
     closureDataTypes.getOrElseUpdate(
       captureParamTypes, {
-        val fields: List[watpe.StructField] = {
+        val fields: Vector[watpe.StructField] = {
           for ((tpe, i) <- captureParamTypes.zipWithIndex) yield {
             watpe.StructField(
               genFieldID.captureParam(i),
@@ -202,13 +202,13 @@ final class WasmContext(
       val tpeNameString = tpe.show()
 
       val funType = watpe.FunctionType(
-        watpe.RefType.struct :: tpe.paramTypes.map(TypeTransformer.transformParamType(_)),
+        watpe.RefType.struct +: tpe.paramTypes.map(TypeTransformer.transformParamType(_)),
         TypeTransformer.transformResultType(tpe.resultType)
       )
       val funTypeID = genTypeID.forClosureFunType(tpe)
       mainRecType.addSubType(funTypeID, OriginalName("fun" + tpeNameString), funType)
 
-      val fields: List[watpe.StructField] = List(
+      val fields: Vector[watpe.StructField] = Vector(
         watpe.StructField(
           genFieldID.typedClosure.data,
           OriginalName("data"),
@@ -239,11 +239,11 @@ final class WasmContext(
   def addGlobal(g: wamod.Global): Unit =
     moduleBuilder.addGlobal(g)
 
-  def getAllCustomJSHelpers(): List[(String, js.Function)] =
-    customJSHelpers.toList
+  def getAllCustomJSHelpers(): Vector[(String, js.Function)] =
+    customJSHelpers.toVector
 
-  def getAllFuncDeclarations(): List[wanme.FunctionID] =
-    _funcDeclarations.toList
+  def getAllFuncDeclarations(): Vector[wanme.FunctionID] =
+    _funcDeclarations.toVector
 }
 
 object WasmContext {
@@ -256,17 +256,17 @@ object WasmContext {
   final class ClassInfo(
       val name: ClassName,
       val kind: ClassKind,
-      val jsClassCaptures: Option[List[ParamDef]],
-      val allFieldDefs: List[FieldDef],
+      val jsClassCaptures: Option[Vector[ParamDef]],
+      val allFieldDefs: Vector[FieldDef],
       val hasInstances: Boolean,
       val isAbstract: Boolean,
       val hasRuntimeTypeInfo: Boolean,
       val jsNativeLoadSpec: Option[JSNativeLoadSpec],
       val jsNativeMembers: Map[MethodName, JSNativeLoadSpec],
-      val staticFieldMirrors: Map[FieldName, List[String]],
+      val staticFieldMirrors: Map[FieldName, Vector[String]],
       _specialInstanceTypes: Int, // should be `val` but there is a large Scaladoc for it below
       val resolvedMethodInfos: Map[MethodName, ConcreteMethodInfo],
-      val tableEntries: List[MethodName],
+      val tableEntries: Vector[MethodName],
       _itableIdx: Int
   ) {
     override def toString(): String =

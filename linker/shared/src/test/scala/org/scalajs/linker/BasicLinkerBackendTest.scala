@@ -47,11 +47,11 @@ class BasicLinkerBackendTest {
   def noInvalidatedModuleInSecondRun(): AsyncResult = await {
     import ModuleSplitStyle._
 
-    val classDefs = List(
+    val classDefs = Vector(
       mainTestClassDef(systemOutPrintln(str("Hello world!")))
     )
 
-    val results = for (splitStyle <- List(FewestModules, SmallestModules)) yield {
+    val results = for (splitStyle <- Vector(FewestModules, SmallestModules)) yield {
       val logger1 = new CapturingLogger
       val logger2 = new CapturingLogger
 

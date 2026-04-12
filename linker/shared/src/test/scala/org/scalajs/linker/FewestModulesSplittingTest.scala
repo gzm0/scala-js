@@ -59,7 +59,7 @@ class FewestModulesSplittingTest {
     val mainInitializer =
       ModuleInitializer.mainMethodWithArgs("Test", "main")
 
-    val moduleInitializers = List(
+    val moduleInitializers = Vector(
       mainInitializer.withModuleID("internal-"),
       mainInitializer.withModuleID("internal--")
     )
@@ -87,20 +87,20 @@ class FewestModulesSplittingTest {
      * suffer from this exponential memory explosion anymore.
      */
 
-    val dynTargetName = m("dynTarget", Nil, ClassRef(ObjectClass))
+    val dynTargetName = m("dynTarget", Vector(), ClassRef(ObjectClass))
 
     def callDynTarget(i: Int) =
-      ApplyDynamicImport(EAF, "Dyn" + i, dynTargetName, Nil)
+      ApplyDynamicImport(EAF, "Dyn" + i, dynTargetName, Vector())
 
     def dynClass(i: Int, body: Tree): ClassDef = {
       val dynMethod = MethodDef(
           MemberFlags.empty.withNamespace(MemberNamespace.PublicStatic),
-          dynTargetName, NON, Nil, AnyType, Some(body))(EOH, UNV)
+          dynTargetName, NON, Vector(), AnyType, Some(body))(EOH, UNV)
 
       classDef(
         className = "Dyn" + i,
         kind = ClassKind.Interface,
-        methods = List(dynMethod)
+        methods = Vector(dynMethod)
       )
     }
 

@@ -215,7 +215,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
     implicit val ctx = ErrorContext(tree)
 
     def checkApplyGeneric(receiverTypeForError: Any, methodName: MethodName,
-        args: List[Tree], tpe: Type, isStatic: Boolean): Unit = {
+        args: Vector[Tree], tpe: Type, isStatic: Boolean): Unit = {
       val (methodParams, resultType) = inferMethodType(methodName, isStatic)
       for ((actual, formal) <- args zip methodParams) {
         typecheckExpect(actual, env, formal)
@@ -515,7 +515,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
         val closureType = ClosureType(descriptor.paramTypes, descriptor.resultType, nullable = false)
         typecheckExpect(fun, env, closureType)
 
-        val possibleTypes = (descriptor.superClass :: descriptor.interfaces).map { parent =>
+        val possibleTypes = (descriptor.superClass +: descriptor.interfaces).map { parent =>
           ClassType(parent, nullable = false, exact = false)
         }
         if (!possibleTypes.exists(isSubtype(_, tree.tpe))) {
@@ -872,7 +872,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
   }
 
   private def inferMethodType(methodName: MethodName, isStatic: Boolean)(
-      implicit ctx: ErrorContext): (List[Type], Type) = {
+      implicit ctx: ErrorContext): (Vector[Type], Type) = {
 
     val paramTypes = methodName.paramTypeRefs.map(typeRefToType)
     val resultType = typeRefToType(methodName.resultTypeRef)
@@ -919,7 +919,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
     classes.getOrElseUpdate(className, {
       reportError(i"Cannot find class $className")
       new CheckedClass(className, ClassKind.Class, None, Some(ObjectClass),
-          Set(ObjectClass), hasInstances = true, None, Nil, Set.empty)
+          Set(ObjectClass), hasInstances = true, None, Vector(), Set.empty)
     })
   }
 
@@ -965,12 +965,12 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
   private class CheckedClass(
       val name: ClassName,
       val kind: ClassKind,
-      val jsClassCaptures: Option[List[ParamDef]],
+      val jsClassCaptures: Option[Vector[ParamDef]],
       val superClassName: Option[ClassName],
       val ancestors: Set[ClassName],
       val hasInstances: Boolean,
       val jsNativeLoadSpec: Option[JSNativeLoadSpec],
-      _fields: List[CheckedField],
+      _fields: Vector[CheckedField],
       val jsNativeMembers: Set[MethodName]) {
 
     val fields = _fields.filter(!_.flags.namespace.isStatic).map(f => f.name -> f).toMap
@@ -1000,7 +1000,7 @@ private final class IRChecker(linkTimeProperties: LinkTimeProperties,
   }
 
   private object CheckedClass {
-    private def checkedFieldsOf(classDef: LinkedClass): List[CheckedField] = {
+    private def checkedFieldsOf(classDef: LinkedClass): Vector[CheckedField] = {
       classDef.fields.collect {
         case FieldDef(flags, FieldIdent(name), _, tpe) =>
           new CheckedField(flags, name, tpe)

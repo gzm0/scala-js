@@ -50,7 +50,7 @@ object Printers {
   }
 
   class IRTreePrinter(protected val out: Writer) extends IndentationManager {
-    protected final def printColumn(ts: List[IRNode], start: String,
+    protected final def printColumn(ts: Vector[IRNode], start: String,
         sep: String, end: String): Unit = {
       print(start); indent()
       var rest = ts
@@ -64,7 +64,7 @@ object Printers {
       undent(); println(); print(end)
     }
 
-    protected final def printRow(ts: List[IRNode], start: String, sep: String,
+    protected final def printRow(ts: Vector[IRNode], start: String, sep: String,
         end: String): Unit = {
       print(start)
       var rest = ts
@@ -77,7 +77,7 @@ object Printers {
       print(end)
     }
 
-    protected final def printRow(ts: List[Type], start: String, sep: String,
+    protected final def printRow(ts: Vector[Type], start: String, sep: String,
         end: String)(implicit dummy: DummyImplicit): Unit = {
       print(start)
       var rest = ts
@@ -93,16 +93,16 @@ object Printers {
     protected def printBlock(tree: Tree): Unit = {
       val trees = tree match {
         case Block(trees) => trees
-        case Skip()       => Nil
-        case _            => tree :: Nil
+        case Skip()       => Vector()
+        case _            => tree +: Vector()
       }
       printBlock(trees)
     }
 
-    protected def printBlock(trees: List[Tree]): Unit =
+    protected def printBlock(trees: Vector[Tree]): Unit =
       printColumn(trees, "{", ";", "}")
 
-    protected def printSig(args: List[ParamDef], restParam: Option[ParamDef],
+    protected def printSig(args: Vector[ParamDef], restParam: Option[ParamDef],
         resultType: Type): Unit = {
       print("(")
       var rem = args
@@ -129,7 +129,7 @@ object Printers {
       }
     }
 
-    def printArgs(args: List[TreeOrJSSpread]): Unit =
+    def printArgs(args: Vector[TreeOrJSSpread]): Unit =
       printRow(args, "(", ", ", ")")
 
     def printAnyNode(node: IRNode): Unit = {
@@ -333,7 +333,7 @@ object Printers {
 
         case SelectJSNativeMember(className, member) =>
           print(className)
-          print("::")
+          print("+:")
           print(member)
 
         case Apply(flags, receiver, method, args) =>
@@ -346,14 +346,14 @@ object Printers {
           print(receiver)
           print(".")
           print(className)
-          print("::")
+          print("+:")
           print(flags)
           print(method)
           printArgs(args)
 
         case ApplyStatic(flags, className, method, args) =>
           print(className)
-          print("::")
+          print("+:")
           print(flags)
           print(method)
           printArgs(args)
@@ -361,7 +361,7 @@ object Printers {
         case ApplyDynamicImport(flags, className, method, args) =>
           print("dynamicImport ")
           print(className)
-          print("::")
+          print("+:")
           print(flags)
           print(method)
           printArgs(args)
@@ -700,7 +700,7 @@ object Printers {
         case JSSuperSelect(superClass, qualifier, item) =>
           print("super(")
           print(superClass)
-          print(")::")
+          print(")+:")
           print(qualifier)
           print('[')
           print(item)
@@ -709,7 +709,7 @@ object Printers {
         case JSSuperMethodCall(superClass, receiver, method, args) =>
           print("super(")
           print(superClass)
-          print(")::")
+          print(")+:")
           print(receiver)
           print('[')
           print(method)
@@ -803,7 +803,7 @@ object Printers {
         case JSArrayConstr(items) =>
           printRow(items, "[", ", ", "]")
 
-        case JSObjectConstr(Nil) =>
+        case JSObjectConstr(Vector()) =>
           print("{}")
 
         case JSObjectConstr(fields) =>
@@ -1029,8 +1029,8 @@ object Printers {
       }
       print(" ")
       printColumn(
-          fields ::: methods ::: jsConstructor.toList :::
-          jsMethodProps ::: jsNativeMembers ::: topLevelExportDefs,
+          fields ++ methods ++ jsConstructor.toVector ++
+          jsMethodProps ++ jsNativeMembers ++ topLevelExportDefs,
           "{", "", "}")
     }
 
@@ -1093,7 +1093,7 @@ object Printers {
             print(flags.namespace.prefixString)
             print("get ")
             printJSMemberName(name)
-            printSig(Nil, None, AnyType)
+            printSig(Vector(), None, AnyType)
             printBlock(body)
           }
 
@@ -1105,7 +1105,7 @@ object Printers {
             print(flags.namespace.prefixString)
             print("set ")
             printJSMemberName(name)
-            printSig(arg :: Nil, None, VoidType)
+            printSig(arg +: Vector(), None, VoidType)
             printBlock(body)
           }
 
@@ -1256,7 +1256,7 @@ object Printers {
     }
 
     def print(spec: JSNativeLoadSpec): Unit = {
-      def printPath(path: List[String]): Unit = {
+      def printPath(path: Vector[String]): Unit = {
         for (propName <- path) {
           print("[\"")
           printEscapeJS(propName, out)
@@ -1301,7 +1301,7 @@ object Printers {
     def print(flags: ApplyFlags)(
         implicit dummy1: DummyImplicit, dummy2: DummyImplicit): Unit = {
       if (flags.isPrivate)
-        print("private::")
+        print("private+:")
     }
 
     // Make it public
