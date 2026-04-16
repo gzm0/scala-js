@@ -50,9 +50,10 @@ object Printers {
   }
 
   class IRTreePrinter(protected val out: Writer) extends IndentationManager {
-    protected final def printColumn(ts: Vector[IRNode], start: String,
+    protected final def printColumn(ts: Seq[IRNode], start: String,
         sep: String, end: String): Unit = {
       print(start); indent()
+      // TODO fix performance
       var rest = ts
       while (rest.nonEmpty) {
         println()
@@ -64,9 +65,10 @@ object Printers {
       undent(); println(); print(end)
     }
 
-    protected final def printRow(ts: Vector[IRNode], start: String, sep: String,
+    protected final def printRow(ts: Seq[IRNode], start: String, sep: String,
         end: String): Unit = {
       print(start)
+      // TODO fix performance
       var rest = ts
       while (rest.nonEmpty) {
         printAnyNode(rest.head)
@@ -93,13 +95,13 @@ object Printers {
     protected def printBlock(tree: Tree): Unit = {
       val trees = tree match {
         case Block(trees) => trees
-        case Skip()       => Vector()
-        case _            => tree +: Vector()
+        case Skip()       => TreeSeq.empty
+        case _            => TreeSeq(tree)
       }
       printBlock(trees)
     }
 
-    protected def printBlock(trees: Vector[Tree]): Unit =
+    protected def printBlock(trees: TreeSeq): Unit =
       printColumn(trees, "{", ";", "}")
 
     protected def printSig(args: Vector[ParamDef], restParam: Option[ParamDef],
@@ -129,7 +131,7 @@ object Printers {
       }
     }
 
-    def printArgs(args: Vector[TreeOrJSSpread]): Unit =
+    def printArgs(args: Seq[TreeOrJSSpread]): Unit =
       printRow(args, "(", ", ", ")")
 
     def printAnyNode(node: IRNode): Unit = {

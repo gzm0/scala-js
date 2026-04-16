@@ -626,7 +626,7 @@ object Serializers {
       }
     }
 
-    def writeTrees(trees: Vector[Tree]): Unit = {
+    def writeTrees(trees: Seq[Tree]): Unit = {
       buffer.writeInt(trees.size)
       trees.foreach(writeTree)
     }
@@ -1720,7 +1720,7 @@ object Serializers {
       }
     }
 
-    def readTrees(): Vector[Tree] =
+    def readTrees(): TreeSeq =
       Vector.fill(readInt())(readTree())
 
     def readClassDef(): ClassDef = {
@@ -2336,7 +2336,7 @@ object Serializers {
     }
 
     private def maybeHackJSConstructorDefAfterSuper(ownerKind: ClassKind,
-        afterSuper0: Vector[Tree], superCallPos: Position): Vector[Tree] = {
+        afterSuper0: TreeSeq, superCallPos: Position): TreeSeq = {
       if (hacks.useBelow(18) && ownerKind == ClassKind.JSModuleClass) {
         afterSuper0 match {
           case StoreModule() +: _ => afterSuper0

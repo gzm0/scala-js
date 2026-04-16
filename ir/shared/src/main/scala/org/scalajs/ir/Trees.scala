@@ -117,7 +117,7 @@ object Trees {
     val tpe = VoidType
   }
 
-  sealed class Block private (val stats: Vector[Tree])(
+  sealed class Block private (val stats: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
     val tpe = stats.last.tpe
@@ -134,26 +134,27 @@ object Trees {
   }
 
   object Block {
-    def apply(stats: Vector[Tree])(implicit pos: Position): Tree = {
-      val flattenedStats = stats flatMap {
-        case Skip()          => Vector()
+    def apply(stats: TreeSeq[Tree])(implicit pos: Position): Tree = {
+      val statsAsSeqs = new TreeSeq.Ops(stats).map {
+        case Skip()          => TreeSeq.empty
         case Block(subStats) => subStats
-        case other           => other +: Vector()
+        case other           => TreeSeq.single(other)
       }
-      flattenedStats match {
-        case Vector()         => Skip()
-        case only +: Vector() => only
-        case _           => new Block(flattenedStats)
+
+      TreeSeq.concat(statsAsSeqs :_*) match {
+        case TreeSeq()     => Skip()
+        case TreeSeq(only) => only
+        case stats         => new Block(stats)
       }
     }
 
-    def apply(stats: Vector[Tree], expr: Tree)(implicit pos: Position): Tree =
-      apply(stats :+ expr)
+    //def apply(stats: TreeSeq, expr: Tree)(implicit pos: Position): Tree =
+    //  apply(stats :+ expr)
 
     def apply(stats: Tree*)(implicit pos: Position): Tree =
-      apply(stats.toVector)
+      apply(TreeSeq(stats :_*))
 
-    def unapply(block: Block): Some[Vector[Tree]] = Some(block.stats)
+    def unapply(block: Block): Some[TreeSeq[Tree]] = Some(block.stats)
   }
 
   sealed case class Labeled(label: LabelName, tpe: Type, body: Tree)(
@@ -240,7 +241,7 @@ object Trees {
   /** A break-free switch (without fallthrough behavior).
    *
    *  Unlike a JavaScript switch, it can be used in expression position.
-   *  It supports alternatives explicitly (hence the `Vector[MatchableLiteral]`
+   *  It supports alternatives explicitly (hence the `TreeSeq[MatchableLiteral]`
    *  in cases), whereas in a switch one would use the fallthrough behavior to
    *  implement alternatives.
    *  (This is not a pattern matching construct like in Scala.)
@@ -261,7 +262,7 @@ object Trees {
    *  `StringLiteral` and `Null`. Allowing more cases would only make IR
    *  checking more complicated, without bringing any added value.
    */
-  sealed case class Match(selector: Tree, cases: Vector[(Vector[MatchableLiteral], Tree)],
+  sealed case class Match(selector: Tree, cases: Vector[(TreeSeq[MatchableLiteral], Tree)],
       default: Tree)(val tpe: Type)(implicit val pos: Position)
       extends Tree
 
@@ -288,7 +289,7 @@ object Trees {
   // Scala expressions
 
   sealed case class New(className: ClassName, ctor: MethodIdent,
-      args: Vector[Tree])(
+      args: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
     val tpe: ClassType = ClassType(className, nullable = false, exact = true)
@@ -325,25 +326,25 @@ object Trees {
 
   /** Apply an instance method with dynamic dispatch (the default). */
   sealed case class Apply(flags: ApplyFlags, receiver: Tree, method: MethodIdent,
-      args: Vector[Tree])(
+      args: TreeSeq[Tree])(
       val tpe: Type)(implicit val pos: Position)
       extends Tree
 
   /** Apply an instance method with static dispatch (e.g., super calls). */
   sealed case class ApplyStatically(flags: ApplyFlags, receiver: Tree,
-      className: ClassName, method: MethodIdent, args: Vector[Tree])(
+      className: ClassName, method: MethodIdent, args: TreeSeq[Tree])(
       val tpe: Type)(implicit val pos: Position)
       extends Tree
 
   /** Apply a static method. */
   sealed case class ApplyStatic(flags: ApplyFlags, className: ClassName,
-      method: MethodIdent, args: Vector[Tree])(
+      method: MethodIdent, args: TreeSeq[Tree])(
       val tpe: Type)(implicit val pos: Position)
       extends Tree
 
   /** Apply a static method via dynamic import. */
   sealed case class ApplyDynamicImport(flags: ApplyFlags, className: ClassName,
-      method: MethodIdent, args: Vector[Tree])(
+      method: MethodIdent, args: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
@@ -366,7 +367,7 @@ object Trees {
    *  3. Let `argsV` be the result of evaluating `args`, in order.
    *  4. Invoke `funV` with arguments `argsV`, and return the result.
    */
-  sealed case class ApplyTypedClosure(flags: ApplyFlags, fun: Tree, args: Vector[Tree])(
+  sealed case class ApplyTypedClosure(flags: ApplyFlags, fun: Tree, args: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
 
@@ -414,7 +415,7 @@ object Trees {
 
   object NewLambda {
     final case class Descriptor(superClass: ClassName,
-        interfaces: Vector[ClassName], methodName: MethodName,
+        interfaces: TreeSeq[ClassName], methodName: MethodName,
         paramTypes: Vector[Type], resultType: Type) {
 
       require(paramTypes.size == methodName.paramTypeRefs.size)
@@ -770,7 +771,7 @@ object Trees {
     val tpe: ArrayType = ArrayType(typeRef, nullable = false, exact = true)
   }
 
-  sealed case class ArrayValue(typeRef: ArrayTypeRef, elems: Vector[Tree])(
+  sealed case class ArrayValue(typeRef: ArrayTypeRef, elems: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
     val tpe: ArrayType = ArrayType(typeRef, nullable = false, exact = true)
@@ -780,7 +781,7 @@ object Trees {
       implicit val pos: Position)
       extends AssignLhs
 
-  sealed case class RecordValue(tpe: RecordType, elems: Vector[Tree])(
+  sealed case class RecordValue(tpe: RecordType, elems: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree
 
@@ -801,7 +802,7 @@ object Trees {
 
   // JavaScript expressions
 
-  sealed case class JSNew(ctor: Tree, args: Vector[TreeOrJSSpread])(
+  sealed case class JSNew(ctor: Tree, args: TreeSeq[TreeOrJSSpread])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
@@ -819,14 +820,14 @@ object Trees {
     val tpe = AnyType
   }
 
-  sealed case class JSFunctionApply(fun: Tree, args: Vector[TreeOrJSSpread])(
+  sealed case class JSFunctionApply(fun: Tree, args: TreeSeq[TreeOrJSSpread])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
   }
 
   sealed case class JSMethodApply(receiver: Tree, method: Tree,
-      args: Vector[TreeOrJSSpread])(implicit val pos: Position)
+      args: TreeSeq[TreeOrJSSpread])(implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
   }
@@ -912,7 +913,7 @@ object Trees {
    *  }}}
    */
   sealed case class JSSuperMethodCall(superClass: Tree, receiver: Tree,
-      method: Tree, args: Vector[TreeOrJSSpread])(
+      method: Tree, args: TreeSeq[TreeOrJSSpread])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
@@ -955,7 +956,7 @@ object Trees {
    *  }
    *  }}}
    */
-  sealed case class JSSuperConstructorCall(args: Vector[TreeOrJSSpread])(
+  sealed case class JSSuperConstructorCall(args: TreeSeq[TreeOrJSSpread])(
       implicit val pos: Position)
       extends Tree {
     val tpe = VoidType
@@ -1133,7 +1134,7 @@ object Trees {
     }
   }
 
-  sealed case class JSArrayConstr(items: Vector[TreeOrJSSpread])(
+  sealed case class JSArrayConstr(items: TreeSeq[TreeOrJSSpread])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyNotNullType
@@ -1362,9 +1363,9 @@ object Trees {
    *  return a `Promise` of their body, and can contain [[JSAwait]] nodes.
    *  `flags.typed` and `flags.async` cannot both be `true`.
    */
-  sealed case class Closure(flags: ClosureFlags, captureParams: Vector[ParamDef],
-      params: Vector[ParamDef], restParam: Option[ParamDef], resultType: Type,
-      body: Tree, captureValues: Vector[Tree])(
+  sealed case class Closure(flags: ClosureFlags, captureParams: TreeSeq[ParamDef],
+      params: TreeSeq[ParamDef], restParam: Option[ParamDef], resultType: Type,
+      body: Tree, captureValues: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
     val tpe: Type =
@@ -1383,7 +1384,7 @@ object Trees {
    *    `jsClassCaptures.get`)
    */
   sealed case class CreateJSClass(className: ClassName,
-      captureValues: Vector[Tree])(
+      captureValues: TreeSeq[Tree])(
       implicit val pos: Position)
       extends Tree {
     val tpe = AnyType
@@ -1462,9 +1463,9 @@ object Trees {
        *  to have no captures. It will still have zero to many JS class values
        *  created with `CreateJSClass`.
        */
-      val jsClassCaptures: Option[Vector[ParamDef]],
+      val jsClassCaptures: Option[TreeSeq[ParamDef]],
       val superClass: Option[ClassIdent],
-      val interfaces: Vector[ClassIdent],
+      val interfaces: TreeSeq[ClassIdent],
       /** If defined, an expression returning the JS class value of the super
        *  class.
        *
@@ -1479,12 +1480,12 @@ object Trees {
        */
       val jsSuperClass: Option[Tree],
       val jsNativeLoadSpec: Option[JSNativeLoadSpec],
-      val fields: Vector[AnyFieldDef],
-      val methods: Vector[MethodDef],
+      val fields: TreeSeq[AnyFieldDef],
+      val methods: TreeSeq[MethodDef],
       val jsConstructor: Option[JSConstructorDef],
-      val jsMethodProps: Vector[JSMethodPropDef],
-      val jsNativeMembers: Vector[JSNativeMemberDef],
-      val topLevelExportDefs: Vector[TopLevelExportDef]
+      val jsMethodProps: TreeSeq[JSMethodPropDef],
+      val jsNativeMembers: TreeSeq[JSNativeMemberDef],
+      val topLevelExportDefs: TreeSeq[TopLevelExportDef]
   )(
       val optimizerHints: OptimizerHints
   )(implicit val pos: Position)
@@ -1497,17 +1498,17 @@ object Trees {
         name: ClassIdent,
         originalName: OriginalName,
         kind: ClassKind,
-        jsClassCaptures: Option[Vector[ParamDef]],
+        jsClassCaptures: Option[TreeSeq[ParamDef]],
         superClass: Option[ClassIdent],
-        interfaces: Vector[ClassIdent],
+        interfaces: TreeSeq[ClassIdent],
         jsSuperClass: Option[Tree],
         jsNativeLoadSpec: Option[JSNativeLoadSpec],
-        fields: Vector[AnyFieldDef],
-        methods: Vector[MethodDef],
+        fields: TreeSeq[AnyFieldDef],
+        methods: TreeSeq[MethodDef],
         jsConstructor: Option[JSConstructorDef],
-        jsMethodProps: Vector[JSMethodPropDef],
-        jsNativeMembers: Vector[JSNativeMemberDef],
-        topLevelExportDefs: Vector[TopLevelExportDef])(
+        jsMethodProps: TreeSeq[JSMethodPropDef],
+        jsNativeMembers: TreeSeq[JSNativeMemberDef],
+        topLevelExportDefs: TreeSeq[TopLevelExportDef])(
         optimizerHints: OptimizerHints)(
         implicit pos: Position): ClassDef = {
       new ClassDef(name, originalName, kind, jsClassCaptures, superClass,
@@ -1547,7 +1548,7 @@ object Trees {
       extends AnyFieldDef
 
   sealed case class MethodDef(flags: MemberFlags, name: MethodIdent,
-      originalName: OriginalName, args: Vector[ParamDef], resultType: Type,
+      originalName: OriginalName, args: TreeSeq[ParamDef], resultType: Type,
       body: Option[Tree])(
       val optimizerHints: OptimizerHints, val version: Version)(
       implicit val pos: Position)
@@ -1556,22 +1557,26 @@ object Trees {
   }
 
   sealed case class JSConstructorDef(flags: MemberFlags,
-      args: Vector[ParamDef], restParam: Option[ParamDef], body: JSConstructorBody)(
+      args: TreeSeq[ParamDef], restParam: Option[ParamDef], body: JSConstructorBody)(
       val optimizerHints: OptimizerHints, val version: Version)(
       implicit val pos: Position)
       extends VersionedMemberDef
 
   sealed case class JSConstructorBody(
-      beforeSuper: Vector[Tree], superCall: JSSuperConstructorCall, afterSuper: Vector[Tree])(
+      beforeSuper: TreeSeq[Tree], superCall: JSSuperConstructorCall, afterSuper: TreeSeq[Tree])(
       implicit val pos: Position)
       extends IRNode {
-    val allStats: Vector[Tree] = beforeSuper ++ (superCall +: afterSuper)
+    def allStats: TreeSeq[Tree] = TreeSeq.concat(
+      beforeSuper,
+      TreeSeq(superCall),
+      afterSuper,
+    )
   }
 
   sealed abstract class JSMethodPropDef extends VersionedMemberDef
 
   sealed case class JSMethodDef(flags: MemberFlags, name: Tree,
-      args: Vector[ParamDef], restParam: Option[ParamDef], body: Tree)(
+      args: TreeSeq[ParamDef], restParam: Option[ParamDef], body: Tree)(
       val optimizerHints: OptimizerHints, val version: Version)(
       implicit val pos: Position)
       extends JSMethodPropDef
@@ -1911,7 +1916,7 @@ object Trees {
      *  Global("cp", Vector("Vect"))
      *  }}}
      */
-    final case class Global(globalRef: String, path: Vector[String]) extends JSNativeLoadSpec {
+    final case class Global(globalRef: String, path: TreeSeq[String]) extends JSNativeLoadSpec {
 
       require(JSGlobalRef.isValidJSGlobalRefName(globalRef))
     }
@@ -1945,7 +1950,7 @@ object Trees {
      *  Import("foo", Vector("default"))
      *  }}}
      */
-    final case class Import(module: String, path: Vector[String]) extends JSNativeLoadSpec
+    final case class Import(module: String, path: TreeSeq[String]) extends JSNativeLoadSpec
 
     /** Like [[Import]], but with a [[Global]] fallback when linking without
      *  modules.
