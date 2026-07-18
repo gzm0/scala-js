@@ -68,20 +68,14 @@ final class Emitter(config: Emitter.Config) {
   }
 
   def emit(moduleSet: ModuleSet, logger: Logger): Result = {
-    val classDefs = moduleSet.modules.flatMap(_.classDefs) ::: moduleSet.abstractClasses
+    val derivedModuleSet = injectDerivedClasses(moduleSet)
 
-    val derivedClasses = DerivedClasses.deriveClasses(classDefs)
-
-    val preprocessInfo = Preprocessor.preprocess(
-      coreSpec,
-      (derivedClasses ::: classDefs).sortWith(compareClasses),
-      moduleSet.modules.flatMap(_.topLevelExports),
-    )
+    val preprocessInfo = Preprocessor.preprocess(coreSpec, derivedModuleSet)
 
     val coreLib = new CoreWasmLib(coreSpec, moduleSet.globalInfo)
 
-    val moduleResults = moduleSet.modules.map { module =>
-      val (wasmModule, jsFileContentInfo) = emitWasmModule(module, coreLib, preprocessInfo, derivedClasses)
+    val moduleResults = derivedModuleSet.modules.map { module =>
+      val (wasmModule, jsFileContentInfo) = emitWasmModule(module, coreLib, preprocessInfo)
       val jsFileContent = buildJSFileContent(module, jsFileContentInfo)
       module.id -> new Result.Module(wasmModule, jsFileContent)
     }
@@ -89,23 +83,46 @@ final class Emitter(config: Emitter.Config) {
     new Result(loaderContent, moduleResults.toMap) // TODO: Check if we actually need a map here.
   }
 
+  private def injectDerivedClasses(moduleSet: ModuleSet): ModuleSet = {
+    val newModules = moduleSet.modules.map { module =>
+      if (module.isRoot) {
+        new ModuleSet.Module(
+          module.id,
+          module.internalDependencies,
+          module.externalDependencies,
+          module.public,
+          module.classDefs ::: DerivedClasses.deriveClasses(module.classDefs),
+          module.topLevelExports,
+          module.initializers,
+        )
+      } else {
+        module
+      }
+    }
+
+    new ModuleSet(newModules, moduleSet.abstractClasses, moduleSet.globalInfo)
+  }
+
   private def emitWasmModule(module: ModuleSet.Module, coreLib: CoreWasmLib,
-    preprocessInfo: Preprocessor.Info, derivedClasses: List[LinkedClass]): (wamod.Module, JSFileContentInfo) = {
+    preprocessInfo: Preprocessor.Info): (wamod.Module, JSFileContentInfo) = {
 
     val topLevelExports = module.topLevelExports
     val moduleInitializers = module.initializers.toList
 
-    implicit val ctx: WasmContext = new WasmContext(coreSpec, coreLib, preprocessInfo)
+    implicit val ctx: WasmContext = new WasmContext(module.id, coreSpec, coreLib, preprocessInfo)
 
-    // TODO: Derived classes.
-    // TODO: Do not emit core lib unless necessary.
-    val sortedClasses = (module.classDefs ::: derivedClasses).sortWith(compareClasses)
+    val sortedClasses = module.classDefs.sortWith(compareClasses)
 
-    coreLib.genPreClasses()
+    if (module.isRoot)
+      coreLib.genPreClasses()
+
     sortedClasses.foreach(classEmitter.genClassDef(_))
     topLevelExports.foreach(classEmitter.genTopLevelExport(_))
-    classEmitter.genArrayClasses()
-    coreLib.genPostClasses()
+
+    if (module.isRoot) {
+      classEmitter.genArrayClasses()
+      coreLib.genPostClasses()
+    }
 
     genStartFunction(sortedClasses, moduleInitializers, topLevelExports)
 
