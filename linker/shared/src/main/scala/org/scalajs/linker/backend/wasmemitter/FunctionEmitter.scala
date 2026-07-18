@@ -967,7 +967,7 @@ private class FunctionEmitter private (
     val receiverLocalForDispatch =
       addSyntheticLocal(watpe.RefType.any)
 
-    val proxyId = ctx.getReflectiveProxyId(methodName)
+    val proxyId = ctx.preprocessInfo.getReflectiveProxyId(methodName)
     val funcTypeID = ctx.tableFunctionType(methodName)
 
     /* We only need to handle calls on non-hijacked classes. For hijacked
