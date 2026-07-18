@@ -123,20 +123,16 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
       make(jsPrototype, RefType.externref, isMutable = false) :: allButJSPrototype
   }
 
-  /** Generates definitions that must come *before* the code generated for regular classes.
-   *
-   *  This notably includes the `typeData` definitions, since the vtable of `jl.Object` is a subtype
-   *  of `typeData`.
-   */
-  def genPreClasses()(implicit ctx: WasmContext): Unit = {
+  def genTypeDefinitions()(implicit ctx: WasmContext): Unit = {
     genPreMainRecTypeDefinitions()
     ctx.moduleBuilder.addRecTypeBuilder(ctx.mainRecType)
     genCoreTypesInRecType()
+  }
 
+  /** Generates definitions that must come *before* the code generated for regular classes. */
+  def genPreClasses()(implicit ctx: WasmContext): Unit = {
     genImports()
-
     genPrimitiveTypeDataGlobals()
-
     genHelperDefinitions()
   }
 

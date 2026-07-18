@@ -113,6 +113,10 @@ final class Emitter(config: Emitter.Config) {
 
     val sortedClasses = module.classDefs.sortWith(compareClasses)
 
+    coreLib.genTypeDefinitions()
+    sortedClasses.foreach(classEmitter.genClassTypes(_))
+    classEmitter.genArrayTypes()
+
     if (module.isRoot)
       coreLib.genPreClasses()
 
