@@ -28,6 +28,7 @@ import org.scalajs.ir.WellKnownNames._
 import org.scalajs.linker.interface.{ModuleInitializer, ModuleKind}
 import org.scalajs.linker.interface.unstable.ModuleInitializerImpl
 import org.scalajs.linker.standard.{CoreSpec, LinkedClass, LinkedTopLevelExport}
+import org.scalajs.linker.standard.ModuleSet.ModuleID
 
 import org.scalajs.linker.backend.emitter.{NameGen => JSNameGen}
 
@@ -144,6 +145,7 @@ final class WasmMainRecTypeContext(
 }
 
 final class WasmContext(
+    val currentModule: ModuleID,
     coreSpec: CoreSpec,
     coreLib: CoreWasmLib,
     preprocessResult: Preprocessor.Result,

@@ -16,8 +16,11 @@ import org.scalajs.ir.Names._
 import org.scalajs.ir.Trees._
 import org.scalajs.ir.ClassKind
 
+import org.scalajs.linker.standard.ModuleSet.ModuleID
+
 final class ClassInfo(
     val name: ClassName,
+    val module: Option[ModuleID],
     val kind: ClassKind,
     val jsClassCaptures: Option[List[ParamDef]],
     val allFieldDefs: List[FieldDef],
