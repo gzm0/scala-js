@@ -180,7 +180,7 @@ const protoFactory = new Proxy({}, {
       }
 
 export async function load(wasmFileURL, exportSetters, privateJSFieldGetters,
-    privateJSFieldSetters, customJSHelpers, wtf16Strings) {
+    privateJSFieldSetters, customJSHelpers, wtf16Strings, internalImports) {
   const myScalaJSHelpers = {
     ...scalaJSHelpers,
     idHashCodeMap: new WeakMap()
@@ -194,6 +194,7 @@ export async function load(wasmFileURL, exportSetters, privateJSFieldGetters,
     "$WTF16StringConstantsModule": wtf16Strings,
     ${if (experimentalUseCustomDescriptors) raw""""$JSPrototypeFactoryModule": protoFactory,"""
       else ""}
+    ...internalImports,
   };
   const options = {
     builtins: ["js-string"],

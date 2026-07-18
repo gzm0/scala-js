@@ -45,10 +45,7 @@ import VarGen._
 final class WasmContext(
     val coreSpec: CoreSpec,
     val coreLib: CoreWasmLib,
-    classInfo: Map[ClassName, WasmContext.ClassInfo],
-    reflectiveProxies: Map[MethodName, Int],
-    val privateJSFields: Map[FieldName, String],
-    val itablesLength: Int
+    val preprocessInfo: Preprocessor.Info
 ) {
   import WasmContext._
 
@@ -106,10 +103,10 @@ final class WasmContext(
   val mainRecType: ModuleBuilder.RecTypeBuilder = new ModuleBuilder.RecTypeBuilder
 
   def getClassInfoOption(name: ClassName): Option[ClassInfo] =
-    classInfo.get(name)
+    preprocessInfo.getClassInfoOption(name)
 
   def getClassInfo(name: ClassName): ClassInfo =
-    classInfo.getOrElse(name, throw new Error(s"Class not found: $name"))
+    preprocessInfo.getClassInfo(name)
 
   def inferTypeFromTypeRef(typeRef: TypeRef): Type = typeRef match {
     case PrimRef(tpe) =>
@@ -124,13 +121,6 @@ final class WasmContext(
     case typeRef: TransientTypeRef =>
       typeRef.tpe
   }
-
-  /** Retrieves a unique identifier for a reflective proxy with the given name.
-   *
-   *  If no class defines a reflective proxy with the given name, returns `-1`.
-   */
-  def getReflectiveProxyId(name: MethodName): Int =
-    reflectiveProxies.getOrElse(name, -1)
 
   /** Adds or reuses a function type for a table function.
    *

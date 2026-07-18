@@ -26,8 +26,28 @@ import EmbeddedConstants._
 import WasmContext._
 
 object Preprocessor {
-  def preprocess(coreSpec: CoreSpec, coreLib: CoreWasmLib,
-      classes: List[LinkedClass], tles: List[LinkedTopLevelExport]): WasmContext = {
+  final class Info(
+    classInfo: Map[ClassName, WasmContext.ClassInfo],
+    reflectiveProxies: Map[MethodName, Int],
+    val privateJSFields: Map[FieldName, String],
+    val itablesLength: Int
+  ) {
+    def getClassInfoOption(name: ClassName): Option[ClassInfo] =
+      classInfo.get(name)
+
+    def getClassInfo(name: ClassName): ClassInfo =
+      classInfo.getOrElse(name, throw new Error(s"Class not found: $name"))
+
+    /** Retrieves a unique identifier for a reflective proxy with the given name.
+     *
+     *  If no class defines a reflective proxy with the given name, returns `-1`.
+     */
+    def getReflectiveProxyId(name: MethodName): Int =
+      reflectiveProxies.getOrElse(name, -1)
+  }
+
+  def preprocess(coreSpec: CoreSpec, classes: List[LinkedClass],
+      tles: List[LinkedTopLevelExport]): Info = {
     val staticFieldMirrors = computeStaticFieldMirrors(tles)
     val privateJSFields = computePrivateJSFields(classes)
 
@@ -66,8 +86,7 @@ object Preprocessor {
     // sort for stability
     val reflectiveProxyIDs = definedReflectiveProxyNames.toList.sorted.zipWithIndex.toMap
 
-    new WasmContext(coreSpec, coreLib, classInfos, reflectiveProxyIDs,
-        privateJSFields, itableBucketCount)
+    new Info(classInfos, reflectiveProxyIDs, privateJSFields, itableBucketCount)
   }
 
   private def computeStaticFieldMirrors(

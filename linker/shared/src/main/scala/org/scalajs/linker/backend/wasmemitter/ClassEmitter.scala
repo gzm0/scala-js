@@ -317,7 +317,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
 
     val reflectiveProxiesInstrs: List[wa.Instr] = {
       val elemsInstrs: List[wa.Instr] = reflectiveProxies
-        .map(proxyInfo => ctx.getReflectiveProxyId(proxyInfo.methodName) -> proxyInfo.tableEntryID)
+        .map(proxyInfo => ctx.preprocessInfo.getReflectiveProxyId(proxyInfo.methodName) -> proxyInfo.tableEntryID)
         .sortBy(_._1) // we will perform a binary search on the ID at run-time
         .flatMap { case (proxyID, tableEntryID) =>
           List(
@@ -669,7 +669,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
 
   private def genVTableTypeFields(classInfo: ClassInfo)(
       implicit ctx: WasmContext): List[watpe.StructField] = {
-    val itableSlotFields = (0 until ctx.itablesLength).map { i =>
+    val itableSlotFields = (0 until ctx.preprocessInfo.itablesLength).map { i =>
       watpe.StructField(
         genFieldID.vtableStruct.itableSlot(i),
         OriginalName.NoOriginalName,
@@ -1250,7 +1250,7 @@ class ClassEmitter(coreSpec: CoreSpec) {
             js.Block(for (fieldDef <- clazz.fields if !fieldDef.flags.namespace.isStatic) yield {
               val nameRef = fieldDef match {
                 case FieldDef(_, name, _, _) =>
-                  js.VarRef(js.Ident(ctx.privateJSFields(name.name)))
+                  js.VarRef(js.Ident(ctx.preprocessInfo.privateJSFields(name.name)))
                 case JSFieldDef(_, nameTree, _) =>
                   helperBuilder.addInput(nameTree)
               }
@@ -1803,7 +1803,7 @@ object ClassEmitter {
   def genItableSlots(classInfoForResolving: WasmContext.ClassInfo,
       ancestors: List[ClassName])(
       implicit ctx: WasmContext): List[wa.Instr] = {
-    val itablesInit = Array.fill[List[wa.Instr]](ctx.itablesLength) {
+    val itablesInit = Array.fill[List[wa.Instr]](ctx.preprocessInfo.itablesLength) {
       List(wa.RefNull(watpe.HeapType.None))
     }
     val resolvedMethodInfos = classInfoForResolving.resolvedMethodInfos

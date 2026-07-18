@@ -60,45 +60,46 @@ final class Emitter(config: Emitter.Config) {
 
   val injectedIRFiles: Seq[IRFile] = PrivateLibHolder.files
 
-  def emit(moduleSet: ModuleSet, logger: Logger): Result = {
-    moduleSet.modules match {
-      case Nil =>
-        new Result(loaderContent, Map.empty)
-
-      case onlyModule :: Nil =>
-        val (wasmModule, jsFileContentInfo) = emitWasmModule(onlyModule, moduleSet.globalInfo)
-        val jsFileContent = buildJSFileContent(onlyModule, jsFileContentInfo)
-        new Result(loaderContent, Map(onlyModule.id -> new Result.Module(wasmModule, jsFileContent)))
-
-      case modules =>
-        throw new UnsupportedOperationException(
-            "The WebAssembly backend does not support multiple modules. Found: " +
-            modules.map(_.id.id).mkString(", "))
-    }
+  private def compareClasses(lhs: LinkedClass, rhs: LinkedClass) = {
+    val lhsAC = lhs.ancestors.size
+    val rhsAC = rhs.ancestors.size
+    if (lhsAC != rhsAC) lhsAC < rhsAC
+    else lhs.className.compareTo(rhs.className) < 0
   }
 
-  private def emitWasmModule(module: ModuleSet.Module,
-      globalInfo: LinkedGlobalInfo): (wamod.Module, JSFileContentInfo) = {
-    // Inject the derived linked classes
-    val allClasses =
-      DerivedClasses.deriveClasses(module.classDefs) ::: module.classDefs
+  def emit(moduleSet: ModuleSet, logger: Logger): Result = {
+    val classDefs = moduleSet.modules.flatMap(_.classDefs) ::: moduleSet.abstractClasses
 
-    /* Sort by ancestor count so that superclasses always appear before
-     * subclasses, then tie-break by name for stability.
-     */
-    val sortedClasses = allClasses.sortWith { (a, b) =>
-      val cmp = Integer.compare(a.ancestors.size, b.ancestors.size)
-      if (cmp != 0) cmp < 0
-      else a.className.compareTo(b.className) < 0
+    val derivedClasses = DerivedClasses.deriveClasses(classDefs)
+
+    val preprocessInfo = Preprocessor.preprocess(
+      coreSpec,
+      (derivedClasses ::: classDefs).sortWith(compareClasses),
+      moduleSet.modules.flatMap(_.topLevelExports),
+    )
+
+    val coreLib = new CoreWasmLib(coreSpec, moduleSet.globalInfo)
+
+    val moduleResults = moduleSet.modules.map { module =>
+      val (wasmModule, jsFileContentInfo) = emitWasmModule(module, coreLib, preprocessInfo, derivedClasses)
+      val jsFileContent = buildJSFileContent(module, jsFileContentInfo)
+      module.id -> new Result.Module(wasmModule, jsFileContent)
     }
+
+    new Result(loaderContent, moduleResults.toMap) // TODO: Check if we actually need a map here.
+  }
+
+  private def emitWasmModule(module: ModuleSet.Module, coreLib: CoreWasmLib,
+    preprocessInfo: Preprocessor.Info, derivedClasses: List[LinkedClass]): (wamod.Module, JSFileContentInfo) = {
 
     val topLevelExports = module.topLevelExports
     val moduleInitializers = module.initializers.toList
 
-    val coreLib = new CoreWasmLib(coreSpec, globalInfo)
+    implicit val ctx: WasmContext = new WasmContext(coreSpec, coreLib, preprocessInfo)
 
-    implicit val ctx: WasmContext =
-      Preprocessor.preprocess(coreSpec, coreLib, sortedClasses, topLevelExports)
+    // TODO: Derived classes.
+    // TODO: Do not emit core lib unless necessary.
+    val sortedClasses = (module.classDefs ::: derivedClasses).sortWith(compareClasses)
 
     coreLib.genPreClasses()
     sortedClasses.foreach(classEmitter.genClassDef(_))
@@ -367,7 +368,7 @@ final class Emitter(config: Emitter.Config) {
       FieldDef(flags, FieldIdent(fieldName), origName, _) <- ClassEmitter.scalaFieldsOf(clazz)
       if !flags.namespace.isStatic
     } yield {
-      val varName = ctx.privateJSFields(fieldName)
+      val varName = ctx.preprocessInfo.privateJSFields(fieldName)
 
       val origName1 = origName.orElse(fieldName)
       ctx.moduleBuilder.addImport(wamod.Import(
@@ -421,12 +422,25 @@ final class Emitter(config: Emitter.Config) {
 
     implicit val noPos = Position.NoPosition
 
-    // Sort for stability
-    val importedModules = module.externalDependencies.toList.sorted
+    val exportsExportName = js.ExportName("exports")
+
+    // Internal imports
+
+    val (internalImports, internalModules) = (for {
+      moduleID <- module.internalDependencies.toList.sortBy(_.id) // sort for stability
+    } yield {
+      val importIdent = js.Ident("internal" + JSNameGen.genModuleName(moduleID.id))
+      val moduleNameStr = js.StringLiteral(moduleID.id) // TODO: internal module pattern?
+      val esImport = js.Import((exportsExportName, importIdent) :: Nil, moduleNameStr)
+      val moduleEntry = (importIdent, js.VarRef(importIdent))
+      (esImport, moduleEntry)
+    }).unzip
 
     // External imports
 
-    val moduleImports = for (moduleName <- importedModules) yield {
+    val externalImports = for {
+      moduleName <- module.externalDependencies.toList.sorted // sort for stability
+    } yield {
       val importIdent = js.Ident("imported" + JSNameGen.genModuleName(moduleName))
       val moduleNameStr = js.StringLiteral(moduleName)
       js.ImportNamespace(importIdent, moduleNameStr)
@@ -512,17 +526,33 @@ final class Emitter(config: Emitter.Config) {
         privateJSFieldGettersDict,
         privateJSFieldSettersDict,
         customJSHelpersDict,
-        wtf16StringsDict
+        wtf16StringsDict,
+        js.ObjectConstr(internalModules),
       )
     )
 
+    val loadStats = {
+      if (module.public) {
+        js.Await(loadCall) :: Nil
+      } else {
+        // ESM export the WASM exports.
+        val exportsIdent = js.Ident("exports")
+        List(
+          js.Let(exportsIdent, mutable = false, rhs = Some {
+            js.DotSelect(js.Await(loadCall), exportsIdent)
+          }),
+          js.Export((exportsIdent, exportsExportName) :: Nil)
+        )
+      }
+    }
+
     val fullTree = (
-      moduleImports :::
+      internalImports :::
+      externalImports :::
         loaderImport ::
         privateJSFieldDecls :::
         exportDecls.flatten :::
-        js.Await(loadCall) ::
-        Nil
+        loadStats
     )
 
     val writer = new ByteArrayWriter
