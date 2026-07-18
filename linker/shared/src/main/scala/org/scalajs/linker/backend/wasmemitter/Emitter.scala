@@ -70,13 +70,7 @@ final class Emitter(config: Emitter.Config) {
   }
 
   def emit(moduleSet: ModuleSet, logger: Logger): Result = {
-    val classDefs = moduleSet.modules.flatMap(_.classDefs) ::: moduleSet.abstractClasses
-
-    val preprocessInfo = Preprocessor.preprocess(
-      coreSpec,
-      classDefs.sortWith(compareClasses),
-      moduleSet.modules.flatMap(_.topLevelExports),
-    )
+    val preprocessInfo = Preprocessor.preprocess(coreSpec, moduleSet)
 
     val coreLib = new CoreWasmLib(coreSpec, moduleSet.globalInfo)
 
@@ -85,7 +79,6 @@ final class Emitter(config: Emitter.Config) {
       val jsFileContent =
         if (coreSpec.moduleKind == ModuleKind.WasmModule) None
         else Some(buildJSFileContent(module, jsFileContentInfo))
-
       module.id -> new Result.Module(wasmModule, jsFileContent)
     }
 
@@ -98,16 +91,20 @@ final class Emitter(config: Emitter.Config) {
     val topLevelExports = module.topLevelExports
     val moduleInitializers = module.initializers.toList
 
-    implicit val ctx: WasmContext = new WasmContext(coreSpec, coreLib, preprocessInfo)
+    implicit val ctx: WasmContext = new WasmContext(module.id, coreSpec, coreLib, preprocessInfo)
 
-    // TODO: Do not emit core lib unless necessary.
     val sortedClasses = module.classDefs.sortWith(compareClasses)
 
-    coreLib.genPreClasses()
+    if (module.isRoot)
+      coreLib.genPreClasses()
+
     sortedClasses.foreach(classEmitter.genClassDef(_))
     topLevelExports.foreach(classEmitter.genTopLevelExport(_))
-    classEmitter.genArrayClasses()
-    coreLib.genPostClasses()
+
+    if (module.isRoot) {
+      classEmitter.genArrayClasses()
+      coreLib.genPostClasses()
+    }
 
     genStartFunction(sortedClasses, moduleInitializers, topLevelExports)
 
