@@ -1372,11 +1372,17 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
     val isAbstract = data.isAbstract
 
-    private[this] val _isAbstractReachable = new AtomicBoolean(false)
-    def isAbstractReachable: Boolean = _isAbstractReachable.get()
+    // Is this method a target of a static(ally) dispatched call.
+    private[this] val _isStaticallyReachable = new AtomicBoolean(false)
+    // Is this method a direct target of a dynamically dispatched call
+    // where this method's owner is the statically known receiver type.
+    private[this] val _isDispatchReachable = new AtomicBoolean(false)
+    // Is this method reachable through a dynamically dispatched call.
+    // If checkAbstractReachability is set to true, this is also set for abstract methods.
+    private[this] val _isDynamicallyReachable = new AtomicBoolean(false)
 
-    private[this] val _isReachable = new AtomicBoolean(false)
-    def isReachable: Boolean = _isReachable.get()
+    private[this] val _reachability = new AtomicInte_isDynamicallyReachable = new AtomicBoolean(false)
+    def reachability: Int = 0 // TODO: make bit map
 
     private[this] val _calledFrom = new GrowingList[From]
     def calledFrom: List[From] = _calledFrom.get()
