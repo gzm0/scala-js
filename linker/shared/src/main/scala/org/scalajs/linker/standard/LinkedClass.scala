@@ -60,6 +60,7 @@ final class LinkedClass(
     val hasRuntimeTypeInfo: Boolean,
     val fieldsRead: Set[FieldName],
     val staticFieldsRead: Set[FieldName],
+    val virtualMethods: List[MethodName],
 
     val staticDependencies: Set[ClassName],
     val externalDependencies: Set[String],

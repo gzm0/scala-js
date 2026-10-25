@@ -158,6 +158,13 @@ private[frontend] object BaseLinker {
       }
       .toList
 
+    val virtualMethods = classDef.methods.iterator
+      .filter(_.flags.namespace == MemberNamespace.Public)
+      .map(m => classInfo.methodInfos(m.flags.namespace)(m.methodName))
+      .filter(_.isAbstractReachable)
+      .map(_.methodName)
+      .toList
+
     val jsConstructor =
       if (classInfo.isAnySubclassInstantiated && !isWasmModule) classDef.jsConstructor
       else None
@@ -200,6 +207,7 @@ private[frontend] object BaseLinker {
         hasRuntimeTypeInfo = classInfo.isDataAccessed,
         fieldsRead = classInfo.fieldsRead.toSet,
         staticFieldsRead = classInfo.staticFieldsRead.toSet,
+        virtualMethods = virtualMethods,
         staticDependencies = classInfo.staticDependencies.toSet,
         externalDependencies = classInfo.externalDependencies.toSet,
         dynamicDependencies = classInfo.dynamicDependencies.toSet,

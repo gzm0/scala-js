@@ -18,7 +18,7 @@ import org.scalajs.ir.Names._
 import org.scalajs.ir.Trees._
 import org.scalajs.ir.Types._
 import org.scalajs.ir.WellKnownNames._
-import org.scalajs.ir.{ClassKind, Traversers}
+import org.scalajs.ir.ClassKind
 
 import org.scalajs.linker.interface.ModuleKind
 import org.scalajs.linker.standard.{CoreSpec, LinkedClass, LinkedTopLevelExport}
@@ -41,9 +41,6 @@ object Preprocessor {
 
     val specialInstanceTypes = computeSpecialInstanceTypes(classes)
 
-    val abstractMethodCalls =
-      AbstractMethodCallCollector.collectAbstractMethodCalls(classes, tles)
-
     val (itableBucketCount, itableBucketAssignments) =
       computeItableBuckets(classes)
 
@@ -56,7 +53,6 @@ object Preprocessor {
         clazz,
         staticFieldMirrors.getOrElse(clazz.className, Map.empty),
         specialInstanceTypes.getOrElse(clazz.className, 0),
-        abstractMethodCalls.getOrElse(clazz.className, Set.empty),
         itableBucketAssignments.getOrElse(clazz.className, -1),
         clazz.superClass.map(sup => classInfosBuilder(sup.name))
       )
@@ -145,7 +141,6 @@ object Preprocessor {
       clazz: LinkedClass,
       staticFieldMirrors: Map[FieldName, List[String]],
       specialInstanceTypes: Int,
-      methodsCalledDynamically0: Set[MethodName],
       itableIdx: Int,
       superClass: Option[ClassInfo]
   ): ClassInfo = {
@@ -227,10 +222,6 @@ object Preprocessor {
     }
 
     val tableEntries: List[MethodName] = {
-      val methodsCalledDynamically: List[MethodName] =
-        if (clazz.hasInstances) methodsCalledDynamically0.toList
-        else Nil
-
       kind match {
         case ClassKind.Class | ClassKind.ModuleClass | ClassKind.HijackedClass =>
           val superTableEntries = superClass.fold[List[MethodName]](Nil)(_.tableEntries)
@@ -239,14 +230,13 @@ object Preprocessor {
           /* When computing the table entries to add for this class, exclude
            * methods that are already in the super class' table entries.
            */
-          val newTableEntries = methodsCalledDynamically
+          val newTableEntries = clazz.virtualMethods
             .filter(!superTableEntrySet.contains(_))
-            .sorted // for stability
 
           superTableEntries ::: newTableEntries
 
         case ClassKind.Interface =>
-          methodsCalledDynamically.sorted // for stability
+          clazz.virtualMethods
 
         case _ =>
           Nil
@@ -286,74 +276,6 @@ object Preprocessor {
       tableEntries,
       itableIdx
     )
-  }
-
-  /** Collects virtual and interface method calls.
-   *
-   *  That information will be used to decide what entries are necessary in
-   *  vtables and itables.
-   *
-   *  TODO Arguably this is a job for the `Analyzer`.
-   */
-  private object AbstractMethodCallCollector {
-    def collectAbstractMethodCalls(classes: List[LinkedClass],
-        tles: List[LinkedTopLevelExport]): Map[ClassName, Set[MethodName]] = {
-
-      val collector = new AbstractMethodCallCollector
-      for (clazz <- classes)
-        collector.collectAbstractMethodCalls(clazz)
-      for (tle <- tles)
-        collector.collectAbstractMethodCalls(tle)
-      collector.result()
-    }
-  }
-
-  private class AbstractMethodCallCollector private () extends Traversers.Traverser {
-    private val builder = new mutable.AnyRefMap[ClassName, mutable.HashSet[MethodName]]
-
-    private def registerCall(className: ClassName, methodName: MethodName): Unit =
-      builder.getOrElseUpdate(className, new mutable.HashSet) += methodName
-
-    def collectAbstractMethodCalls(clazz: LinkedClass): Unit = {
-      for (method <- clazz.methods)
-        traverseMethodDef(method)
-      for (jsConstructor <- clazz.jsConstructorDef)
-        traverseJSConstructorDef(jsConstructor)
-      for (exported <- clazz.exportedMembers)
-        traverseJSMethodPropDef(exported)
-    }
-
-    def collectAbstractMethodCalls(tle: LinkedTopLevelExport): Unit = {
-      tle.tree match {
-        case TopLevelMethodExportDef(_, jsMethodDef) =>
-          traverseJSMethodPropDef(jsMethodDef)
-        case _ =>
-          ()
-      }
-    }
-
-    def result(): Map[ClassName, Set[MethodName]] =
-      builder.toMap.map(kv => kv._1 -> kv._2.toSet)
-
-    override def traverse(tree: Tree): Unit = {
-      super.traverse(tree)
-
-      tree match {
-        case Apply(flags, receiver, MethodIdent(methodName), _) if !methodName.isReflectiveProxy =>
-          receiver.tpe match {
-            case ClassType(className, _, false) =>
-              registerCall(className, methodName)
-            case AnyType =>
-              registerCall(ObjectClass, methodName)
-            case _ =>
-              // For all other cases, including arrays, we will always perform a static dispatch
-              ()
-          }
-
-        case _ =>
-          ()
-      }
-    }
   }
 
   /** Group interface types and types that implement any interfaces into buckets,

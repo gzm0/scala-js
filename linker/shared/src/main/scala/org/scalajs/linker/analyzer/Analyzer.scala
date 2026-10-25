@@ -115,7 +115,7 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
   import AnalyzerRun._
 
   private val allowAddingSyntheticMethods = initial
-  private val checkAbstractReachability = initial
+  private val checkAbstractReachability = true // TODO: disable for JS refinement stage?
 
   private val isNoModule = config.coreSpec.moduleKind == ModuleKind.NoModule
   private val isWasmModule = config.coreSpec.moduleKind == ModuleKind.WasmModule
@@ -1406,7 +1406,6 @@ private class AnalyzerRun(config: CommonPhaseConfig, initial: Boolean,
 
       _calledFrom ::= from
       if (!_isReachable.getAndSet(true)) {
-        _isAbstractReachable.set(true)
         doReach()
       }
     }

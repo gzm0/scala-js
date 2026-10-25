@@ -103,6 +103,7 @@ final class Desugarer(config: CommonPhaseConfig, checkIR: Boolean) {
         hasRuntimeTypeInfo,
         fieldsRead,
         staticFieldsRead,
+        virtualMethods,
         staticDependencies,
         externalDependencies,
         dynamicDependencies,
