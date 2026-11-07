@@ -28,11 +28,20 @@ import SpecialNames._
 object VarGen {
 
   object genGlobalID {
-    final case class forModuleInstance(className: ClassName) extends GlobalID
-    final case class forModuleInitFlag(className: ClassName) extends GlobalID
-    final case class forJSClassValue(className: ClassName) extends GlobalID
+    sealed abstract class Untracked {
+      private[genGlobalID] def className: ClassName
+    }
 
-    final case class forVTable(typeRef: NonArrayTypeRef) extends GlobalID
+    final case class forModuleInstance(className: ClassName) extends Untracked
+    final case class forModuleInitFlag(className: ClassName) extends Untracked
+    final case class forJSClassValue(className: ClassName) extends Untracked
+
+    final case class forVTable(typeRef: NonArrayTypeRef) extends Untracked {
+      private[genGlobalID] final def className: ClassName = typeRef match {
+        case ClassRef(className) => className
+        case _: PrimRef          => ObjectClass
+      }
+    }
 
     object forVTable {
       def apply(className: ClassName): forVTable =
@@ -48,23 +57,36 @@ object VarGen {
      *  are dynamically created by the `specificArrayTypeData` helper and
      *  stored in their component type data's `arrayOf` field.
      */
-    final case class forArrayVTable(baseTypeRef: NonArrayTypeRef) extends GlobalID
+    final case class forArrayVTable(baseTypeRef: NonArrayTypeRef) extends Untracked {
+      private[genGlobalID] final def className: ClassName = ObjectClass
+    }
 
-    final case class forJSPrototype(className: ClassName) extends GlobalID
+    final case class forJSPrototype(className: ClassName) extends Untracked
 
-    final case class forStaticField(fieldName: FieldName) extends GlobalID
+    final case class forStaticField(fieldName: FieldName) extends Untracked {
+      private[genGlobalID] final def className: ClassName = fieldName.className
+    }
 
-    case object lastIDHashCode extends GlobalID
+    case object lastIDHashCode extends Untracked {
+      private[genGlobalID] final def className: ClassName = ObjectClass
+    }
 
     // No-JS Wasm only
-    case object stringLiteralCache extends GlobalID
-    case object emptyString extends GlobalID
+    case object stringLiteralCache extends Untracked {
+      private[genGlobalID] final def className: ClassName = ObjectClass
+    }
+
+    case object emptyString extends Untracked {
+      private[genGlobalID] final def className: ClassName = ObjectClass
+    }
 
     /** A `GlobalID` for a JS helper global.
      *
      *  Its `toString()` is guaranteed to correspond to the import name of the helper.
      */
-    sealed abstract class JSHelperGlobalID extends GlobalID
+    sealed abstract class JSHelperGlobalID extends Untracked {
+      private[genGlobalID] final def className: ClassName = ObjectClass
+    }
 
     case object undef extends JSHelperGlobalID
     case object bFalse extends JSHelperGlobalID
