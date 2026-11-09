@@ -12,6 +12,8 @@
 
 package org.scalajs.linker.backend.wasmemitter
 
+import scala.language.implicitConversions
+
 import org.scalajs.ir.Names._
 import org.scalajs.ir.Trees.{JSUnaryOp, JSBinaryOp, MemberNamespace}
 import org.scalajs.ir.Types._
@@ -30,6 +32,22 @@ object VarGen {
   object genGlobalID {
     sealed abstract class Untracked {
       private[genGlobalID] def className: ClassName
+    }
+
+    private final case class Tracked(ut: Untracked) extends GlobalID
+
+    object Untracked {
+      implicit def track(ut: Untracked)(implicit ctx: WasmContext): GlobalID = {
+        val targetModule = ctx.getClassInfo(ut.className).module.getOrElse {
+          throw new AssertionError("TODO")
+        }
+
+        if (targetModule != ctx.currentModule) {
+          // TODO: Import
+        }
+
+        Tracked(ut)
+      }
     }
 
     final case class forModuleInstance(className: ClassName) extends Untracked
@@ -72,13 +90,8 @@ object VarGen {
     }
 
     // No-JS Wasm only
-    case object stringLiteralCache extends Untracked {
-      private[genGlobalID] final def className: ClassName = ObjectClass
-    }
-
-    case object emptyString extends Untracked {
-      private[genGlobalID] final def className: ClassName = ObjectClass
-    }
+    case object stringLiteralCache extends GlobalID
+    case object emptyString extends GlobalID
 
     /** A `GlobalID` for a JS helper global.
      *

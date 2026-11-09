@@ -53,16 +53,16 @@ object SWasmGen {
     }
   }
 
-  def genLoadTypeData(fb: FunctionBuilder, typeRef: TypeRef): Unit = typeRef match {
+  def genLoadTypeData(fb: FunctionBuilder, typeRef: TypeRef)(implicit ctx: WasmContext): Unit = typeRef match {
     case typeRef: NonArrayTypeRef  => genLoadNonArrayTypeData(fb, typeRef)
     case typeRef: ArrayTypeRef     => genLoadArrayTypeData(fb, typeRef)
     case typeRef: TransientTypeRef => throw new IllegalArgumentException(typeRef.toString())
   }
 
-  def genLoadNonArrayTypeData(fb: FunctionBuilder, typeRef: NonArrayTypeRef): Unit =
+  def genLoadNonArrayTypeData(fb: FunctionBuilder, typeRef: NonArrayTypeRef)(implicit ctx: WasmContext): Unit =
     fb += GlobalGet(genGlobalID.forVTable(typeRef))
 
-  def genLoadArrayTypeData(fb: FunctionBuilder, arrayTypeRef: ArrayTypeRef): Unit = {
+  def genLoadArrayTypeData(fb: FunctionBuilder, arrayTypeRef: ArrayTypeRef)(implicit ctx: WasmContext): Unit = {
     val ArrayTypeRef(base, dimensions) = arrayTypeRef
 
     base match {
