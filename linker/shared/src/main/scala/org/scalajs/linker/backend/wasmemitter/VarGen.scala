@@ -28,34 +28,41 @@ import SpecialNames._
  *  `LocalID`s and `LabelID`s are directly managed by `FunctionBuilder` instead.
  */
 object VarGen {
+  /** Abstract representation of a modularized ID */
+  sealed abstract class Modularized[ID] {
+    private[VarGen] def className: ClassName
+  }
+
+  private def ensureImported(id: Modularized[_])(implicit ctx: WasmContext) = {
+    val targetModule = ctx.getClassInfo(id.className).module.getOrElse {
+      throw new AssertionError("TODO")
+    }
+
+    if (targetModule != ctx.currentModule) {
+      // TODO: Add import to ctx.
+    }
+  }
+
+  private final case class ImportedGlobalID(id: Modularized[GlobalID]) extends GlobalID
+  private final case class ImportedFunctionID(id: Modularized[FunctionID]) extends FunctionID
+
+  implicit def trackGlobalID(id: Modularized[GlobalID])(implicit ctx: WasmContext): GlobalID = {
+    ensureImported(id)
+    ImportedGlobalID(id)
+  }
+
+  implicit def trackFunctionID(id: Modularized[FunctionID])(implicit ctx: WasmContext): FunctionID = {
+    ensureImported(id)
+    ImportedFunctionID(id)
+  }
 
   object genGlobalID {
-    sealed abstract class Untracked {
-      private[genGlobalID] def className: ClassName
-    }
+    final case class forModuleInstance(className: ClassName) extends Modularized[GlobalID]
+    final case class forModuleInitFlag(className: ClassName) extends Modularized[GlobalID]
+    final case class forJSClassValue(className: ClassName) extends Modularized[GlobalID]
 
-    private final case class Tracked(ut: Untracked) extends GlobalID
-
-    object Untracked {
-      implicit def track(ut: Untracked)(implicit ctx: WasmContext): GlobalID = {
-        val targetModule = ctx.getClassInfo(ut.className).module.getOrElse {
-          throw new AssertionError("TODO")
-        }
-
-        if (targetModule != ctx.currentModule) {
-          // TODO: Import
-        }
-
-        Tracked(ut)
-      }
-    }
-
-    final case class forModuleInstance(className: ClassName) extends Untracked
-    final case class forModuleInitFlag(className: ClassName) extends Untracked
-    final case class forJSClassValue(className: ClassName) extends Untracked
-
-    final case class forVTable(typeRef: NonArrayTypeRef) extends Untracked {
-      private[genGlobalID] final def className: ClassName = typeRef match {
+    final case class forVTable(typeRef: NonArrayTypeRef) extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = typeRef match {
         case ClassRef(className) => className
         case _: PrimRef          => ObjectClass
       }
@@ -75,18 +82,18 @@ object VarGen {
      *  are dynamically created by the `specificArrayTypeData` helper and
      *  stored in their component type data's `arrayOf` field.
      */
-    final case class forArrayVTable(baseTypeRef: NonArrayTypeRef) extends Untracked {
-      private[genGlobalID] final def className: ClassName = ObjectClass
+    final case class forArrayVTable(baseTypeRef: NonArrayTypeRef) extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = ObjectClass
     }
 
-    final case class forJSPrototype(className: ClassName) extends Untracked
+    final case class forJSPrototype(className: ClassName) extends Modularized[GlobalID]
 
-    final case class forStaticField(fieldName: FieldName) extends Untracked {
-      private[genGlobalID] final def className: ClassName = fieldName.className
+    final case class forStaticField(fieldName: FieldName) extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = fieldName.className
     }
 
-    case object lastIDHashCode extends Untracked {
-      private[genGlobalID] final def className: ClassName = ObjectClass
+    case object lastIDHashCode extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = ObjectClass
     }
 
     // No-JS Wasm only
@@ -97,8 +104,8 @@ object VarGen {
      *
      *  Its `toString()` is guaranteed to correspond to the import name of the helper.
      */
-    sealed abstract class JSHelperGlobalID extends Untracked {
-      private[genGlobalID] final def className: ClassName = ObjectClass
+    sealed abstract class JSHelperGlobalID extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = ObjectClass
     }
 
     case object undef extends JSHelperGlobalID
@@ -110,14 +117,17 @@ object VarGen {
   object genFunctionID {
     final case class forMethod(namespace: MemberNamespace,
         className: ClassName, methodName: MethodName)
-        extends FunctionID
+        extends Modularized[FunctionID]
 
-    final case class forTableEntry(className: ClassName, methodName: MethodName) extends FunctionID
+    final case class forTableEntry(className: ClassName, methodName: MethodName)
+        extends Modularized[FunctionID]
 
     final case class forExport(exportedName: String) extends FunctionID
     final case class forTopLevelExportSetter(exportedName: String) extends FunctionID
-    final case class forPrivateJSFieldGetter(fieldName: FieldName) extends FunctionID
-    final case class forPrivateJSFieldSetter(fieldName: FieldName) extends FunctionID
+    final case class forPrivateJSFieldGetter(fieldName: FieldName)
+        extends Modularized[FunctionID]
+    final case class forPrivateJSFieldSetter(fieldName: FieldName)
+        extends Modularized[FunctionID]
 
     final case class forExportedMethod(className: ClassName, exportedName: String)
         extends FunctionID
@@ -128,28 +138,29 @@ object VarGen {
     final case class forExportedPropSetter(className: ClassName, exportedName: String)
         extends FunctionID
 
-    final case class loadModule(className: ClassName) extends FunctionID
-    final case class newDefault(className: ClassName) extends FunctionID
-    final case class instanceTest(className: ClassName) extends FunctionID
-    final case class clone(className: ClassName) extends FunctionID
-    final case class cloneArray(arrayBaseRef: NonArrayTypeRef) extends FunctionID
+    final case class loadModule(className: ClassName) extends Modularized[FunctionID]
+    final case class newDefault(className: ClassName) extends Modularized[FunctionID]
+    final case class instanceTest(className: ClassName) extends Modularized[FunctionID]
+    final case class clone(className: ClassName) extends Modularized[FunctionID]
+    final case class cloneArray(arrayBaseRef: NonArrayTypeRef) extends Modularized[FunctionID]
 
-    final case class asInstance(targetTpe: Type) extends FunctionID
+    final case class asInstance(targetTpe: Type) extends Modularized[FunctionID]
 
-    final case class arrayGet(baseRef: NonArrayTypeRef) extends FunctionID
+    final case class arrayGet(baseRef: NonArrayTypeRef) extends Modularized[FunctionID]
 
     def arrayGetFor(arrayTypeRef: ArrayTypeRef): arrayGet = arrayTypeRef match {
       case ArrayTypeRef(base: PrimRef, 1) => arrayGet(base)
       case _                              => arrayGet(ClassRef(ObjectClass))
     }
 
-    final case class arraySet(baseRef: NonArrayTypeRef) extends FunctionID
+    final case class arraySet(baseRef: NonArrayTypeRef) extends Modularized[FunctionID]
 
     def arraySetFor(arrayTypeRef: ArrayTypeRef): arraySet = arrayTypeRef match {
       case ArrayTypeRef(base: PrimRef, 1) => arraySet(base)
       case _                              => arraySet(ClassRef(ObjectClass))
     }
 
+    // TODO: Continue here.
     final case class isJSClassInstance(className: ClassName) extends FunctionID
     final case class loadJSClass(className: ClassName) extends FunctionID
     final case class createJSClassOf(className: ClassName) extends FunctionID
