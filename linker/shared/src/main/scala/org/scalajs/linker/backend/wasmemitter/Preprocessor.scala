@@ -21,8 +21,9 @@ import org.scalajs.ir.WellKnownNames._
 import org.scalajs.ir.{ClassKind, Traversers}
 
 import org.scalajs.linker.interface.ModuleKind
-import org.scalajs.linker.standard.{CoreSpec, LinkedClass, LinkedTopLevelExport}
+import org.scalajs.linker.standard.{CoreSpec, LinkedClass, LinkedTopLevelExport, ModuleSet}
 
+import ModuleSet.ModuleID
 import EmbeddedConstants._
 import WasmContext._
 import ClassInfo.ConcreteMethodInfo
@@ -35,25 +36,49 @@ object Preprocessor {
       val itablesLength: Int
   )
 
-  def preprocess(coreSpec: CoreSpec, classes: List[LinkedClass],
-      tles: List[LinkedTopLevelExport]): Result = {
-    val staticFieldMirrors = computeStaticFieldMirrors(tles)
-    val privateJSFields = computePrivateJSFields(classes)
+  private def compareClasses(lhs: (Any, LinkedClass), rhs: (Any, LinkedClass)) = {
+    val lhsAC = lhs._2.ancestors.size
+    val rhsAC = rhs._2.ancestors.size
+    if (lhsAC != rhsAC) lhsAC < rhsAC
+    else lhs._2.className.compareTo(rhs._2.className) < 0
+  }
 
-    val specialInstanceTypes = computeSpecialInstanceTypes(classes)
+  def preprocess(coreSpec: CoreSpec, moduleSet: ModuleSet): Result = {
+    val concreteClassesWithModule = for {
+      module <- moduleSet.modules
+      clazz <- module.classDefs
+    } yield {
+      (Some(module.id), clazz)
+    }
+
+    val abstractClassesWithModule = moduleSet.abstractClasses.map((None, _))
+
+    val allClassesWithModule =
+      (concreteClassesWithModule ::: abstractClassesWithModule).sortWith(compareClasses)
+    val allClasses = allClassesWithModule.unzip._2
+
+    val tles = moduleSet.modules.flatMap(_.topLevelExports)
+
+    val staticFieldMirrors = computeStaticFieldMirrors(tles)
+    val privateJSFields = computePrivateJSFields(allClasses)
+
+    val specialInstanceTypes = computeSpecialInstanceTypes(allClasses)
 
     val abstractMethodCalls =
-      AbstractMethodCallCollector.collectAbstractMethodCalls(classes, tles)
+      AbstractMethodCallCollector.collectAbstractMethodCalls(allClasses, tles)
 
     val (itableBucketCount, itableBucketAssignments) =
-      computeItableBuckets(classes)
+      computeItableBuckets(allClasses)
 
     val classInfosBuilder = mutable.HashMap.empty[ClassName, ClassInfo]
     val definedReflectiveProxyNames = mutable.HashSet.empty[MethodName]
 
-    for (clazz <- classes) {
+    for {
+      (module, clazz) <- allClassesWithModule
+    } {
       val classInfo = preprocess(
         coreSpec,
+        module,
         clazz,
         staticFieldMirrors.getOrElse(clazz.className, Map.empty),
         specialInstanceTypes.getOrElse(clazz.className, 0),
@@ -143,6 +168,7 @@ object Preprocessor {
 
   private def preprocess(
       coreSpec: CoreSpec,
+      module: Option[ModuleID],
       clazz: LinkedClass,
       staticFieldMirrors: Map[FieldName, List[String]],
       specialInstanceTypes: Int,
@@ -271,6 +297,7 @@ object Preprocessor {
 
     new ClassInfo(
       className,
+      module,
       kind,
       clazz.jsClassCaptures,
       allFieldDefs,

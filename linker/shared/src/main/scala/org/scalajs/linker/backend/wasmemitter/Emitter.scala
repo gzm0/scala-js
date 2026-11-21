@@ -62,54 +62,52 @@ final class Emitter(config: Emitter.Config) {
 
   val injectedIRFiles: Seq[IRFile] = PrivateLibHolder.files
 
-  def emit(moduleSet: ModuleSet, logger: Logger): Result = {
-    moduleSet.modules match {
-      case Nil =>
-        new Result(None, Map.empty)
-
-      case onlyModule :: Nil =>
-        val (wasmModule, jsFileContentInfo) = emitWasmModule(onlyModule, moduleSet.globalInfo)
-        val jsFileContent =
-          if (coreSpec.moduleKind == ModuleKind.WasmModule) None
-          else Some(buildJSFileContent(onlyModule, jsFileContentInfo))
-
-        new Result(loaderContent, Map(onlyModule.id -> new Result.Module(wasmModule, jsFileContent)))
-
-      case modules =>
-        throw new UnsupportedOperationException(
-            "The WebAssembly backend does not support multiple modules. Found: " +
-            modules.map(_.id.id).mkString(", "))
-    }
+  private def compareClasses(lhs: LinkedClass, rhs: LinkedClass) = {
+    val lhsAC = lhs.ancestors.size
+    val rhsAC = rhs.ancestors.size
+    if (lhsAC != rhsAC) lhsAC < rhsAC
+    else lhs.className.compareTo(rhs.className) < 0
   }
 
-  private def emitWasmModule(module: ModuleSet.Module,
-      globalInfo: LinkedGlobalInfo): (wamod.Module, JSFileContentInfo) = {
+  def emit(moduleSet: ModuleSet, logger: Logger): Result = {
+    val preprocessResult = Preprocessor.preprocess(coreSpec, moduleSet)
 
-    /* Sort by ancestor count so that superclasses always appear before
-     * subclasses, then tie-break by name for stability.
-     */
-    val sortedClasses = module.classDefs.sortWith { (a, b) =>
-      val cmp = Integer.compare(a.ancestors.size, b.ancestors.size)
-      if (cmp != 0) cmp < 0
-      else a.className.compareTo(b.className) < 0
+    val coreLib = new CoreWasmLib(coreSpec, moduleSet.globalInfo)
+
+    val mainRecTypeCtx = emitMainRecType(coreLib, moduleSet, preprocessResult)
+
+    val moduleResults = moduleSet.modules.map { module =>
+      val (wasmModule, jsFileContentInfo) = emitWasmModule(module, coreLib, mainRecTypeCtx, preprocessResult)
+      val jsFileContent =
+        if (coreSpec.moduleKind == ModuleKind.WasmModule) None
+        else Some(buildJSFileContent(module, jsFileContentInfo))
+      module.id -> new Result.Module(wasmModule, jsFileContent)
     }
 
-    val topLevelExports = module.topLevelExports
-    val moduleInitializers = module.initializers.toList
+    new Result(loaderContent, moduleResults.toMap) // TODO: Check if we actually need a map here.
+  }
 
-    val preprocessResult = Preprocessor.preprocess(coreSpec, sortedClasses, topLevelExports)
-
-    val coreLib = new CoreWasmLib(coreSpec, globalInfo)
-
-    // Build the main rec type.
+  private def emitMainRecType(coreLib: CoreWasmLib, moduleSet: ModuleSet, preprocessResult: Preprocessor.Result): WasmMainRecTypeContext = {
     val mainRecTypeContext = new WasmMainRecTypeContext(coreSpec, coreLib, preprocessResult)
+
+    val classDefs = (moduleSet.modules.flatMap(_.classDefs) ::: moduleSet.abstractClasses)
+    val sortedClasses = classDefs.sortWith(compareClasses) // TODO: same sorting than in preprocessor, dedupe?
 
     coreLib.genCoreTypesInRecType(mainRecTypeContext.mainRecType)
     sortedClasses.foreach(classEmitter.genClassType(_)(mainRecTypeContext))
     classEmitter.genArrayClassTypes()(mainRecTypeContext)
 
-    // Build everything else.
+    mainRecTypeContext
+  }
+
+  private def emitWasmModule(module: ModuleSet.Module, coreLib: CoreWasmLib, mainRecTypeContext: WasmMainRecTypeContext, // TODO: only take result
+    preprocessResult: Preprocessor.Result): (wamod.Module, JSFileContentInfo) = {
+
+    val topLevelExports = module.topLevelExports
+    val moduleInitializers = module.initializers.toList
+
     implicit val ctx: WasmContext = new WasmContext(
+      module.id,
       coreSpec,
       coreLib,
       preprocessResult,
@@ -117,15 +115,21 @@ final class Emitter(config: Emitter.Config) {
       mainRecTypeContext.generatedTypedClosureTypes
     )
 
-    coreLib.genPreMainRecTypeDefinitions()
+    if (module.isRoot)
+      coreLib.genPreMainRecTypeDefinitions()
 
     ctx.moduleBuilder.addRecTypeBuilder(mainRecTypeContext.mainRecType)
 
-    coreLib.genPreClasses()
+    val sortedClasses = module.classDefs.sortWith(compareClasses)
+
+
     sortedClasses.foreach(classEmitter.genClassDef(_))
     topLevelExports.foreach(classEmitter.genTopLevelExport(_))
-    classEmitter.genArrayClassDefs()
-    coreLib.genPostClasses()
+
+    if (module.isRoot) {
+      classEmitter.genArrayClassDefs()
+      coreLib.genPostClasses()
+    }
 
     genStartFunction(sortedClasses, moduleInitializers, topLevelExports)
 
@@ -446,12 +450,25 @@ final class Emitter(config: Emitter.Config) {
 
     implicit val noPos = Position.NoPosition
 
-    // Sort for stability
-    val importedModules = module.externalDependencies.toList.sorted
+    val exportsExportName = js.ExportName("exports")
+
+    // Internal imports
+
+    val (internalImports, internalModules) = (for {
+      moduleID <- module.internalDependencies.toList.sortBy(_.id) // sort for stability
+    } yield {
+      val importIdent = js.Ident("internal" + JSNameGen.genModuleName(moduleID.id))
+      val moduleNameStr = js.StringLiteral(moduleID.id) // TODO: internal module pattern?
+      val esImport = js.Import((exportsExportName, importIdent) :: Nil, moduleNameStr)
+      val moduleEntry = (importIdent, js.VarRef(importIdent))
+      (esImport, moduleEntry)
+    }).unzip
 
     // External imports
 
-    val moduleImports = for (moduleName <- importedModules) yield {
+    val externalImports = for {
+      moduleName <- module.externalDependencies.toList.sorted // sort for stability
+    } yield {
       val importIdent = js.Ident("imported" + JSNameGen.genModuleName(moduleName))
       val moduleNameStr = js.StringLiteral(moduleName)
       js.ImportNamespace(importIdent, moduleNameStr)
@@ -537,17 +554,33 @@ final class Emitter(config: Emitter.Config) {
         privateJSFieldGettersDict,
         privateJSFieldSettersDict,
         customJSHelpersDict,
-        wtf16StringsDict
+        wtf16StringsDict,
+        js.ObjectConstr(internalModules),
       )
     )
 
+    val loadStats = {
+      if (module.public) {
+        js.Await(loadCall) :: Nil
+      } else {
+        // ESM export the WASM exports.
+        val exportsIdent = js.Ident("exports")
+        List(
+          js.Let(exportsIdent, mutable = false, rhs = Some {
+            js.DotSelect(js.Await(loadCall), exportsIdent)
+          }),
+          js.Export((exportsIdent, exportsExportName) :: Nil)
+        )
+      }
+    }
+
     val fullTree = (
-      moduleImports :::
+      internalImports :::
+      externalImports :::
         loaderImport ::
         privateJSFieldDecls :::
         exportDecls.flatten :::
-        js.Await(loadCall) ::
-        Nil
+        loadStats
     )
 
     val writer = new ByteArrayWriter
