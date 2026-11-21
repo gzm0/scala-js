@@ -32,9 +32,9 @@ private[wasmemitter] final class JSStringPool extends StringPool {
   private var poolWasGenerated: Boolean = false
 
   def getConstantStringDataForTypeData(str: String): List[Instr] =
-    getConstantStringInstr(str)
+    List(getConstantStringSingleInstr(str))
 
-  def getConstantStringInstr(str: String): List[Instr] =
+  def getConstantStringInstr(str: String)(implicit ctx: WasmContext): List[Instr] =
     List(getConstantStringSingleInstr(str))
 
   private def getConstantStringSingleInstr(str: String): GlobalGet = {
@@ -45,7 +45,7 @@ private[wasmemitter] final class JSStringPool extends StringPool {
     GlobalGet(StringLiteralID(str))
   }
 
-  def getEmptyStringInstr(): GlobalGet =
+  def getEmptyStringInstr()(implicit ctx: WasmContext): GlobalGet =
     getConstantStringSingleInstr("")
 
   /** Generates the string pool, and returns the list of WTF-16 strings that

@@ -12,6 +12,8 @@
 
 package org.scalajs.linker.backend.wasmemitter
 
+import scala.language.implicitConversions
+
 import org.scalajs.ir.Names._
 import org.scalajs.ir.Trees.{JSUnaryOp, JSBinaryOp, MemberNamespace}
 import org.scalajs.ir.Types._
@@ -26,13 +28,51 @@ import SpecialNames._
  *  `LocalID`s and `LabelID`s are directly managed by `FunctionBuilder` instead.
  */
 object VarGen {
+  /** Abstract representation of a modularized ID */
+  sealed abstract class Modularized[ID] {
+    private[VarGen] def className: ClassName
+  }
+
+  /** Utility for CoreLib IDs (always in the core module). */
+  sealed abstract class CoreLib[ID] extends Modularized[ID] {
+    private[VarGen] final def className: ClassName = ObjectClass
+  }
+
+  private def ensureImported(id: Modularized[_])(implicit ctx: WasmContext) = {
+    val targetModule = ctx.getClassInfo(id.className).module.getOrElse {
+      throw new AssertionError("TODO")
+    }
+
+    if (targetModule != ctx.currentModule) {
+
+      // TODO: Add import to ctx.
+    }
+  }
+
+  private final case class ImportedGlobalID(id: Modularized[GlobalID]) extends GlobalID
+  private final case class ImportedFunctionID(id: Modularized[FunctionID]) extends FunctionID
+
+  implicit def trackGlobalID(id: Modularized[GlobalID])(implicit ctx: WasmContext): GlobalID = {
+    ensureImported(id)
+    ImportedGlobalID(id)
+  }
+
+  implicit def trackFunctionID(id: Modularized[FunctionID])(implicit ctx: WasmContext): FunctionID = {
+    ensureImported(id)
+    ImportedFunctionID(id)
+  }
 
   object genGlobalID {
-    final case class forModuleInstance(className: ClassName) extends GlobalID
-    final case class forModuleInitFlag(className: ClassName) extends GlobalID
-    final case class forJSClassValue(className: ClassName) extends GlobalID
+    final case class forModuleInstance(className: ClassName) extends Modularized[GlobalID]
+    final case class forModuleInitFlag(className: ClassName) extends Modularized[GlobalID]
+    final case class forJSClassValue(className: ClassName) extends Modularized[GlobalID]
 
-    final case class forVTable(typeRef: NonArrayTypeRef) extends GlobalID
+    final case class forVTable(typeRef: NonArrayTypeRef) extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = typeRef match {
+        case ClassRef(className) => className
+        case _: PrimRef          => ObjectClass
+      }
+    }
 
     object forVTable {
       def apply(className: ClassName): forVTable =
@@ -48,23 +88,25 @@ object VarGen {
      *  are dynamically created by the `specificArrayTypeData` helper and
      *  stored in their component type data's `arrayOf` field.
      */
-    final case class forArrayVTable(baseTypeRef: NonArrayTypeRef) extends GlobalID
+    final case class forArrayVTable(baseTypeRef: NonArrayTypeRef) extends CoreLib[GlobalID]
 
-    final case class forJSPrototype(className: ClassName) extends GlobalID
+    final case class forJSPrototype(className: ClassName) extends Modularized[GlobalID]
 
-    final case class forStaticField(fieldName: FieldName) extends GlobalID
+    final case class forStaticField(fieldName: FieldName) extends Modularized[GlobalID] {
+      private[VarGen] final def className: ClassName = fieldName.className
+    }
 
-    case object lastIDHashCode extends GlobalID
+    case object lastIDHashCode extends CoreLib[GlobalID]
 
     // No-JS Wasm only
-    case object stringLiteralCache extends GlobalID
-    case object emptyString extends GlobalID
+    case object stringLiteralCache extends CoreLib[GlobalID]
+    case object emptyString extends CoreLib[GlobalID]
 
     /** A `GlobalID` for a JS helper global.
      *
      *  Its `toString()` is guaranteed to correspond to the import name of the helper.
      */
-    sealed abstract class JSHelperGlobalID extends GlobalID
+    sealed abstract class JSHelperGlobalID extends CoreLib[GlobalID]
 
     case object undef extends JSHelperGlobalID
     case object bFalse extends JSHelperGlobalID
@@ -75,58 +117,71 @@ object VarGen {
   object genFunctionID {
     final case class forMethod(namespace: MemberNamespace,
         className: ClassName, methodName: MethodName)
-        extends FunctionID
+        extends Modularized[FunctionID]
 
-    final case class forTableEntry(className: ClassName, methodName: MethodName) extends FunctionID
+    final case class forTableEntry(className: ClassName, methodName: MethodName)
+        extends Modularized[FunctionID]
 
     final case class forExport(exportedName: String) extends FunctionID
     final case class forTopLevelExportSetter(exportedName: String) extends FunctionID
-    final case class forPrivateJSFieldGetter(fieldName: FieldName) extends FunctionID
-    final case class forPrivateJSFieldSetter(fieldName: FieldName) extends FunctionID
+    final case class forPrivateJSFieldGetter(fieldName: FieldName)
+        extends Modularized[FunctionID] {
+      private[VarGen] final def className: ClassName = fieldName.className
+    }
+
+    final case class forPrivateJSFieldSetter(fieldName: FieldName)
+        extends Modularized[FunctionID] {
+      private[VarGen] final def className: ClassName = fieldName.className
+    }
 
     final case class forExportedMethod(className: ClassName, exportedName: String)
-        extends FunctionID
+        extends FunctionID // TODO: modularized?
 
     final case class forExportedPropGetter(className: ClassName, exportedName: String)
-        extends FunctionID
+        extends FunctionID // TODO: modularized?
 
     final case class forExportedPropSetter(className: ClassName, exportedName: String)
-        extends FunctionID
+        extends FunctionID // TODO: modularized?
 
-    final case class loadModule(className: ClassName) extends FunctionID
-    final case class newDefault(className: ClassName) extends FunctionID
-    final case class instanceTest(className: ClassName) extends FunctionID
-    final case class clone(className: ClassName) extends FunctionID
-    final case class cloneArray(arrayBaseRef: NonArrayTypeRef) extends FunctionID
+    final case class loadModule(className: ClassName) extends Modularized[FunctionID]
+    final case class newDefault(className: ClassName) extends Modularized[FunctionID]
+    final case class instanceTest(className: ClassName) extends Modularized[FunctionID]
+    final case class clone(className: ClassName) extends Modularized[FunctionID]
+    final case class cloneArray(arrayBaseRef: NonArrayTypeRef) extends CoreLib[FunctionID]
 
-    final case class asInstance(targetTpe: Type) extends FunctionID
+    final case class asInstance(targetTpe: Type) extends Modularized[FunctionID] {
+      private[VarGen] def className: ClassName = targetTpe match {
+        case ClassType(className, _, _) => className
+        case _                          => ObjectClass
+      }
+    }
 
-    final case class arrayGet(baseRef: NonArrayTypeRef) extends FunctionID
+    final case class arrayGet(baseRef: NonArrayTypeRef) extends CoreLib[FunctionID]
 
     def arrayGetFor(arrayTypeRef: ArrayTypeRef): arrayGet = arrayTypeRef match {
       case ArrayTypeRef(base: PrimRef, 1) => arrayGet(base)
       case _                              => arrayGet(ClassRef(ObjectClass))
     }
 
-    final case class arraySet(baseRef: NonArrayTypeRef) extends FunctionID
+    final case class arraySet(baseRef: NonArrayTypeRef) extends CoreLib[FunctionID]
 
     def arraySetFor(arrayTypeRef: ArrayTypeRef): arraySet = arrayTypeRef match {
       case ArrayTypeRef(base: PrimRef, 1) => arraySet(base)
       case _                              => arraySet(ClassRef(ObjectClass))
     }
 
-    final case class isJSClassInstance(className: ClassName) extends FunctionID
-    final case class loadJSClass(className: ClassName) extends FunctionID
-    final case class createJSClassOf(className: ClassName) extends FunctionID
-    final case class preSuperStats(className: ClassName) extends FunctionID
-    final case class superArgs(className: ClassName) extends FunctionID
-    final case class postSuperStats(className: ClassName) extends FunctionID
+    final case class isJSClassInstance(className: ClassName) extends Modularized[FunctionID]
+    final case class loadJSClass(className: ClassName) extends Modularized[FunctionID]
+    final case class createJSClassOf(className: ClassName) extends Modularized[FunctionID]
+    final case class preSuperStats(className: ClassName) extends Modularized[FunctionID]
+    final case class superArgs(className: ClassName) extends Modularized[FunctionID]
+    final case class postSuperStats(className: ClassName) extends Modularized[FunctionID]
 
-    case object start extends FunctionID
+    case object start extends FunctionID // not modularized, per module
 
     // No-JS Wasm only
-    case object hijackedValueToString extends FunctionID
-    case object stringLiteral extends FunctionID
+    case object hijackedValueToString extends CoreLib[FunctionID]
+    case object stringLiteral extends CoreLib[FunctionID]
 
     // JS helpers
 
@@ -134,7 +189,7 @@ object VarGen {
      *
      *  Its `toString()` is guaranteed to correspond to the import name of the helper.
      */
-    sealed abstract class JSHelperFunctionID extends FunctionID
+    sealed abstract class JSHelperFunctionID extends CoreLib[FunctionID]
 
     case object is extends JSHelperFunctionID
 
@@ -186,41 +241,41 @@ object VarGen {
 
     // Wasm internal helpers
 
-    case object typeDataName extends FunctionID
-    case object createClassOf extends FunctionID
-    case object getClassOf extends FunctionID
-    case object specificArrayTypeData extends FunctionID
-    case object valueDescription extends FunctionID
-    case object classCastException extends FunctionID
-    case object asSpecificRefArray extends FunctionID
-    case object throwArrayStoreException extends FunctionID
-    case object throwArrayIndexOutOfBoundsException extends FunctionID
-    case object throwNegativeArraySizeException extends FunctionID
-    case object throwNullPointerException extends FunctionID
-    case object checkedStringCharAt extends FunctionID
-    case object checkedStringCodePointAt extends FunctionID
-    case object checkedSubstringStart extends FunctionID
-    case object checkedSubstringStartEnd extends FunctionID
-    case object throwModuleInitError extends FunctionID
-    case object isInstance extends FunctionID
-    case object isAssignableFrom extends FunctionID
-    case object cast extends FunctionID
-    case object getComponentType extends FunctionID
-    case object getSuperClass extends FunctionID
-    case object newArray extends FunctionID
-    case object doubleIsFloat extends FunctionID
-    case object anyGetClass extends FunctionID
-    case object anyGetClassName extends FunctionID
-    case object intGetTypeData extends FunctionID
-    case object doubleGetTypeData extends FunctionID
-    case object anyGetTypeData extends FunctionID
-    case object identityHashCode extends FunctionID
-    case object searchReflectiveProxy extends FunctionID
+    case object typeDataName extends CoreLib[FunctionID]
+    case object createClassOf extends CoreLib[FunctionID]
+    case object getClassOf extends CoreLib[FunctionID]
+    case object specificArrayTypeData extends CoreLib[FunctionID]
+    case object valueDescription extends CoreLib[FunctionID]
+    case object classCastException extends CoreLib[FunctionID]
+    case object asSpecificRefArray extends CoreLib[FunctionID]
+    case object throwArrayStoreException extends CoreLib[FunctionID]
+    case object throwArrayIndexOutOfBoundsException extends CoreLib[FunctionID]
+    case object throwNegativeArraySizeException extends CoreLib[FunctionID]
+    case object throwNullPointerException extends CoreLib[FunctionID]
+    case object checkedStringCharAt extends CoreLib[FunctionID]
+    case object checkedStringCodePointAt extends CoreLib[FunctionID]
+    case object checkedSubstringStart extends CoreLib[FunctionID]
+    case object checkedSubstringStartEnd extends CoreLib[FunctionID]
+    case object throwModuleInitError extends CoreLib[FunctionID]
+    case object isInstance extends CoreLib[FunctionID]
+    case object isAssignableFrom extends CoreLib[FunctionID]
+    case object cast extends CoreLib[FunctionID]
+    case object getComponentType extends CoreLib[FunctionID]
+    case object getSuperClass extends CoreLib[FunctionID]
+    case object newArray extends CoreLib[FunctionID]
+    case object doubleIsFloat extends CoreLib[FunctionID]
+    case object anyGetClass extends CoreLib[FunctionID]
+    case object anyGetClassName extends CoreLib[FunctionID]
+    case object intGetTypeData extends CoreLib[FunctionID]
+    case object doubleGetTypeData extends CoreLib[FunctionID]
+    case object anyGetTypeData extends CoreLib[FunctionID]
+    case object identityHashCode extends CoreLib[FunctionID]
+    case object searchReflectiveProxy extends CoreLib[FunctionID]
 
     private final case class SpecializedArrayCopyID(arrayBaseRef: NonArrayTypeRef)
-        extends FunctionID
+        extends CoreLib[FunctionID]
 
-    def specializedArrayCopy(arrayTypeRef: ArrayTypeRef): FunctionID = {
+    def specializedArrayCopy(arrayTypeRef: ArrayTypeRef): Modularized[FunctionID] = {
       val baseRef = arrayTypeRef match {
         case ArrayTypeRef(baseRef: PrimRef, 1) => baseRef
         case _                                 => ClassRef(ObjectClass)
@@ -228,9 +283,9 @@ object VarGen {
       SpecializedArrayCopyID(baseRef)
     }
 
-    case object arrayCopyCheckBounds extends FunctionID
-    case object slowRefArrayCopy extends FunctionID
-    case object genericArrayCopy extends FunctionID
+    case object arrayCopyCheckBounds extends CoreLib[FunctionID]
+    case object slowRefArrayCopy extends CoreLib[FunctionID]
+    case object genericArrayCopy extends CoreLib[FunctionID]
 
     // String builtins
 
@@ -248,22 +303,22 @@ object VarGen {
 
     // No-JS Wasm only
     object wasmString {
-      case object stringConcat extends FunctionID
-      case object stringEquals extends FunctionID
+      case object stringConcat extends CoreLib[FunctionID]
+      case object stringEquals extends CoreLib[FunctionID]
 
       /** Mutate the given `wasmString` ref to contain all concatenated characters. */
-      case object collapseString extends FunctionID
+      case object collapseString extends CoreLib[FunctionID]
 
       /** Returns a full character array of the concatenated strings. */
-      case object getWholeChars extends FunctionID
+      case object getWholeChars extends CoreLib[FunctionID]
 
       /** Returns a charCode at the given index. */
-      case object charCodeAt extends FunctionID
+      case object charCodeAt extends CoreLib[FunctionID]
     }
 
     // No-JS Wasm only
-    final case class arrayToWasmArray(baseRef: PrimRef) extends FunctionID
-    final case class wasmArrayToArray(baseRef: PrimRef) extends FunctionID
+    final case class arrayToWasmArray(baseRef: PrimRef) extends CoreLib[FunctionID]
+    final case class wasmArrayToArray(baseRef: PrimRef) extends CoreLib[FunctionID]
   }
 
   object genFieldID {

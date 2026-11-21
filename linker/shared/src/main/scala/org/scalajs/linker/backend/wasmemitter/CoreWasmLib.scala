@@ -884,7 +884,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
     fb.buildAndAddToModule()
   }
 
-  private def genStringConcat(fb: FunctionBuilder): Unit = {
+  private def genStringConcat(fb: FunctionBuilder)(implicit ctx: WasmContext): Unit = {
     if (hasJSInterop)
       fb += Call(genFunctionID.stringBuiltins.concat)
     else
@@ -4518,7 +4518,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
   // --- Utils ---
 
   private def maybeWrapInUBE(fb: FunctionBuilder, behavior: CheckedBehavior)(
-      genExceptionInstance: => Unit): Unit = {
+      genExceptionInstance: => Unit)(implicit ctx: WasmContext): Unit = {
     if (behavior == CheckedBehavior.Fatal) {
       genNewScalaClass(fb, UndefinedBehaviorErrorClass, ThrowableArgConsructorName) {
         genExceptionInstance
@@ -4529,7 +4529,7 @@ final class CoreWasmLib(coreSpec: CoreSpec, globalInfo: LinkedGlobalInfo) {
   }
 
   private def genNewScalaClass(fb: FunctionBuilder, cls: ClassName, ctor: MethodName)(
-      genCtorArgs: => Unit): Unit = {
+      genCtorArgs: => Unit)(implicit ctx: WasmContext): Unit = {
     val instanceLocal = fb.addLocal(NoOriginalName, RefType(genTypeID.forClass(cls)))
 
     fb += Call(genFunctionID.newDefault(cls))

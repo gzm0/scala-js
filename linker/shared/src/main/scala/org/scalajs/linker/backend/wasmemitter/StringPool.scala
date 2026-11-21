@@ -24,10 +24,10 @@ private[wasmemitter] trait StringPool {
   def getConstantStringDataForTypeData(str: String): List[Instr]
 
   /** Returns instructions that load the given constant string. */
-  def getConstantStringInstr(str: String): List[Instr]
+  def getConstantStringInstr(str: String)(implicit ctx: WasmContext): List[Instr]
 
   /** Returns an instruction that loads the empty string. */
-  def getEmptyStringInstr(): Instr
+  def getEmptyStringInstr()(implicit ctx: WasmContext): Instr
 
   /** Generates the string pool. */
   def genPool()(implicit ctx: WasmContext): List[(String, String)]

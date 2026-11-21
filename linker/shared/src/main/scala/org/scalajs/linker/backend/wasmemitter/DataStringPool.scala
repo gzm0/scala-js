@@ -59,10 +59,10 @@ private[wasmemitter] final class DataStringPool extends StringPool {
    *  The resulting list is *not* a Wasm constant expression, since it includes
    *  a `call` to the helper function `stringLiteral`.
    */
-  def getConstantStringInstr(str: String): List[Instr] =
+  def getConstantStringInstr(str: String)(implicit ctx: WasmContext): List[Instr] =
     getConstantStringDataInstr(str) :+ Call(genFunctionID.stringLiteral)
 
-  def getEmptyStringInstr(): Instr =
+  def getEmptyStringInstr()(implicit ctx: WasmContext): Instr =
     GlobalGet(genGlobalID.emptyString)
 
   /** Returns the list of 3 constant integers that must be passed to `stringLiteral`.
